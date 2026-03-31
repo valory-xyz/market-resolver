@@ -7,7 +7,7 @@ license: Apache-2.0
 fingerprint:
   README.md: bafybeie6lb2mlmzmkycbcfma4onidhegfu4ipgpybg2av5mhfs5zx42b2m
 fingerprint_ignore_patterns: []
-agent: valory/market_resolver:0.1.0:bafybeibnwklz3h5ag3dzqqgiyjuy2rosc5vmw7373u2onnbqb5ic4gkyim
+agent: valory/market_resolver:0.1.0:bafybeiciawkns2wv5gcrzfjrts5kffkmoplf66zfwy34rjgwefcvjgvybq
 number_of_agents: 1
 deployment:
   agent:
@@ -115,7 +115,7 @@ models:
       response_key: ${CT_SUBGRAPH_RESPONSE_KEY:str:data}
       response_type: ${CT_SUBGRAPH_RESPONSE_TYPE:str:list}
       retries: ${CT_SUBGRAPH_RETRIES:int:5}
-      url: ${CT_SUBGRAPH_URL:str:https://conditional-tokens.subgraph.autonolas.tech}
+      url: ${CT_SUBGRAPH_URL:str:https://gateway.thegraph.com/api/api-key/subgraphs/id/7s9rGBffUTL8kDZuxvvpuc46v44iuDarbrADBFw5uVp2}
   omen_subgraph:
     args:
       headers:
@@ -124,7 +124,7 @@ models:
       response_key: ${OMEN_SUBGRAPH_RESPONSE_KEY:str:data}
       response_type: ${OMEN_SUBGRAPH_RESPONSE_TYPE:str:list}
       retries: ${OMEN_SUBGRAPH_RETRIES:int:5}
-      url: ${OMEN_SUBGRAPH_URL:str:https://gateway.thegraph.com/api/[api-key]/subgraphs/id/9fUVQpFwzpdWS9bq5WkAnmKbNNcoBwatMR4yZq81pbbz}
+      url: ${OMEN_SUBGRAPH_URL:str:https://gateway.thegraph.com/api/api-key/subgraphs/id/9fUVQpFwzpdWS9bq5WkAnmKbNNcoBwatMR4yZq81pbbz}
   realitio_subgraph:
     args:
       headers:
@@ -133,17 +133,17 @@ models:
       response_key: ${REALITIO_SUBGRAPH_RESPONSE_KEY:str:data}
       response_type: ${REALITIO_SUBGRAPH_RESPONSE_TYPE:str:list}
       retries: ${REALITIO_SUBGRAPH_RETRIES:int:5}
-      url: ${REALITIO_SUBGRAPH_URL:str:https://realitio.subgraph.autonolas.tech}
+      url: ${REALITIO_SUBGRAPH_URL:str:https://gateway.thegraph.com/api/api-key/subgraphs/id/E7ymrCnNcQdAAgLbdFWzGE5mvr5Mb5T9VfT43FqA7bNh}
 ---
 public_id: valory/ledger:0.19.0
 type: connection
 config:
   ledger_apis:
-    ethereum:
-      address: ${ETHEREUM_LEDGER_RPC:str:https://rpc.gnosischain.com}
-      chain_id: ${ETHEREUM_LEDGER_CHAIN_ID:int:100}
-      poa_chain: ${ETHEREUM_LEDGER_IS_POA_CHAIN:bool:false}
-      default_gas_price_strategy: ${ETHEREUM_LEDGER_PRICING:str:eip1559}
+    gnosis:
+      address: ${GNOSIS_LEDGER_RPC:str:https://rpc.gnosischain.com}
+      chain_id: ${GNOSIS_LEDGER_CHAIN_ID:int:100}
+      poa_chain: ${GNOSIS_LEDGER_IS_POA_CHAIN:bool:false}
+      default_gas_price_strategy: ${GNOSIS_LEDGER_PRICING:str:eip1559}
 ---
 public_id: valory/p2p_libp2p_client:0.1.0
 type: connection

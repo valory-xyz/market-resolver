@@ -166,7 +166,7 @@ models:
       response_key: data
       response_type: list
       retries: 5
-      url: https://conditional-tokens.subgraph.autonolas.tech
+      url: https://gateway.thegraph.com/api/api-key/subgraphs/id/7s9rGBffUTL8kDZuxvvpuc46v44iuDarbrADBFw5uVp2
     class_name: ConditionalTokensSubgraph
   omen_subgraph:
     args:
@@ -178,7 +178,7 @@ models:
       response_key: data
       response_type: list
       retries: 5
-      url: https://api.thegraph.com/subgraphs/name/protofire/omen-xdai
+      url: https://gateway.thegraph.com/api/api-key/subgraphs/id/9fUVQpFwzpdWS9bq5WkAnmKbNNcoBwatMR4yZq81pbbz
     class_name: OmenSubgraph
   realitio_subgraph:
     args:
@@ -190,7 +190,7 @@ models:
       response_key: data
       response_type: list
       retries: 5
-      url: https://realitio.subgraph.autonolas.tech
+      url: https://gateway.thegraph.com/api/api-key/subgraphs/id/E7ymrCnNcQdAAgLbdFWzGE5mvr5Mb5T9VfT43FqA7bNh
     class_name: RealitioSubgraph
   randomness_api:
     args:
