@@ -7,7 +7,7 @@ license: Apache-2.0
 fingerprint:
   README.md: bafybeie6lb2mlmzmkycbcfma4onidhegfu4ipgpybg2av5mhfs5zx42b2m
 fingerprint_ignore_patterns: []
-agent: valory/market_resolver:0.1.0:bafybeiciawkns2wv5gcrzfjrts5kffkmoplf66zfwy34rjgwefcvjgvybq
+agent: valory/market_resolver:0.1.0:bafybeif3mohxj6cdr3v4xrriw36trksrpgj3twfrnz47tyy4taez5orn5u
 number_of_agents: 1
 deployment:
   agent:
@@ -139,6 +139,11 @@ public_id: valory/ledger:0.19.0
 type: connection
 config:
   ledger_apis:
+    ethereum:
+      address: ${ETHEREUM_LEDGER_RPC:str:https://rpc.gnosischain.com}
+      chain_id: ${ETHEREUM_LEDGER_CHAIN_ID:int:100}
+      poa_chain: ${ETHEREUM_LEDGER_IS_POA_CHAIN:bool:false}
+      default_gas_price_strategy: ${ETHEREUM_LEDGER_PRICING:str:eip1559}
     gnosis:
       address: ${GNOSIS_LEDGER_RPC:str:https://rpc.gnosischain.com}
       chain_id: ${GNOSIS_LEDGER_CHAIN_ID:int:100}
