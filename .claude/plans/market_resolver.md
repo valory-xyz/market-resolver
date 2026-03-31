@@ -47,8 +47,8 @@ All operations in this skill are **deterministic**: subgraph queries return the 
 ```
 Rounds:
   0. ScanMarketsRound              # scan pending markets, classify answers
-  1. EvaluateAnswersRound          # prepare Mech request for one unverified answer
-  2. BuildChallengesTxRound        # after Mech OR direct from Scan: build tx or mark OK
+  1. EvaluateAnswersRound          # decide: request Mech or reuse existing data
+  2. BuildChallengesTxRound        # build answer/challenge tx or mark as verified
   3. CleanupTrackingRound          # purge finalized markets from DB
   4. FinishedWithMechRequestRound  (degenerate → MechInteract)
   5. FinishedWithChallengeTxRound  (degenerate → TxSettlement)
@@ -59,26 +59,26 @@ Initial states: {ScanMarketsRound, BuildChallengesTxRound}
 
 Transition function:
   ScanMarketsRound:
-    DONE          → EvaluateAnswersRound          # NEEDS_EVALUATION: needs Mech
-    CHALLENGE     → BuildChallengesTxRound        # NEEDS_CHALLENGE: has Mech data, skip to tx
+    DONE          → EvaluateAnswersRound          # found actionable question
     NONE          → CleanupTrackingRound          # all OK or no pending markets
     NO_MAJORITY   → ScanMarketsRound
     ROUND_TIMEOUT → ScanMarketsRound
 
   EvaluateAnswersRound:
-    DONE          → FinishedWithMechRequestRound  # → MechInteract → BuildChallenges
-    NONE          → CleanupTrackingRound          # nothing to evaluate after filtering
+    DONE          → FinishedWithMechRequestRound  # needs Mech → MechInteract → BuildChallenges
+    NONE          → BuildChallengesTxRound        # already has Mech data → skip Mech, build tx
     NO_MAJORITY   → CleanupTrackingRound
     ROUND_TIMEOUT → CleanupTrackingRound
 
-  BuildChallengesTxRound:                         # entered after MechInteract OR directly from Scan
-    DONE          → FinishedWithChallengeTxRound  # → TxSettlement → Cleanup
-    NONE          → CleanupTrackingRound          # Mech agreed, no challenge needed
+  BuildChallengesTxRound:                         # entered after MechInteract OR from Evaluate
+    DONE          → FinishedWithChallengeTxRound  # tx built → TxSettlement → Cleanup
+    NONE          → CleanupTrackingRound          # Mech agreed, no tx needed
     NO_MAJORITY   → CleanupTrackingRound
     ROUND_TIMEOUT → CleanupTrackingRound
 
   CleanupTrackingRound:
     DONE          → FinishedResolutionRound
+    NONE          → FinishedResolutionRound
     NO_MAJORITY   → FinishedResolutionRound
     ROUND_TIMEOUT → FinishedResolutionRound
 ```
@@ -87,14 +87,14 @@ Transition function:
 
 ```
 ScanMarkets ──DONE──► EvaluateAnswers ──DONE──► [MechInteract]
-    │     │                 │                         │
-    │     │──CHALLENGE──┐   │──NONE──┐                ▼
-    │                   ▼            │         BuildChallengesTx
-    │──NONE──┐   BuildChallengesTx   │                │
-             │          │            │     ──DONE──► [TxSettlement]
-             │   ──DONE──► [TxSettl] │                │
-             │          │            │                │
-             ▼          ▼            ▼                ▼
+    │                       │                         │
+    │                       │──NONE──┐                ▼
+    │                                ▼         BuildChallengesTx
+    │──NONE──┐           BuildChallengesTx            │
+             │                  │              ──DONE──► [TxSettlement]
+             │           ──DONE──► [TxSettl]          │
+             │                  │──NONE──┐            │
+             ▼                           ▼            ▼
          CleanupTracking ◄────────────────────────────┘
              │
              ▼
@@ -159,31 +159,31 @@ for each pending question (unanswered first, then sorted by finalization_deadlin
             → add to DB as NEEDS_EVALUATION, actionable
 ```
 
-**Pick first actionable**: Select the first question with `NEEDS_EVALUATION` or `NEEDS_CHALLENGE` (in finalization-urgency order). Only one question is processed per cycle.
+**Pick first actionable**: Select the first question with `NEEDS_EVALUATION` or `CHALLENGE_PENDING` with cooldown elapsed (in finalization-urgency order, unanswered first). Only one question is processed per cycle.
 
-**Routing**:
-- `NEEDS_EVALUATION` → `EvaluateAnswersRound` (needs Mech) → emit `DONE`
-- `NEEDS_CHALLENGE` → `BuildChallengesTxRound` (skip Mech, go straight to tx) → emit `CHALLENGE`
-- Nothing actionable → `CleanupTrackingRound` → emit `NONE`
-
-**Events**: `DONE` (needs Mech evaluation), `CHALLENGE` (skip Mech, build tx directly), `NONE` (nothing to do)
+**Events**: `DONE` (found actionable question → EvaluateAnswers), `NONE` (nothing to do → Cleanup)
 
 ### `EvaluateAnswersRound`
 
-**Purpose**: Build a Mech request for the selected question. **Only entered for `NEEDS_EVALUATION` — never for questions that already have Mech data.**
+**Purpose**: Decide whether to request Mech or reuse existing evaluation data.
 
 **Logic**:
-1. Read the selected question from SynchronizedData
-2. Build Mech request (question text + current answer context + resolution date)
-3. Store as `mech_requests` → route to MechInteract
+1. Read the selected question and its DB entry from SynchronizedData
+2. If the question has no prior Mech evaluation (`evaluation` is null):
+   - Build Mech request (question text + current answer context + resolution date)
+   - Store as `mech_requests` in SynchronizedData
+   - Emit `DONE` → `FinishedWithMechRequestRound` → MechInteract
+3. If the question already has Mech evaluation data (re-challenge scenario):
+   - Skip Mech request entirely — existing data is still valid
+   - Emit `NONE` → `BuildChallengesTxRound` (go straight to tx)
 
-**Events**: `DONE` (mech request ready → MechInteract), `NONE` (nothing to evaluate)
+**Events**: `DONE` (needs Mech → MechInteract), `NONE` (has Mech data → BuildChallenges)
 
 ### `BuildChallengesTxRound`
 
 **Purpose**: Build answer/challenge transaction. Entered in two ways:
-- After MechInteract returns (`FinishedMechResponseRound` → here): fresh Mech data to process
-- Directly from ScanMarkets (`CHALLENGE` event): existing Mech data, re-challenge scenario
+- After MechInteract returns (`FinishedMechResponseRound` → here via composition): fresh Mech data
+- From EvaluateAnswers (`NONE` event): existing Mech data, re-challenge scenario
 
 **Logic**:
 
@@ -622,7 +622,7 @@ The resolver uses `mech_interact_abci` the same way market-creator does. The cor
    └── skill.yaml
    ```
 
-2. Define `Event` enum: `DONE`, `CHALLENGE`, `NONE`, `NO_MAJORITY`, `ROUND_TIMEOUT`
+2. Define `Event` enum: `DONE`, `NONE`, `NO_MAJORITY`, `ROUND_TIMEOUT`
 3. Define all 7 rounds (4 active + 3 degenerate) with transition function
 4. Stub behaviours — each returns `NONE` (no-op pass-through)
 5. Wire `fsm_specification.yaml`
