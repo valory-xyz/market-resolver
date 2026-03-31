@@ -467,26 +467,22 @@ FinishedResetAndPauseErrorRound         → RegistrationRound
 
 **Goal**: A running agent that recovers funds and forwards excess — no resolver logic yet.
 
-1. Copy shared skills from market-creator as dev packages:
-   - `identify_service_owner_abci`
-   - `funds_forwarder_abci`
-   - `omen_funds_recoverer_abci`
-2. Register them in `packages/packages.json` under `dev`
-3. Create a minimal composed app (`market_resolver_abci`) that chains:
+1. Shared skills (`identify_service_owner_abci`, `funds_forwarder_abci`, `omen_funds_recoverer_abci`) consumed as **third_party** packages — must be `autonomy push`-ed from market-creator first.
+2. Create a minimal composed app (`market_resolver_abci`) that chains:
    - `AgentRegistrationAbciApp` → `IdentifyServiceOwnerAbciApp` → `FundsForwarderAbciApp` → `OmenFundsRecovererAbciApp` → `ResetPauseAbciApp` + `TerminationAbciApp`
    - No `MarketResolutionManagerAbciApp` yet — recovery feeds directly into reset
-4. Create `packages/valory/agents/market_resolver/` — agent config
-5. Create `packages/valory/services/market_resolver/` — service config
-6. Update `.coveragerc` source paths, `tox.ini` (`SERVICE_SPECIFIC_PACKAGES`, test commands), `.gitignore`
-7. Run `autonomy packages lock`
-8. Verify: `tox -e check-packages`, `tox -e check-hash`, `tox -e check-abciapp-specs`, `tox -e check-handlers`, linters pass
-9. Deploy and run locally — confirm the agent cycles through Registration → Owner → Funds → Recovery → Reset
+3. Create `packages/valory/agents/market_resolver/` — agent config
+4. Create `packages/valory/services/market_resolver/` — service config
+5. Update `.coveragerc` source paths, `tox.ini` (`SERVICE_SPECIFIC_PACKAGES`, test commands), `.gitignore`
+6. Run `autonomy packages sync --all && autonomy packages lock`
+7. Verify: `tox -e check-packages`, `tox -e check-hash`, `tox -e check-abciapp-specs`, `tox -e check-handlers`, linters pass
+8. Deploy and run locally via `make run-agent` — confirm the agent cycles through Registration → Owner → Funds → Recovery → Reset
 
 **Deliverable**: Running agent that recovers Omen funds and sweeps excess to service owner. Green CI.
 
 ### Phase 2: Build `market_resolution_manager_abci`
 
-**Goal**: Fully implemented core skill with all rounds, 100% test coverage.
+**Goal**: Fully implemented core skill with all rounds working.
 
 #### 2a. Scaffold
 
@@ -510,23 +506,14 @@ FinishedResetAndPauseErrorRound         → RegistrationRound
    ├── dialogues.py
    ├── models.py                # MarketResolutionManagerParams
    ├── fsm_specification.yaml
-   ├── skill.yaml
-   └── tests/
-       ├── conftest.py
-       ├── test_behaviours/
-       ├── test_rounds.py
-       ├── test_payloads.py
-       ├── test_handlers.py
-       ├── test_dialogues.py
-       └── test_models.py
+   └── skill.yaml
    ```
 
 2. Define `Event` enum: `DONE`, `NONE`, `NO_MAJORITY`, `ROUND_TIMEOUT`
 3. Define all 7 rounds (4 active + 3 degenerate) with transition function
 4. Stub behaviours — each returns `NONE` (no-op pass-through)
 5. Wire `fsm_specification.yaml`
-6. Write tests for FSM transitions, payloads, handlers, dialogues, models
-7. Verify: `autonomy analyse fsm-specs`, `autonomy analyse docstrings`, 100% coverage
+6. Verify: `autonomy analyse fsm-specs`, `autonomy analyse docstrings`
 
 **Checkpoint**: Skeleton skill that cycles through `ScanMarkets → Cleanup → Reset` doing nothing.
 
@@ -540,8 +527,6 @@ FinishedResetAndPauseErrorRound         → RegistrationRound
    - Sort by finalization urgency, pick first actionable
    - Submit payload with selected question + updated DB
 2. Add `questions_db` to `cross_period_persisted_keys`
-3. Tests: mock subgraph responses, test all classification branches, test sort order
-4. Verify: 100% coverage
 
 **Checkpoint**: Scan round correctly identifies which question to process.
 
@@ -552,8 +537,6 @@ FinishedResetAndPauseErrorRound         → RegistrationRound
    - If `NEEDS_ANSWER`: build resolve Mech request (question text + resolution date)
    - If `NEEDS_EVALUATION`: build evaluation Mech request (question + current answer + context)
    - Store `mech_requests` for MechInteract
-2. Tests: mock selected question data, test both request types, test NONE path
-3. Verify: 100% coverage
 
 **Checkpoint**: Mech requests correctly formatted for both answering and evaluation.
 
@@ -568,8 +551,6 @@ FinishedResetAndPauseErrorRound         → RegistrationRound
    - If cooldown not elapsed: emit NONE (wait)
    - Economic checks: bond cap, balance, escalation limit
 2. Implement Realitio contract interaction for `submitAnswer`
-3. Tests: all decision branches, cooldown timing edge cases, economic limits
-4. Verify: 100% coverage
 
 **Checkpoint**: Full challenge logic with economic safety checks.
 
@@ -579,12 +560,10 @@ FinishedResetAndPauseErrorRound         → RegistrationRound
    - Query subgraph for finalized questions (or use data from ScanMarkets)
    - Remove entries from `questions_db` where `answerFinalizedTimestamp != null`
    - Submit updated DB
-2. Tests: verify purge logic, verify non-finalized entries are kept
-3. Verify: 100% coverage
 
 **Checkpoint**: Clean DB lifecycle — entries are created, updated, and eventually removed.
 
-**Deliverable**: Fully implemented `market_resolution_manager_abci` skill, all rounds working, 100% coverage.
+**Deliverable**: Fully implemented `market_resolution_manager_abci` skill, all rounds working.
 
 ### Phase 3: Integrate `market_resolution_manager_abci` into Composed App
 
@@ -595,13 +574,28 @@ FinishedResetAndPauseErrorRound         → RegistrationRound
    - Add `MechInteractAbciApp` to the chain
    - Wire all transition mappings (see "Composed App Transition Mapping" above)
 2. Update agent and service configs with new parameters (`watched_creator_addresses`, `trusted_addresses`, challenge config, etc.)
-3. Update `tox.ini` test commands to include coverage for the new skill
-4. Verify: `autonomy analyse fsm-specs`, `tox -e check-abciapp-specs`, `tox -e analyse-service`, `tox -e check-handlers`
-5. Deploy and run locally — confirm full cycle: Registration → Owner → Funds → Recovery → Scan → Evaluate → Challenge → Reset
+3. Verify: `autonomy analyse fsm-specs`, `tox -e check-abciapp-specs`, `tox -e analyse-service`, `tox -e check-handlers`
+4. Deploy and run locally via `make run-agent` — confirm full cycle: Registration → Owner → Funds → Recovery → Scan → Evaluate → Challenge → Reset
 
 **Deliverable**: Fully integrated agent with resolver logic active.
 
-### Phase 4: Integration Testing & Hardening
+### Phase 4: Unit Tests & Coverage
+
+**Goal**: 100% statement + branch coverage for all dev packages.
+
+1. Create test directory structure for `market_resolution_manager_abci`:
+   - `tests/conftest.py`, `test_rounds.py`, `test_payloads.py`, `test_handlers.py`, `test_dialogues.py`, `test_models.py`
+   - `tests/test_behaviours/` — one test file per behaviour
+2. Create tests for `market_resolver_abci` composed skill:
+   - `test_composition.py`, `test_behaviours.py`, `test_dialogues.py`, `test_handlers.py`, `test_models.py`
+3. Update `tox.ini` test commands to include all dev skill coverage
+4. All external boundaries mocked: subgraph, Mech, ledger, contracts
+5. Test all FSM transitions, classification branches, cooldown timing, economic limits
+6. Verify: `tox -e py3.11-linux` (100% coverage), all linters pass
+
+**Deliverable**: Full test suite, green CI.
+
+### Phase 5: Integration Testing & Hardening
 
 **Goal**: End-to-end validation and edge case hardening.
 
@@ -615,7 +609,6 @@ FinishedResetAndPauseErrorRound         → RegistrationRound
    - Bond cap exceeded → stop challenging
 2. Test DB persistence across periods (`cross_period_persisted_keys`)
 3. Test composed app transitions end-to-end
-4. Verify all linters: `tox -e black-check && tox -e isort-check && tox -e flake8 && tox -e mypy && tox -e pylint && tox -e darglint`
-5. Verify full CI: `tox -e py3.11-linux`
+4. Verify full CI: `tox -e py3.11-linux`
 
 **Deliverable**: Production-ready service with comprehensive test coverage.
