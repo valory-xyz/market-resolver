@@ -19,16 +19,27 @@
 
 """This module contains the base behaviour for the market resolution manager."""
 
+import json
 from abc import ABC
-from typing import cast
+from typing import Any, Dict, Generator, Optional, cast
 
 from packages.valory.skills.abstract_round_abci.behaviours import BaseBehaviour
 from packages.valory.skills.market_resolution_manager_abci.models import (
     MarketResolutionManagerParams,
+    SharedState,
 )
 from packages.valory.skills.market_resolution_manager_abci.rounds import (
     SynchronizedData,
 )
+
+HTTP_OK = 200
+
+
+def to_content(query: str) -> bytes:
+    """Convert the given query string to payload content."""
+    finalized_query = {"query": query}
+    encoded_query = json.dumps(finalized_query, sort_keys=True).encode("utf-8")
+    return encoded_query
 
 
 class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
@@ -43,3 +54,71 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
     def params(self) -> MarketResolutionManagerParams:
         """Return the params."""
         return cast(MarketResolutionManagerParams, super().params)
+
+    @property
+    def last_synced_timestamp(self) -> int:
+        """Get last synced timestamp."""
+        state = cast(SharedState, self.context.state)
+        last_timestamp = (
+            state.round_sequence.last_round_transition_timestamp.timestamp()
+        )
+        return int(last_timestamp)
+
+    def get_omen_subgraph_result(
+        self,
+        query: str,
+    ) -> Generator[None, None, Optional[Dict[str, Any]]]:
+        """Query the Omen subgraph.
+
+        :param query: the GraphQL query string.
+        :yield: None
+        :return: the parsed JSON response, or None on error.
+        """
+        response = yield from self.get_http_response(
+            content=to_content(query),
+            **self.context.omen_subgraph.get_spec(),
+        )
+
+        if response is None:
+            self.context.logger.error(
+                "Could not retrieve response from Omen subgraph. Response was None."
+            )
+            return None
+        if response.status_code != HTTP_OK:
+            self.context.logger.error(
+                f"Could not retrieve response from Omen subgraph. "
+                f"Received status code {response.status_code}.\n{response}"
+            )
+            return None
+
+        return json.loads(response.body.decode())
+
+    def get_realitio_subgraph_result(
+        self,
+        query: str,
+    ) -> Generator[None, None, Optional[Dict[str, Any]]]:
+        """Query the Realitio subgraph.
+
+        :param query: the GraphQL query string.
+        :yield: None
+        :return: the parsed JSON response, or None on error.
+        """
+        response = yield from self.get_http_response(
+            content=to_content(query),
+            **self.context.realitio_subgraph.get_spec(),
+        )
+
+        if response is None:
+            self.context.logger.error(
+                "Could not retrieve response from Realitio subgraph. "
+                "Response was None."
+            )
+            return None
+        if response.status_code != HTTP_OK:
+            self.context.logger.error(
+                f"Could not retrieve response from Realitio subgraph. "
+                f"Received status code {response.status_code}.\n{response}"
+            )
+            return None
+
+        return json.loads(response.body.decode())

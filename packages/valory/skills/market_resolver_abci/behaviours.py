@@ -31,8 +31,14 @@ from packages.valory.skills.funds_forwarder_abci.behaviours import (
 from packages.valory.skills.identify_service_owner_abci.behaviours import (
     IdentifyServiceOwnerRoundBehaviour,
 )
+from packages.valory.skills.market_resolution_manager_abci.behaviours.round_behaviour import (
+    MarketResolutionManagerRoundBehaviour,
+)
 from packages.valory.skills.market_resolver_abci.composition import (
     MarketResolverAbciApp,
+)
+from packages.valory.skills.mech_interact_abci.behaviours.round_behaviour import (
+    MechInteractRoundBehaviour,
 )
 from packages.valory.skills.omen_funds_recoverer_abci.behaviours.round_behaviour import (
     OmenFundsRecovererRoundBehaviour,
@@ -63,8 +69,10 @@ class MarketResolverRoundBehaviour(AbstractRoundBehaviour):
         *IdentifyServiceOwnerRoundBehaviour.behaviours,
         *FundsForwarderRoundBehaviour.behaviours,
         *OmenFundsRecovererRoundBehaviour.behaviours,
+        *MarketResolutionManagerRoundBehaviour.behaviours,
         *TransactionSettlementRoundBehaviour.behaviours,
         *ResetPauseABCIConsensusBehaviour.behaviours,
         *TerminationAbciBehaviours.behaviours,
+        *MechInteractRoundBehaviour.behaviours,
     }
     background_behaviours_cls = {BackgroundBehaviour}

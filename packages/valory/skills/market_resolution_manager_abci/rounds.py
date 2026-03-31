@@ -34,7 +34,7 @@ from packages.valory.skills.abstract_round_abci.base import (
 )
 from packages.valory.skills.market_resolution_manager_abci.payloads import (
     BuildChallengesTxPayload,
-    CleanupTrackingPayload,
+    CleanupTrackedMarketsPayload,
     EvaluateAnswersPayload,
     ScanPendingMarketsPayload,
 )
@@ -162,15 +162,15 @@ class BuildChallengesTxRound(CollectSameUntilThresholdRound):
         return None
 
 
-class CleanupTrackingRound(CollectSameUntilThresholdRound):
+class CleanupTrackedMarketsRound(CollectSameUntilThresholdRound):
     """Round to purge finalized questions from the database."""
 
-    payload_class = CleanupTrackingPayload
+    payload_class = CleanupTrackedMarketsPayload
     synchronized_data_class = SynchronizedData
     done_event = Event.DONE
     none_event = Event.NONE
     no_majority_event = Event.NO_MAJORITY
-    collection_key = "cleanup_tracking"
+    collection_key = "cleanup_tracked_markets"
     selection_key = ("content",)
 
     def end_block(self) -> Optional[Tuple[BaseSynchronizedData, Enum]]:
@@ -228,7 +228,7 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
             - none: 3.
             - no majority: 3.
             - round timeout: 3.
-        3. CleanupTrackingRound
+        3. CleanupTrackedMarketsRound
             - done: 6.
             - none: 6.
             - no majority: 6.
@@ -244,27 +244,31 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
     """
 
     initial_round_cls: AppState = ScanPendingMarketsRound
-    initial_states: Set[AppState] = {ScanPendingMarketsRound, BuildChallengesTxRound}
+    initial_states: Set[AppState] = {
+        ScanPendingMarketsRound,
+        BuildChallengesTxRound,
+        CleanupTrackedMarketsRound,
+    }
     transition_function: AbciAppTransitionFunction = {
         ScanPendingMarketsRound: {
             Event.DONE: EvaluateAnswersRound,
-            Event.NONE: CleanupTrackingRound,
+            Event.NONE: CleanupTrackedMarketsRound,
             Event.NO_MAJORITY: ScanPendingMarketsRound,
             Event.ROUND_TIMEOUT: ScanPendingMarketsRound,
         },
         EvaluateAnswersRound: {
             Event.DONE: FinishedWithMechRequestRound,
             Event.NONE: BuildChallengesTxRound,
-            Event.NO_MAJORITY: CleanupTrackingRound,
-            Event.ROUND_TIMEOUT: CleanupTrackingRound,
+            Event.NO_MAJORITY: CleanupTrackedMarketsRound,
+            Event.ROUND_TIMEOUT: CleanupTrackedMarketsRound,
         },
         BuildChallengesTxRound: {
             Event.DONE: FinishedWithChallengeTxRound,
-            Event.NONE: CleanupTrackingRound,
-            Event.NO_MAJORITY: CleanupTrackingRound,
-            Event.ROUND_TIMEOUT: CleanupTrackingRound,
+            Event.NONE: CleanupTrackedMarketsRound,
+            Event.NO_MAJORITY: CleanupTrackedMarketsRound,
+            Event.ROUND_TIMEOUT: CleanupTrackedMarketsRound,
         },
-        CleanupTrackingRound: {
+        CleanupTrackedMarketsRound: {
             Event.DONE: FinishedResolutionRound,
             Event.NONE: FinishedResolutionRound,
             Event.NO_MAJORITY: FinishedResolutionRound,
@@ -288,9 +292,10 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
     db_pre_conditions: Dict[AppState, Set[str]] = {
         ScanPendingMarketsRound: set(),
         BuildChallengesTxRound: set(),
+        CleanupTrackedMarketsRound: set(),
     }
     db_post_conditions: Dict[AppState, Set[str]] = {
         FinishedWithMechRequestRound: set(),
-        FinishedWithChallengeTxRound: set(),
+        FinishedWithChallengeTxRound: {"most_voted_tx_hash"},
         FinishedResolutionRound: set(),
     }

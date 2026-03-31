@@ -54,7 +54,7 @@ class MarketResolutionManagerParams(BaseParams):
         )
         self.trusted_addresses: List[str] = kwargs.pop("trusted_addresses", [])
         self.mech_tool: str = kwargs.pop(
-            "mech_tool", "resolve-market-reasoning-gpt-4.1"
+            "mech_tool", "resolve-market-jury-v1"
         )
         self.initial_answer_bond: int = kwargs.pop(
             "initial_answer_bond", 10000000000000000000
@@ -73,4 +73,11 @@ class MarketResolutionManagerParams(BaseParams):
         )
         self.max_escalation_rounds: int = kwargs.pop("max_escalation_rounds", 5)
         self.max_mech_retries: int = kwargs.pop("max_mech_retries", 3)
+        # Read without popping — MechParams also needs these
+        self.mech_interact_round_timeout_seconds: int = kwargs.get(
+            "mech_interact_round_timeout_seconds", 1200
+        )
+        self.mech_interaction_sleep_time: int = kwargs.get(
+            "mech_interaction_sleep_time", 10
+        )
         super().__init__(*args, **kwargs)

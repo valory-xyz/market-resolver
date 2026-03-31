@@ -46,7 +46,7 @@ class BuildChallengesTxPayload(BaseTxPayload):
 
 
 @dataclass(frozen=True)
-class CleanupTrackingPayload(BaseTxPayload):
-    """Payload for the CleanupTrackingRound."""
+class CleanupTrackedMarketsPayload(BaseTxPayload):
+    """Payload for the CleanupTrackedMarketsRound."""
 
     content: str

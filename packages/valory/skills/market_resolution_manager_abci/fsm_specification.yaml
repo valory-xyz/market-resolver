@@ -11,10 +11,11 @@ final_states:
 label: MarketResolutionManagerAbciApp
 start_states:
 - BuildChallengesTxRound
+- CleanupTrackedMarketsRound
 - ScanPendingMarketsRound
 states:
 - BuildChallengesTxRound
-- CleanupTrackingRound
+- CleanupTrackedMarketsRound
 - EvaluateAnswersRound
 - FinishedResolutionRound
 - FinishedWithChallengeTxRound
@@ -22,18 +23,18 @@ states:
 - ScanPendingMarketsRound
 transition_func:
     (BuildChallengesTxRound, DONE): FinishedWithChallengeTxRound
-    (BuildChallengesTxRound, NONE): CleanupTrackingRound
-    (BuildChallengesTxRound, NO_MAJORITY): CleanupTrackingRound
-    (BuildChallengesTxRound, ROUND_TIMEOUT): CleanupTrackingRound
-    (CleanupTrackingRound, DONE): FinishedResolutionRound
-    (CleanupTrackingRound, NONE): FinishedResolutionRound
-    (CleanupTrackingRound, NO_MAJORITY): FinishedResolutionRound
-    (CleanupTrackingRound, ROUND_TIMEOUT): FinishedResolutionRound
+    (BuildChallengesTxRound, NONE): CleanupTrackedMarketsRound
+    (BuildChallengesTxRound, NO_MAJORITY): CleanupTrackedMarketsRound
+    (BuildChallengesTxRound, ROUND_TIMEOUT): CleanupTrackedMarketsRound
+    (CleanupTrackedMarketsRound, DONE): FinishedResolutionRound
+    (CleanupTrackedMarketsRound, NONE): FinishedResolutionRound
+    (CleanupTrackedMarketsRound, NO_MAJORITY): FinishedResolutionRound
+    (CleanupTrackedMarketsRound, ROUND_TIMEOUT): FinishedResolutionRound
     (EvaluateAnswersRound, DONE): FinishedWithMechRequestRound
     (EvaluateAnswersRound, NONE): BuildChallengesTxRound
-    (EvaluateAnswersRound, NO_MAJORITY): CleanupTrackingRound
-    (EvaluateAnswersRound, ROUND_TIMEOUT): CleanupTrackingRound
+    (EvaluateAnswersRound, NO_MAJORITY): CleanupTrackedMarketsRound
+    (EvaluateAnswersRound, ROUND_TIMEOUT): CleanupTrackedMarketsRound
     (ScanPendingMarketsRound, DONE): EvaluateAnswersRound
-    (ScanPendingMarketsRound, NONE): CleanupTrackingRound
+    (ScanPendingMarketsRound, NONE): CleanupTrackedMarketsRound
     (ScanPendingMarketsRound, NO_MAJORITY): ScanPendingMarketsRound
     (ScanPendingMarketsRound, ROUND_TIMEOUT): ScanPendingMarketsRound

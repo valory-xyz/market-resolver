@@ -49,7 +49,7 @@ Rounds:
   0. ScanPendingMarketsRound              # scan pending markets, classify answers
   1. EvaluateAnswersRound          # decide: request Mech or reuse existing data
   2. BuildChallengesTxRound        # build answer/challenge tx or mark as verified
-  3. CleanupTrackingRound          # purge finalized markets from DB
+  3. CleanupTrackedMarketsRound          # purge finalized markets from DB
   4. FinishedWithMechRequestRound  (degenerate → MechInteract)
   5. FinishedWithChallengeTxRound  (degenerate → TxSettlement)
   6. FinishedResolutionRound       (degenerate → ResetPause)
@@ -60,23 +60,23 @@ Initial states: {ScanPendingMarketsRound, BuildChallengesTxRound}
 Transition function:
   ScanPendingMarketsRound:
     DONE          → EvaluateAnswersRound          # found actionable question
-    NONE          → CleanupTrackingRound          # all OK or no pending markets
+    NONE          → CleanupTrackedMarketsRound          # all OK or no pending markets
     NO_MAJORITY   → ScanPendingMarketsRound
     ROUND_TIMEOUT → ScanPendingMarketsRound
 
   EvaluateAnswersRound:
     DONE          → FinishedWithMechRequestRound  # needs Mech → MechInteract → BuildChallenges
     NONE          → BuildChallengesTxRound        # already has Mech data → skip Mech, build tx
-    NO_MAJORITY   → CleanupTrackingRound
-    ROUND_TIMEOUT → CleanupTrackingRound
+    NO_MAJORITY   → CleanupTrackedMarketsRound
+    ROUND_TIMEOUT → CleanupTrackedMarketsRound
 
   BuildChallengesTxRound:                         # entered after MechInteract OR from Evaluate
     DONE          → FinishedWithChallengeTxRound  # tx built → TxSettlement → Cleanup
-    NONE          → CleanupTrackingRound          # Mech agreed, no tx needed
-    NO_MAJORITY   → CleanupTrackingRound
-    ROUND_TIMEOUT → CleanupTrackingRound
+    NONE          → CleanupTrackedMarketsRound          # Mech agreed, no tx needed
+    NO_MAJORITY   → CleanupTrackedMarketsRound
+    ROUND_TIMEOUT → CleanupTrackedMarketsRound
 
-  CleanupTrackingRound:
+  CleanupTrackedMarketsRound:
     DONE          → FinishedResolutionRound
     NONE          → FinishedResolutionRound
     NO_MAJORITY   → FinishedResolutionRound
@@ -95,7 +95,7 @@ ScanPendingMarkets ──DONE──► EvaluateAnswers ──DONE──► [Mech
              │           ──DONE──► [TxSettl]          │
              │                  │──NONE──┐            │
              ▼                           ▼            ▼
-         CleanupTracking ◄────────────────────────────┘
+         CleanupTrackedMarkets ◄────────────────────────────┘
              │
              ▼
        [FinishedResolution] → ResetPause
@@ -210,7 +210,7 @@ elif mech_answer DISAGREES with on_chain_answer:
 
 **Events**: `DONE` (challenge/answer tx built), `NONE` (Mech agreed or cooldown not elapsed)
 
-### `CleanupTrackingRound`
+### `CleanupTrackedMarketsRound`
 
 **Purpose**: Purge finalized markets from `questions_db`.
 
@@ -250,7 +250,7 @@ questions_db: Dict[str, QuestionEntry] = {
         # Populated by EvaluateAnswersRound (request) and BuildChallengesTxRound (response)
         "mech_request": {                        # MechMetadata dict (null if not yet requested)
             "prompt": "Question: Will...",       #   the prompt sent to Mech
-            "tool": "resolve-market-reasoning-gpt-4.1",  #   which Mech tool
+            "tool": "resolve-market-jury-v1",  #   which Mech tool
             "nonce": "abc123",                   #   unique request nonce
         },
         "mech_response": {                       # MechInteractionResponse dict (null if not yet received)
@@ -294,7 +294,7 @@ First seen (non-trusted answerer) → NEEDS_EVALUATION (queue for Mech)
   ↓ Mech disagrees               → CHALLENGE_PENDING (wait for cooldown)
   ↓ Cooldown elapsed, challenged → TRUSTED_ANSWER (we are now the answerer)
   ↓ Someone re-challenges us     → CHALLENGE_PENDING (re-challenge using existing Mech data, no new request)
-  ↓ Question finalizes           → removed from DB (CleanupTrackingRound)
+  ↓ Question finalizes           → removed from DB (CleanupTrackedMarketsRound)
 ```
 
 ### Re-scan logic (each cycle)
@@ -438,7 +438,7 @@ DB: `q5 → CHALLENGE_PENDING, detected_at=now, mech_answer=0x00...01`
 |---|---|---|
 | q5 | `CHALLENGE_PENDING` | cooldown not elapsed (detected 1 cycle ago) → skip |
 
-Everything else OK → `NONE` → CleanupTracking
+Everything else OK → `NONE` → CleanupTrackedMarkets
 
 ### Cycle 5 (cooldown elapsed)
 
@@ -455,7 +455,7 @@ DB: `q5 → ANSWERED_BY_US`
 |---|---|---|
 | q5 | `ANSWERED_BY_US`, latest answerer = our safe | skip (us) |
 
-Answer finalizes after timeout. Next cycle: CleanupTracking removes q5.
+Answer finalizes after timeout. Next cycle: CleanupTrackedMarkets removes q5.
 
 ---
 
@@ -467,7 +467,7 @@ watched_creator_addresses: []          # market creator safes to monitor (requir
 trusted_addresses: []                  # trusted answerers (our safe auto-included)
 
 # Mech
-mech_tool: "resolve-market-reasoning-gpt-4.1"  # single tool for both answering and evaluating
+mech_tool: "resolve-market-jury-v1"  # single tool for both answering and evaluating
                                                 # will migrate to "resolve-market-jury" when live
 
 # Answering & Challenging
@@ -528,10 +528,10 @@ FinishedWithoutRecoveryTxRound          → ScanPendingMarketsRound
 # Watchdog
 FinishedWithMechRequestRound            → MechVersionDetectionRound
 FinishedMechResponseRound               → BuildChallengesTxRound
-FinishedMechRequestSkipRound            → CleanupTrackingRound
-FinishedMechResponseTimeoutRound        → CleanupTrackingRound
+FinishedMechRequestSkipRound            → CleanupTrackedMarketsRound
+FinishedMechResponseTimeoutRound        → CleanupTrackedMarketsRound
 FinishedWithChallengeTxRound            → TxSettlement
-FinishedTransactionSubmissionRound      → CleanupTrackingRound
+FinishedTransactionSubmissionRound      → CleanupTrackedMarketsRound
 
 # Done
 FinishedResolutionRound                 → ResetAndPauseRound
@@ -561,9 +561,15 @@ FinishedResetAndPauseErrorRound         → RegistrationRound
 - No `scripts/` directory — all tox references removed
 - All shared skills are third_party (not dev) — repo only owns `market_resolver_abci`, agent, and service packages
 
-### Phase 2: Build `market_resolution_manager_abci`
+### Phase 2: Build `market_resolution_manager_abci` ✅ COMPLETE (skeleton + business logic)
 
 **Goal**: Fully implemented core skill with all rounds working.
+
+**Status**: All behaviours implemented with business logic. Remaining TODOs within the code:
+- `EvaluateAnswersBehaviour`: write `mech_requests` to SynchronizedData for MechInteract pickup (needs Phase 3 composition wiring)
+- `BuildChallengesTxBehaviour`: parse `mech_responses` from MechInteract, build actual `submitAnswer` tx via Realitio contract API, check safe balance
+- `CleanupTrackedMarketsBehaviour`: subgraph query may need adjustment based on actual Omen subgraph schema for question-level filtering
+- All behaviours: unused imports to clean up during lint phase
 
 #### MechInteract integration pattern
 
@@ -579,8 +585,8 @@ The resolver uses `mech_interact_abci` the same way market-creator does. The cor
    - `MechResponseRound` → polls for response
 4. MechInteract final states route back to core skill via composition:
    - `FinishedMechResponseRound` → `BuildChallengesTxRound` (success — Mech answered)
-   - `FinishedMechRequestSkipRound` → `CleanupTrackingRound` (no request needed)
-   - `FinishedMechResponseTimeoutRound` → `CleanupTrackingRound` (Mech timed out)
+   - `FinishedMechRequestSkipRound` → `CleanupTrackedMarketsRound` (no request needed)
+   - `FinishedMechResponseTimeoutRound` → `CleanupTrackedMarketsRound` (Mech timed out)
    - `FinishedMechRequestRound` → `TxSettlement` (Mech request needs on-chain tx)
    - `FinishedMechPurchaseSubscriptionRound` → `TxSettlement` (subscription purchase)
    - `FailedMechInformationRound` → `MechVersionDetectionRound` (retry)
@@ -670,9 +676,9 @@ The resolver uses `mech_interact_abci` the same way market-creator does. The cor
 
 **Checkpoint**: Full challenge logic with economic safety checks.
 
-#### 2e. `CleanupTrackingRound` — DB Maintenance
+#### 2e. `CleanupTrackedMarketsRound` — DB Maintenance
 
-1. Implement `CleanupTrackingBehaviour`:
+1. Implement `CleanupTrackedMarketsBehaviour`:
    - Query subgraph for finalized questions (or use data from ScanPendingMarkets)
    - Remove entries from `questions_db` where `answerFinalizedTimestamp != null`
    - Submit updated DB
@@ -683,7 +689,15 @@ The resolver uses `mech_interact_abci` the same way market-creator does. The cor
 
 ### Phase 3: Integrate `market_resolution_manager_abci` into Composed App
 
-**Goal**: Wire the core skill and MechInteract into the running agent from Phase 1.
+**Goal**: Wire the core skill and MechInteract into the running agent from Phase 1. ✅ COMPLETE
+
+**Key decisions:**
+- `market_resolution_manager_abci` is `is_abstract: true` (required for chaining)
+- `CleanupTrackedMarketsRound` added to `initial_states` (entered from MechInteract skip/timeout via composition)
+- `FinishedWithChallengeTxRound` has `most_voted_tx_hash` as post-condition (required by TxSettlement)
+- `FinishedTransactionSubmissionRound` routes to `MechResponseRound` (handles both Mech request tx and challenge tx settlement)
+- TODO: add PostTransactionRound to multiplex based on tx_submitter (currently MechResponse handles both)
+- `mech_interact_round_timeout_seconds` and `mech_interaction_sleep_time` read with `kwargs.get` (not pop) to avoid consuming them before MechParams
 
 1. Update `market_resolver_abci/composition.py`:
    - Add `MechInteractAbciApp` to the chain
@@ -709,14 +723,14 @@ The resolver uses `mech_interact_abci` the same way market-creator does. The cor
 
      # MechInteract → Core skill (response received)
      MechFinalStates.FinishedMechResponseRound → BuildChallengesTxRound
-     MechFinalStates.FinishedMechRequestSkipRound → CleanupTrackingRound
-     MechFinalStates.FinishedMechResponseTimeoutRound → CleanupTrackingRound
+     MechFinalStates.FinishedMechRequestSkipRound → CleanupTrackedMarketsRound
+     MechFinalStates.FinishedMechResponseTimeoutRound → CleanupTrackedMarketsRound
 
      # Core skill → TxSettlement (challenge tx)
      MarketResolutionManagerAbci.FinishedWithChallengeTxRound → TxSettlement
 
-     # TxSettlement → CleanupTracking (after any tx)
-     TxSettlement.FinishedTransactionSubmissionRound → CleanupTrackingRound
+     # TxSettlement → CleanupTrackedMarkets (after any tx)
+     TxSettlement.FinishedTransactionSubmissionRound → CleanupTrackedMarketsRound
 
      # Core skill → Reset
      MarketResolutionManagerAbci.FinishedResolutionRound → ResetAndPauseRound

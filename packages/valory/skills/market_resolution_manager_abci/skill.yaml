@@ -10,18 +10,18 @@ fingerprint:
   README.md: bafybeicebua5cqf3pfr34hy5mmnr6i7m7wgxlkzbto6woi5dkuv4fqbymi
   __init__.py: bafybeiedhf4rirdachml54zzde7nl3nhuwz4c5xwskrc5udfphefbrdsfu
   behaviours/__init__.py: bafybeignnrbklzekhqurn6ptli5zhzsov2qtdzr5se4xe4hqdywt2vbtvu
-  behaviours/base.py: bafybeien4kr7vrzljceczqkbz2jz7eosv4dombdw3y7xsoxquvu6kz454y
-  behaviours/build_challenges.py: bafybeigyhkwymied3rbhgjrwblp3fllwxygmqxfnzilaixwjy2gf5x2hva
-  behaviours/cleanup_tracking.py: bafybeihy73kqb2pmmixhurqqboj6qkztsejbinjb7hgfpal67oislj7r2e
-  behaviours/evaluate_answers.py: bafybeifhg3hyjeuitxi47b4jhth6rlwjuksma552ccfzzsb4dtm4oz7leq
-  behaviours/round_behaviour.py: bafybeig7axp4nepxqvuq6hinqf7xreblyzonpcq7oy7ba3b4ai4hywmace
-  behaviours/scan_pending_markets.py: bafybeidylbxtmpmunbj7dkvkbos3xzhvdsi2hg2fy2v6poul66j6zq3c2e
+  behaviours/base.py: bafybeidth67hpym2y7yecp2b5yqn3ldgluorggpk65iqfdhvzkqnpxmv6i
+  behaviours/build_challenges.py: bafybeihks74l23ylym6wuqrxrkrkneyyrqbm3cyob77q4htgdrdt2z5wdu
+  behaviours/cleanup_tracked_markets.py: bafybeihucvqtkxtruisbcu3wbs2yyavjhmq3njfx35glwbedql2ik7qoam
+  behaviours/evaluate_answers.py: bafybeifzjzed7gzvte2r7lfniwymjjyl6l7osk66ftmbq2gxvanweaynai
+  behaviours/round_behaviour.py: bafybeie3gjqocsmg6tkjo6zf6w7rqqq2mnp7cadwzsja76hsgl6kz3zlqi
+  behaviours/scan_pending_markets.py: bafybeiffucajnbkrylkpcbbczhg2ujw4pjvx5loah7qsmwiiwqrpltdmiq
   dialogues.py: bafybeict7mdksmjklx6wy2zplunpcfwhgxv5votxbsodidyum2phx3tv34
-  fsm_specification.yaml: bafybeigrjh44efsigzjjhiggjjcm4gru2yeqlfve3qmce442xve5krhgpi
+  fsm_specification.yaml: bafybeiehpev3uqkqrfvktrrp5bnqbhmznrmk3eowcgleflf52pv77pcmqu
   handlers.py: bafybeigby2ymzvsoiwbgtdd4esk6xrkrafp2b22yqz5xi4ekrnqwqqoq4y
-  models.py: bafybeibo3juvhgr364ldr4yybblx4hhy2smdva3vxda2ropgdinexrnnui
-  payloads.py: bafybeiglbcytmsgrlwd3xeopfbtzamizfdwekys6koidxjttquoqj6wsfu
-  rounds.py: bafybeif4fdwwgqnfrzclsnayhll4cclwsr4bmii33vd6xm3wkmsp32zjo4
+  models.py: bafybeiayll7m6eurqpjc4d4oawhuhyfftnmnsy73f7auqnl3nahwcc6dkm
+  payloads.py: bafybeieveqjvn3ebdttf5lryrhtsntanoyz4ye3kfp2j7qwiycjqjtv34q
+  rounds.py: bafybeidx5eybpq25nrq4sq4x3ite3jztnzd4dcmg5hp65vu4j6kszj34d4
   states/__init__.py: bafybeiho5s4sehwxmgtp4ddgntnkxhjks5cflihdtag7zqy6btjrhzcyti
   states/base.py: bafybeibq5yn737fj3xo2ng4thbaixtmtnvlzcjzimdyjbdoevdlb7mts2e
   tests/__init__.py: bafybeidpf4le7kmwrvl6u3s4yl2mrlznnu7scha3hvcpd3s2omwo7bdwkq
@@ -29,8 +29,7 @@ fingerprint:
 fingerprint_ignore_patterns: []
 connections: []
 contracts: []
-protocols:
-- valory/contract_api:1.0.0:bafybeibld2xb5m7kyluiptkamp4nrt6oeomkohz7a3yppbv2oo7qw2e4la
+protocols: []
 skills:
 - valory/abstract_round_abci:0.1.0:bafybeihygetmlgnhawrbyswvpvv3wpztr2hlhxkljmohp4r7qcmvglpwdq
 behaviours:
@@ -83,7 +82,7 @@ models:
     args:
       watched_creator_addresses: []
       trusted_addresses: []
-      mech_tool: resolve-market-reasoning-gpt-4.1
+      mech_tool: resolve-market-jury-v1
       initial_answer_bond: 10000000000000000000
       challenge_cooldown_fraction: 0.25
       challenge_urgency_buffer: 3600
@@ -141,6 +140,14 @@ models:
       tendermint_p2p_url: localhost:26656
       tendermint_url: http://localhost:26657
       tx_timeout: 10.0
+      use_termination: false
+      use_slashing: false
+      slash_cooldown_hours: 3
+      slash_threshold_amount: 10000000000000000
+      light_slash_unit_amount: 5000000000000000
+      serious_slash_unit_amount: 8000000000000000
+      termination_sleep: 900
+      termination_from_block: 0
       validate_timeout: 1205
     class_name: MarketResolutionManagerParams
   requests:
@@ -158,4 +165,4 @@ models:
 dependencies:
   open-aea-test-autonomy:
     version: ==0.21.16
-is_abstract: false
+is_abstract: true

@@ -21,6 +21,12 @@
 
 import packages.valory.skills.funds_forwarder_abci.rounds as FundsForwarderAbci
 import packages.valory.skills.identify_service_owner_abci.rounds as IdentifyServiceOwnerAbci
+import packages.valory.skills.market_resolution_manager_abci.rounds as MarketResolutionManagerAbci
+import packages.valory.skills.mech_interact_abci.rounds as MechInteractAbci
+import packages.valory.skills.mech_interact_abci.states.final_states as MechFinalStates
+import packages.valory.skills.mech_interact_abci.states.mech_version as MechVersionStates
+import packages.valory.skills.mech_interact_abci.states.request as MechRequestStates
+import packages.valory.skills.mech_interact_abci.states.response as MechResponseStates
 import packages.valory.skills.omen_funds_recoverer_abci.rounds as OmenFundsRecovererAbci
 import packages.valory.skills.transaction_settlement_abci.rounds as TransactionSettlementAbci
 from packages.valory.skills.abstract_round_abci.abci_app_chain import (
@@ -46,15 +52,56 @@ from packages.valory.skills.termination_abci.rounds import (
 )
 
 abci_app_transition_mapping: AbciAppTransitionMapping = {
+    # Registration → IdentifyServiceOwner
     FinishedRegistrationRound: IdentifyServiceOwnerAbci.IdentifyServiceOwnerRound,
+
+    # IdentifyServiceOwner → FundsForwarder / Recovery
     IdentifyServiceOwnerAbci.FinishedIdentifyServiceOwnerRound: FundsForwarderAbci.FundsForwarderRound,
     IdentifyServiceOwnerAbci.FinishedIdentifyServiceOwnerErrorRound: OmenFundsRecovererAbci.RemoveLiquidityRound,
+
+    # FundsForwarder → Recovery / TxSettlement
     FundsForwarderAbci.FinishedFundsForwarderNoTxRound: OmenFundsRecovererAbci.RemoveLiquidityRound,
     FundsForwarderAbci.FinishedFundsForwarderWithTxRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
+
+    # Fund recovery → TxSettlement / Core skill
     OmenFundsRecovererAbci.FinishedWithRecoveryTxRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
-    OmenFundsRecovererAbci.FinishedWithoutRecoveryTxRound: ResetAndPauseRound,
-    TransactionSettlementAbci.FinishedTransactionSubmissionRound: ResetAndPauseRound,
+    OmenFundsRecovererAbci.FinishedWithoutRecoveryTxRound: MarketResolutionManagerAbci.ScanPendingMarketsRound,
+
+    # Core skill → MechInteract (needs Mech evaluation — start Mech flow)
+    MarketResolutionManagerAbci.FinishedWithMechRequestRound: MechVersionStates.MechVersionDetectionRound,
+
+    # MechInteract internal routing
+    MechFinalStates.FinishedMarketplaceLegacyDetectedRound: MechRequestStates.MechRequestRound,
+    MechFinalStates.FinishedMechLegacyDetectedRound: MechRequestStates.MechRequestRound,
+    MechFinalStates.FinishedMechInformationRound: MechRequestStates.MechRequestRound,
+    MechFinalStates.FailedMechInformationRound: MechVersionStates.MechVersionDetectionRound,
+
+    # MechInteract → TxSettlement (for on-chain Mech request)
+    MechFinalStates.FinishedMechRequestRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
+    MechFinalStates.FinishedMechPurchaseSubscriptionRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
+
+    # MechInteract → Core skill (response received)
+    MechFinalStates.FinishedMechResponseRound: MarketResolutionManagerAbci.BuildChallengesTxRound,
+
+    # MechInteract → Reset (skip/timeout — retry next cycle)
+    MechFinalStates.FinishedMechRequestSkipRound: ResetAndPauseRound,
+    MechFinalStates.FinishedMechResponseTimeoutRound: ResetAndPauseRound,
+
+    # Core skill → TxSettlement (challenge tx)
+    MarketResolutionManagerAbci.FinishedWithChallengeTxRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
+
+    # TxSettlement → MechResponse (after Mech request tx) or Reset (after challenge tx)
+    # NOTE: TxSettlement can only map to ONE target. Since both Mech request txs
+    # and challenge txs go through TxSettlement, we route to MechResponseRound.
+    # For challenge txs, MechResponse will find no pending request and skip.
+    # TODO: add a PostTransactionRound to multiplex based on tx_submitter.
+    TransactionSettlementAbci.FinishedTransactionSubmissionRound: MechResponseStates.MechResponseRound,
     TransactionSettlementAbci.FailedRound: ResetAndPauseRound,
+
+    # Core skill → Reset
+    MarketResolutionManagerAbci.FinishedResolutionRound: ResetAndPauseRound,
+
+    # Reset → next cycle
     FinishedResetAndPauseRound: IdentifyServiceOwnerAbci.IdentifyServiceOwnerRound,
     FinishedResetAndPauseErrorRound: RegistrationRound,
 }
@@ -71,7 +118,9 @@ MarketResolverAbciApp = chain(
         IdentifyServiceOwnerAbci.IdentifyServiceOwnerAbciApp,
         FundsForwarderAbci.FundsForwarderAbciApp,
         OmenFundsRecovererAbci.OmenFundsRecovererAbciApp,
+        MarketResolutionManagerAbci.MarketResolutionManagerAbciApp,
         TransactionSettlementAbci.TransactionSubmissionAbciApp,
+        MechInteractAbci.MechInteractAbciApp,
         ResetPauseAbciApp,
     ),
     abci_app_transition_mapping,
