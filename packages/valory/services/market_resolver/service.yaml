@@ -1,0 +1,42 @@
+name: market_resolver
+author: valory
+version: 0.1.0
+description: The market resolver service.
+aea_version: '>=2.0.0, <3.0.0'
+license: Apache-2.0
+fingerprint:
+  README.md: bafybeie6lb2mlmzmkycbcfma4onidhegfu4ipgpybg2av5mhfs5zx42b2m
+fingerprint_ignore_patterns: []
+agent: valory/market_resolver:0.1.0:bafybeif3kh4dca7ydlpomg3fnfcha2ifq7qu6uocctwu6nb2rtytnw7boi
+number_of_agents: 1
+deployment:
+  agent:
+    default:
+      startup_command: null
+  network:
+    default: {}
+---
+public_id: valory/market_resolver_abci:0.1.0
+type: skill
+models:
+  params:
+    args:
+      setup:
+        all_participants: ${ALL_PARTICIPANTS:list:["0x0000000000000000000000000000000000000000"]}
+        safe_contract_address: ${SAFE_CONTRACT_ADDRESS:str:0x0000000000000000000000000000000000000000}
+        consensus_threshold: ${CONSENSUS_THRESHOLD:int:null}
+      reset_pause_duration: ${RESET_PAUSE_DURATION:int:1800}
+      reset_tendermint_after: ${RESET_TENDERMINT_AFTER:int:1}
+      on_chain_service_id: ${ON_CHAIN_SERVICE_ID:int:null}
+      multisend_address: ${MULTISEND_ADDRESS:str:0x0000000000000000000000000000000000000000}
+      expected_service_owner_address: ${EXPECTED_SERVICE_OWNER_ADDRESS:str:0x0000000000000000000000000000000000000000}
+      funds_forwarder_token_config: ${FUNDS_FORWARDER_TOKEN_CONFIG:str:{}}
+      realitio_contract: ${REALITIO_CONTRACT:str:0x79e32aE03fb27B07C89c0c568F80287C01ca2E57}
+      realitio_oracle_proxy_contract: ${REALITIO_ORACLE_PROXY_CONTRACT:str:0x0000000000000000000000000000000000000000}
+      conditional_tokens_contract: ${CONDITIONAL_TOKENS_CONTRACT:str:0xCeAfDD6bc0bEF976fdCd1112955828E00543c0Ce}
+      collateral_tokens_contract: ${COLLATERAL_TOKENS_CONTRACT:str:0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d}
+      xdai_threshold: ${XDAI_THRESHOLD:int:3000000000000000000}
+      redeem_winnings_batch_size: ${REDEEM_WINNINGS_BATCH_SIZE:int:5}
+  omen_subgraph:
+    args:
+      url: ${OMEN_SUBGRAPH_URL:str:https://api.thegraph.com/subgraphs/name/protofire/omen-xdai}
