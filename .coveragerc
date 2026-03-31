@@ -1,0 +1,25 @@
+[run]
+branch = True
+source =
+    packages/valory
+omit =
+    */tests/*
+    */__init__.py
+    */__pycache__/*
+    */*_pb2.py
+    */*_pb2_grpc.py
+
+[report]
+fail_under = 100
+show_missing = True
+exclude_lines =
+    pragma: no cover
+    raise NotImplementedError
+    if TYPE_CHECKING:
+    @abstractmethod
+    pass
+partial_branches =
+    pragma: no branch
+
+[html]
+directory = htmlcov
