@@ -9,12 +9,12 @@ aea_version: '>=2.0.0, <3.0.0'
 fingerprint:
   README.md: bafybeiahbbj3x5pfg3tqbnrrnw2mhc2jguaqrwg7pjzk2ycxoqmlm6scje
   __init__.py: bafybeig5dyyxibrg3ouf4ax53l5mpytzttebdvqmjewltawxtswk4op364
-  behaviours.py: bafybeib27uwfufrwyjtcudecvoedtoc2tvltiocnxaonidx5xtjl6avmc4
-  composition.py: bafybeierx73owf4izf2uyotp6ftyl3h53lhvhwto4uxekdtbdlh2hcx2p4
+  behaviours.py: bafybeifzfyykbrqdsqqrhmmghesn3ztjx7jvrkztars5fdj6kw4r6tdyny
+  composition.py: bafybeier2r6yb4syt3nbnsqzxkm3jvfnmsc36v6bg4dsl65bd6s5rfpgty
   dialogues.py: bafybeidhc2scoo5hrmpovzoem5s36b3yas6vggkkajoijautv7g3bqaeb4
-  fsm_specification.yaml: bafybeigjsob62kd5xyrwn2c4kxbadbd3oztdnwbgmu6cn5ao5olqco5ley
+  fsm_specification.yaml: bafybeih6kkiixsyqnstpu2c2yuv4lspsmgirakuo4k2k4ur25siv6bu4tu
   handlers.py: bafybeibl7txv6psjg3bl6tr5y5yigpl4bgqe5aoao62v5v7gwh26soz2au
-  models.py: bafybeih5qbqn2n7zgbkgwnebrhkpvoqmkxsxrwdwiogj2dj73w6v5f33ki
+  models.py: bafybeihwqf72psxcewszs2poh7yjukntvmminez5qbmftgtxvaximzfzou
   tests/__init__.py: bafybeibb6rglfusig6k56wjqe6pofhyjt2hbknwk6culahlooxo73bx2lu
 fingerprint_ignore_patterns: []
 connections: []
@@ -29,7 +29,8 @@ skills:
 - valory/identify_service_owner_abci:0.1.0:bafybeid3uz3zy2feigoyw47jknqg3m5nwettuazprefzmz57jgktdsumne
 - valory/funds_forwarder_abci:0.1.0:bafybeig4kflknvmbpbsaeeim4kurgpjvpduu36xfcjm3ehrjhxamt6byaa
 - valory/omen_funds_recoverer_abci:0.1.0:bafybeicr7c5pbar6qk5c45qgbkvbl4aaz7nqwxsbtcw2n45dcotukjme7i
-- valory/market_resolution_manager_abci:0.1.0:bafybeidvlxtypu47nlnmvj4vnrtdjhvdg7eokfwr6kjbi25wutdme2hkxa
+- valory/mech_interact_abci:0.1.0:bafybeibrmrdpys5xfivpmlyerbwlu2am2rmqb75bwub3cvcrvfwdbqxv54
+- valory/market_resolution_manager_abci:0.1.0:bafybeidbhuozqe3ylto4s5zga43baqakcnih34yfdkews67b7wdua6nyny
 behaviours:
   main:
     args: {}
@@ -167,6 +168,23 @@ models:
       max_challenge_bond: 100000000000000000000
       max_escalation_rounds: 5
       max_mech_retries: 3
+      mech_interact_round_timeout_seconds: 1200
+      mech_interaction_sleep_time: 10
+      use_mech_marketplace: false
+      mech_marketplace_config:
+        mech_marketplace_address: '0x0000000000000000000000000000000000000000'
+        priority_mech_address: '0x0000000000000000000000000000000000000000'
+        priority_mech_staking_instance_address: '0x0000000000000000000000000000000000000000'
+        priority_mech_service_id: 0
+        requester_staking_instance_address: '0x0000000000000000000000000000000000000000'
+        response_timeout: 300
+        use_dynamic_mech_selection: false
+      mech_contract_address: '0x77af31de935740567cf4ff1986d04b2c964a786a'
+      mech_wrapped_native_token_address: '0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d'
+      irrelevant_tools: []
+      ignored_mechs: []
+      penalize_mech_time_window: 1800
+      deliveries_lookback_days: 30
     class_name: Params
   conditional_tokens_subgraph:
     args:
@@ -215,6 +233,46 @@ models:
       retries: 5
       url: https://drand.cloudflare.com/public/latest
     class_name: RandomnessApi
+  mech_response:
+    args:
+      api_id: mech_response
+      headers:
+        Content-Type: application/json
+      method: GET
+      parameters: {}
+      response_key: result
+      response_type: str
+      retries: 5
+      url: ''
+    class_name: MechResponseSpecs
+  mech_tools:
+    args:
+      api_id: mech_tools
+      headers:
+        Content-Type: application/json
+      method: GET
+      parameters: {}
+      response_key: tools
+      response_type: list
+      retries: 5
+      url: ''
+    class_name: MechToolsSpecs
+  mechs_subgraph:
+    args:
+      api_id: mechs
+      headers:
+        Content-Type: application/json
+      method: POST
+      parameters: {}
+      response_key: data:meches
+      response_type: list
+      error_key: errors
+      error_index: 0
+      error_type: dict
+      retries: 5
+      url: https://api.subgraph.autonolas.tech/api/proxy/marketplace-gnosis
+      delivery_rate_cap: 10000000000000000
+    class_name: MechsSubgraph
   requests:
     args: {}
     class_name: Requests

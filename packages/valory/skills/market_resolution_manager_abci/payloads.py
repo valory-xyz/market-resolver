@@ -36,8 +36,14 @@ class ScanPendingMarketsPayload(BaseTxPayload):
 
 @dataclass(frozen=True)
 class EvaluateAnswersPayload(BaseTxPayload):
-    """Payload for the EvaluateAnswersRound."""
+    """Payload for the EvaluateAnswersRound.
 
+    Two mutually exclusive fields:
+    - mech_requests: JSON-serialized list of MechMetadata dicts (needs Mech)
+    - evaluation_result: status string (has existing data, skip Mech)
+    """
+
+    mech_requests: Optional[str] = None
     evaluation_result: Optional[str] = None
 
 

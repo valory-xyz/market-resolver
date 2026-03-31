@@ -19,7 +19,9 @@
 
 """This module contains the rounds for the market resolution manager."""
 
-from typing import Dict, FrozenSet, Optional, Set
+import json
+from enum import Enum
+from typing import Dict, FrozenSet, List, Optional, Set, Tuple
 
 from packages.valory.skills.abstract_round_abci.base import (
     AbciApp,
@@ -39,33 +41,50 @@ from packages.valory.skills.market_resolution_manager_abci.payloads import (
 from packages.valory.skills.market_resolution_manager_abci.states.base import (
     Event,
 )
+from packages.valory.skills.mech_interact_abci.states.base import (
+    MechInteractionResponse,
+    MechMetadata,
+)
 
 
 class SynchronizedData(BaseSynchronizedData):
     """Class to represent the synchronized data.
 
-    The questions_db is NOT stored here — it lives on SharedState (context.state)
-    to avoid passing large data through Tendermint consensus.
-    Only lightweight consensus fields are stored here.
+    The questions_db lives on SharedState (not here) — too heavy for Tendermint.
+    Mech requests/responses are stored here for MechInteract integration.
     """
 
     @property
     def selected_market_id(self) -> Optional[str]:
-        """Get the selected question ID for this cycle."""
+        """Get the selected market ID for this cycle."""
         return self.db.get("selected_market_id", None)
 
     @property
     def selected_market_action(self) -> Optional[str]:
-        """Get the action for the selected question."""
+        """Get the action for the selected market."""
         return self.db.get("selected_market_action", None)
+
+    @property
+    def mech_requests(self) -> List[MechMetadata]:
+        """Get the mech requests."""
+        serialized = self.db.get("mech_requests", "[]")
+        if serialized is None:
+            serialized = "[]"
+        requests = json.loads(serialized)
+        return [MechMetadata(**item) for item in requests]
+
+    @property
+    def mech_responses(self) -> List[MechInteractionResponse]:
+        """Get the mech responses."""
+        serialized = self.db.get("mech_responses", "[]")
+        if serialized is None:
+            serialized = "[]"
+        responses = json.loads(serialized)
+        return [MechInteractionResponse(**item) for item in responses]
 
 
 class ScanPendingMarketsRound(CollectSameUntilThresholdRound):
-    """Round to scan pending markets and classify questions.
-
-    Agents agree on: n_markets, selected_market_id, selected_market_action.
-    The full questions_db is computed deterministically by each agent locally.
-    """
+    """Round to scan pending markets and classify questions."""
 
     payload_class = ScanPendingMarketsPayload
     synchronized_data_class = SynchronizedData
@@ -81,10 +100,12 @@ class ScanPendingMarketsRound(CollectSameUntilThresholdRound):
 
 
 class EvaluateAnswersRound(CollectSameUntilThresholdRound):
-    """Round to evaluate answers — simulated Mech or reuse existing data.
+    """Round to evaluate answers — request Mech or reuse existing data.
 
-    done_event → BuildChallengesTxRound (has evaluation)
-    none_event → FinishedWithMechRequestRound (needs real Mech — not used yet)
+    Custom end_block to handle two "data present" paths:
+    - mech_requests set → DONE → FinishedWithMechRequestRound (needs Mech)
+    - evaluation_result set → NONE → BuildChallengesTxRound (has data, skip Mech)
+    - both None → NO_MAJORITY fallback
     """
 
     payload_class = EvaluateAnswersPayload
@@ -93,7 +114,37 @@ class EvaluateAnswersRound(CollectSameUntilThresholdRound):
     none_event = Event.NONE
     no_majority_event = Event.NO_MAJORITY
     collection_key = "participant_to_evaluate"
-    selection_key = ("evaluation_result",)
+    selection_key = (
+        get_name(SynchronizedData.mech_requests),
+        "evaluation_result",
+    )
+
+    def end_block(self) -> Optional[Tuple[BaseSynchronizedData, Enum]]:
+        """Process the end of the block.
+
+        Routes based on which field is set:
+        - mech_requests → DONE → FinishedWithMechRequestRound
+        - evaluation_result → NONE → BuildChallengesTxRound
+        """
+        if self.threshold_reached:
+            values = dict(
+                zip(self.selection_key, self.most_voted_payload_values)
+            )
+            values[self.collection_key] = self.serialized_collection
+            synchronized_data = self.synchronized_data.update(
+                synchronized_data_class=self.synchronized_data_class,
+                **values,
+            )
+            if values.get(get_name(SynchronizedData.mech_requests)) is not None:
+                return synchronized_data, self.done_event
+            if values.get("evaluation_result") is not None:
+                return synchronized_data, self.none_event
+            return self.synchronized_data, self.no_majority_event
+        if not self.is_majority_possible(
+            self.collection, self.synchronized_data.nb_participants
+        ):
+            return self.synchronized_data, self.no_majority_event
+        return None
 
 
 class BuildChallengesTxRound(CollectSameUntilThresholdRound):
@@ -146,8 +197,8 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
             - no majority: 0.
             - round timeout: 0.
         1. EvaluateAnswersRound
-            - done: 2.
-            - none: 4.
+            - done: 4.
+            - none: 2.
             - no majority: 3.
             - round timeout: 3.
         2. BuildChallengesTxRound
@@ -184,8 +235,8 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
             Event.ROUND_TIMEOUT: ScanPendingMarketsRound,
         },
         EvaluateAnswersRound: {
-            Event.DONE: BuildChallengesTxRound,
-            Event.NONE: CleanupTrackedMarketsRound,
+            Event.DONE: FinishedWithMechRequestRound,
+            Event.NONE: BuildChallengesTxRound,
             Event.NO_MAJORITY: CleanupTrackedMarketsRound,
             Event.ROUND_TIMEOUT: CleanupTrackedMarketsRound,
         },
@@ -201,12 +252,12 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
             Event.NO_MAJORITY: FinishedResolutionRound,
             Event.ROUND_TIMEOUT: FinishedResolutionRound,
         },
-        # FinishedWithMechRequestRound: {},  # TODO: re-enable with real Mech
+        FinishedWithMechRequestRound: {},
         FinishedWithChallengeTxRound: {},
         FinishedResolutionRound: {},
     }
     final_states: Set[AppState] = {
-        # FinishedWithMechRequestRound,  # TODO: re-enable with real Mech
+        FinishedWithMechRequestRound,
         FinishedWithChallengeTxRound,
         FinishedResolutionRound,
     }
@@ -220,6 +271,9 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
         CleanupTrackedMarketsRound: set(),
     }
     db_post_conditions: Dict[AppState, Set[str]] = {
+        FinishedWithMechRequestRound: {
+            get_name(SynchronizedData.mech_requests)
+        },
         FinishedWithChallengeTxRound: {"most_voted_tx_hash"},
         FinishedResolutionRound: set(),
     }

@@ -687,17 +687,76 @@ The resolver uses `mech_interact_abci` the same way market-creator does. The cor
 
 **Deliverable**: Fully implemented `market_resolution_manager_abci` skill, all rounds working.
 
-### Phase 3: Integrate `market_resolution_manager_abci` into Composed App
+### Phase 3: Integrate `market_resolution_manager_abci` into Composed App ✅ COMPLETE (simulated Mech)
 
-**Goal**: Wire the core skill and MechInteract into the running agent from Phase 1. ✅ COMPLETE
+**Status**: Core skill wired into composed app. Mech is simulated (hardcoded answer=NO). Agent scans mainnet markets, classifies them, simulated Mech evaluates, `sys.exit(1)` breakpoint before any challenge tx.
 
 **Key decisions:**
 - `market_resolution_manager_abci` is `is_abstract: true` (required for chaining)
-- `CleanupTrackedMarketsRound` added to `initial_states` (entered from MechInteract skip/timeout via composition)
+- `CleanupTrackedMarketsRound` added to `initial_states` (entered from composition after TxSettlement or MechInteract)
 - `FinishedWithChallengeTxRound` has `most_voted_tx_hash` as post-condition (required by TxSettlement)
-- `FinishedTransactionSubmissionRound` routes to `MechResponseRound` (handles both Mech request tx and challenge tx settlement)
-- TODO: add PostTransactionRound to multiplex based on tx_submitter (currently MechResponse handles both)
-- `mech_interact_round_timeout_seconds` and `mech_interaction_sleep_time` read with `kwargs.get` (not pop) to avoid consuming them before MechParams
+- `questions_db` stored on `SharedState` (not SynchronizedData) — too heavy for Tendermint consensus
+- Payloads are lightweight: market counts, selected market ID, action strings
+- DB keyed by FPMM market ID (not Realitio question ID) — both stored in each entry
+- Two Omen subgraph queries: pending (unanswered) + finalizing (answered but not yet finalized)
+
+### Phase 3b: Real MechInteract Integration
+
+**Goal**: Replace simulated Mech with real MechInteract skill. Always go through Mech (no re-challenge optimization yet).
+
+**Approach (option 2 — simple, no custom end_block):**
+- `EvaluateAnswersRound`: single `mech_requests` field in payload
+  - `mech_requests` not None → `done_event` → `FinishedWithMechRequestRound` → MechInteract
+  - `mech_requests` None → `none_event` → `CleanupTrackedMarketsRound` (nothing to evaluate)
+- After MechInteract: `FinishedMechResponseRound` → `BuildChallengesTxRound` (via composition)
+- `BuildChallengesTxRound` reads `mech_responses` from SynchronizedData
+- Always queries Mech, even for re-challenges (optimization deferred)
+
+**Steps:**
+
+1. **Re-add `FinishedWithMechRequestRound`** to rounds.py (degenerate, final state)
+2. **Update `EvaluateAnswersRound` transitions:**
+   - `done_event → FinishedWithMechRequestRound` (needs Mech)
+   - `none_event → CleanupTrackedMarketsRound` (nothing to evaluate)
+3. **Update `EvaluateAnswersPayload`:**
+   - Single field: `mech_requests: Optional[str]` (JSON-serialized list of MechMetadata dicts)
+   - `selection_key = get_name(SynchronizedData.mech_requests)`
+4. **Update `EvaluateAnswersBehaviour`:**
+   - Build `MechMetadata(nonce=market_id, tool=mech_tool, prompt=question_title)` for selected market
+   - Serialize as `json.dumps([asdict(metadata)])` and send as payload
+   - Remove all simulated Mech code
+5. **Add `mech_requests` and `mech_responses` to `SynchronizedData`:**
+   - `mech_requests` property: JSON → List[MechMetadata]
+   - `mech_responses` property: JSON → List[MechInteractionResponse]
+6. **Update `BuildChallengesTxBehaviour`:**
+   - Read `mech_responses` from SynchronizedData
+   - Parse Mech answer (JSON result field)
+   - Compare with on-chain answer
+   - Update questions_db with evaluation data
+   - Print detailed challenge info and `sys.exit(1)` breakpoint
+7. **Re-add MechInteract to composed app:**
+   - Add `MechInteractAbciApp` to chain
+   - Add composition mappings for all MechInteract final states
+   - Add PostTransactionRound or route TxSettlement → ScanPendingMarkets (simple for now)
+8. **Re-add MechInteract models, params, skill deps:**
+   - models.py: MechResponseSpecs, MechToolsSpecs, MechsSubgraph, MechInteractParams
+   - skill.yaml: mech_interact_abci dependency, Mech model configs, Mech params
+   - agent config + service.yaml: Mech overrides
+   - behaviours.py: MechInteractRoundBehaviour
+
+**PostTransactionRound (deferred):**
+- Currently TxSettlement → ScanPendingMarkets for all txs
+- This means after Mech request tx settles, it restarts scan instead of polling for response
+- Full Mech round trip requires PostTransactionRound that checks `tx_submitter`:
+  - MechRequestRound → MechResponseRound
+  - BuildChallengesTx → CleanupTrackedMarkets
+  - Recovery → ScanPendingMarkets
+- For now, after Mech request tx settles → scan → re-evaluate → Mech detects pending request → responds
+
+**Re-challenge optimization (deferred):**
+- Currently always queries Mech even when we already have evaluation data
+- Future: check `entry.evaluation` in EvaluateAnswers, skip Mech if data exists and answer unchanged
+- Requires custom end_block or an additional event to route EvaluateAnswers → BuildChallenges directly
 
 1. Update `market_resolver_abci/composition.py`:
    - Add `MechInteractAbciApp` to the chain

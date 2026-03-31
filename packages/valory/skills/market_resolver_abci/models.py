@@ -45,6 +45,19 @@ from packages.valory.skills.market_resolution_manager_abci.rounds import (
 from packages.valory.skills.market_resolver_abci.composition import (
     MarketResolverAbciApp,
 )
+from packages.valory.skills.mech_interact_abci.models import (
+    MechResponseSpecs as BaseMechResponseSpecs,
+)
+from packages.valory.skills.mech_interact_abci.models import (
+    MechToolsSpecs as BaseMechToolsSpecs,
+)
+from packages.valory.skills.mech_interact_abci.models import (
+    MechsSubgraph as BaseMechsSubgraph,
+)
+from packages.valory.skills.mech_interact_abci.models import (
+    Params as MechInteractAbciParams,
+)
+from packages.valory.skills.mech_interact_abci.rounds import Event as MechInteractEvent
 from packages.valory.skills.omen_funds_recoverer_abci.models import (
     ConditionalTokensSubgraph as BaseConditionalTokensSubgraph,
 )
@@ -73,6 +86,9 @@ RandomnessApi = ApiSpecs
 OmenSubgraph = BaseOmenSubgraph
 ConditionalTokensSubgraph = BaseConditionalTokensSubgraph
 RealitioSubgraph = BaseRealitioSubgraph
+MechResponseSpecs = BaseMechResponseSpecs
+MechToolsSpecs = BaseMechToolsSpecs
+MechsSubgraph = BaseMechsSubgraph
 
 
 class SharedState(BaseSharedState):
@@ -117,12 +133,16 @@ class SharedState(BaseSharedState):
         MarketResolverAbciApp.event_to_timeout[
             MarketResolutionManagerEvent.ROUND_TIMEOUT
         ] = self.context.params.round_timeout_seconds
+        MarketResolverAbciApp.event_to_timeout[MechInteractEvent.ROUND_TIMEOUT] = (
+            self.context.params.mech_interact_round_timeout_seconds
+        )
 
 
 class Params(
     MarketResolutionManagerParams,
     OmenFundsRecovererParams,
     FundsForwarderParams,
+    MechInteractAbciParams,
     TerminationParams,
 ):
     """A model to represent params for multiple abci apps."""
