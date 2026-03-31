@@ -45,12 +45,16 @@ packages/valory/skills/termination_abci
 packages/valory/skills/transaction_settlement_abci
 packages/valory/skills/funds_forwarder_abci
 packages/valory/skills/identify_service_owner_abci
+packages/valory/skills/omen_funds_recoverer_abci
 packages/valory/contracts/staking_token
+packages/valory/contracts/fpmm
 
 leak_report
+data/
 __pycache__
 temp/
 agent/
+market_resolver/
 logs/
 .env
 

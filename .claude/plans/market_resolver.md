@@ -46,7 +46,7 @@ All operations in this skill are **deterministic**: subgraph queries return the 
 
 ```
 Rounds:
-  0. ScanMarketsRound              # scan pending markets, classify answers
+  0. ScanPendingMarketsRound              # scan pending markets, classify answers
   1. EvaluateAnswersRound          # decide: request Mech or reuse existing data
   2. BuildChallengesTxRound        # build answer/challenge tx or mark as verified
   3. CleanupTrackingRound          # purge finalized markets from DB
@@ -54,15 +54,15 @@ Rounds:
   5. FinishedWithChallengeTxRound  (degenerate → TxSettlement)
   6. FinishedResolutionRound       (degenerate → ResetPause)
 
-Initial state: ScanMarketsRound
-Initial states: {ScanMarketsRound, BuildChallengesTxRound}
+Initial state: ScanPendingMarketsRound
+Initial states: {ScanPendingMarketsRound, BuildChallengesTxRound}
 
 Transition function:
-  ScanMarketsRound:
+  ScanPendingMarketsRound:
     DONE          → EvaluateAnswersRound          # found actionable question
     NONE          → CleanupTrackingRound          # all OK or no pending markets
-    NO_MAJORITY   → ScanMarketsRound
-    ROUND_TIMEOUT → ScanMarketsRound
+    NO_MAJORITY   → ScanPendingMarketsRound
+    ROUND_TIMEOUT → ScanPendingMarketsRound
 
   EvaluateAnswersRound:
     DONE          → FinishedWithMechRequestRound  # needs Mech → MechInteract → BuildChallenges
@@ -86,7 +86,7 @@ Transition function:
 ### Flow Diagram
 
 ```
-ScanMarkets ──DONE──► EvaluateAnswers ──DONE──► [MechInteract]
+ScanPendingMarkets ──DONE──► EvaluateAnswers ──DONE──► [MechInteract]
     │                       │                         │
     │                       │──NONE──┐                ▼
     │                                ▼         BuildChallengesTx
@@ -105,7 +105,7 @@ ScanMarkets ──DONE──► EvaluateAnswers ──DONE──► [MechInterac
 
 ## Round Details
 
-### `ScanMarketsRound`
+### `ScanPendingMarketsRound`
 
 **Purpose**: Discover pending markets from watched creators, classify by answer status, and pick the first actionable question.
 
@@ -523,7 +523,7 @@ FinishedFundsForwarderNoTxRound         → RemoveLiquidityRound
 
 # Fund recovery
 FinishedWithRecoveryTxRound             → TxSettlement
-FinishedWithoutRecoveryTxRound          → ScanMarketsRound
+FinishedWithoutRecoveryTxRound          → ScanPendingMarketsRound
 
 # Watchdog
 FinishedWithMechRequestRound            → MechVersionDetectionRound
@@ -628,11 +628,11 @@ The resolver uses `mech_interact_abci` the same way market-creator does. The cor
 5. Wire `fsm_specification.yaml`
 6. Verify: `autonomy analyse fsm-specs`, `autonomy analyse docstrings`
 
-**Checkpoint**: Skeleton skill that cycles through `ScanMarkets → Cleanup → Reset` doing nothing.
+**Checkpoint**: Skeleton skill that cycles through `ScanPendingMarkets → Cleanup → Reset` doing nothing.
 
-#### 2b. `ScanMarketsRound` — Subgraph Queries & Classification
+#### 2b. `ScanPendingMarketsRound` — Subgraph Queries & Classification
 
-1. Implement `ScanMarketsBehaviour`:
+1. Implement `ScanPendingMarketsBehaviour`:
    - Query Omen subgraph for pending markets from `watched_creator_addresses`
    - Query Realitio subgraph for latest answerers
    - Load `questions_db` from SynchronizedData
@@ -673,7 +673,7 @@ The resolver uses `mech_interact_abci` the same way market-creator does. The cor
 #### 2e. `CleanupTrackingRound` — DB Maintenance
 
 1. Implement `CleanupTrackingBehaviour`:
-   - Query subgraph for finalized questions (or use data from ScanMarkets)
+   - Query subgraph for finalized questions (or use data from ScanPendingMarkets)
    - Remove entries from `questions_db` where `answerFinalizedTimestamp != null`
    - Submit updated DB
 
@@ -692,7 +692,7 @@ The resolver uses `mech_interact_abci` the same way market-creator does. The cor
 
      ```python
      # Fund recovery → Core skill
-     OmenFundsRecovererAbci.FinishedWithoutRecoveryTxRound → ScanMarketsRound
+     OmenFundsRecovererAbci.FinishedWithoutRecoveryTxRound → ScanPendingMarketsRound
 
      # Core skill → MechInteract
      MarketResolutionManagerAbci.FinishedWithMechRequestRound → MechVersionDetectionRound

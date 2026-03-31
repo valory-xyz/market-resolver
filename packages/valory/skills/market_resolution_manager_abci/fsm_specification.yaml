@@ -1,0 +1,39 @@
+alphabet_in:
+- DONE
+- NONE
+- NO_MAJORITY
+- ROUND_TIMEOUT
+default_start_state: ScanPendingMarketsRound
+final_states:
+- FinishedResolutionRound
+- FinishedWithChallengeTxRound
+- FinishedWithMechRequestRound
+label: MarketResolutionManagerAbciApp
+start_states:
+- BuildChallengesTxRound
+- ScanPendingMarketsRound
+states:
+- BuildChallengesTxRound
+- CleanupTrackingRound
+- EvaluateAnswersRound
+- FinishedResolutionRound
+- FinishedWithChallengeTxRound
+- FinishedWithMechRequestRound
+- ScanPendingMarketsRound
+transition_func:
+    (BuildChallengesTxRound, DONE): FinishedWithChallengeTxRound
+    (BuildChallengesTxRound, NONE): CleanupTrackingRound
+    (BuildChallengesTxRound, NO_MAJORITY): CleanupTrackingRound
+    (BuildChallengesTxRound, ROUND_TIMEOUT): CleanupTrackingRound
+    (CleanupTrackingRound, DONE): FinishedResolutionRound
+    (CleanupTrackingRound, NONE): FinishedResolutionRound
+    (CleanupTrackingRound, NO_MAJORITY): FinishedResolutionRound
+    (CleanupTrackingRound, ROUND_TIMEOUT): FinishedResolutionRound
+    (EvaluateAnswersRound, DONE): FinishedWithMechRequestRound
+    (EvaluateAnswersRound, NONE): BuildChallengesTxRound
+    (EvaluateAnswersRound, NO_MAJORITY): CleanupTrackingRound
+    (EvaluateAnswersRound, ROUND_TIMEOUT): CleanupTrackingRound
+    (ScanPendingMarketsRound, DONE): EvaluateAnswersRound
+    (ScanPendingMarketsRound, NONE): CleanupTrackingRound
+    (ScanPendingMarketsRound, NO_MAJORITY): ScanPendingMarketsRound
+    (ScanPendingMarketsRound, ROUND_TIMEOUT): ScanPendingMarketsRound

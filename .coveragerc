@@ -1,7 +1,8 @@
 [run]
 branch = True
 source =
-    packages/valory
+    packages/valory/skills/market_resolver_abci
+    packages/valory/skills/market_resolution_manager_abci
 omit =
     */tests/*
     */__init__.py

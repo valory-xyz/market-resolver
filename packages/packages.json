@@ -1,5 +1,6 @@
 {
     "dev": {
+        "skill/valory/market_resolution_manager_abci/0.1.0": "bafybeief3tipaojnrcusvuenmyzigbdurt5uehbkfkj4mnmf7rzgkuugjy",
         "skill/valory/market_resolver_abci/0.1.0": "bafybeicm2xiunk52tgmr5a3zqajqztnbbsux3bzdgcg6dodrefja2bylsi",
         "agent/valory/market_resolver/0.1.0": "bafybeif3mohxj6cdr3v4xrriw36trksrpgj3twfrnz47tyy4taez5orn5u",
         "service/valory/market_resolver/0.1.0": "bafybeiaaopmj72pi2ycuvfjlar2sxg5ieat7fsxt3ic2qcylkx3t72i2pi"
