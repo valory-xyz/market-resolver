@@ -20,33 +20,36 @@
 """This module contains the payloads for the market resolution manager."""
 
 from dataclasses import dataclass
+from typing import Optional
 
 from packages.valory.skills.abstract_round_abci.base import BaseTxPayload
 
 
 @dataclass(frozen=True)
 class ScanPendingMarketsPayload(BaseTxPayload):
-    """Payload for the ScanMarketsRound."""
+    """Payload for the ScanPendingMarketsRound."""
 
-    content: str
+    n_markets: Optional[int] = None
+    selected_market_id: Optional[str] = None
+    selected_market_action: Optional[str] = None
 
 
 @dataclass(frozen=True)
 class EvaluateAnswersPayload(BaseTxPayload):
     """Payload for the EvaluateAnswersRound."""
 
-    content: str
+    evaluation_result: Optional[str] = None
 
 
 @dataclass(frozen=True)
 class BuildChallengesTxPayload(BaseTxPayload):
     """Payload for the BuildChallengesTxRound."""
 
-    content: str
+    challenge_data: Optional[str] = None
 
 
 @dataclass(frozen=True)
 class CleanupTrackedMarketsPayload(BaseTxPayload):
     """Payload for the CleanupTrackedMarketsRound."""
 
-    content: str
+    n_cleaned: Optional[int] = None

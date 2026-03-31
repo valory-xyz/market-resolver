@@ -40,7 +40,7 @@ protocols:
 skills:
 - valory/abstract_abci:0.1.0:bafybeict6h3wfmddpvam5gmmanqzuokup6ppoev3t4j5uyl7xxahjaols4
 - valory/abstract_round_abci:0.1.0:bafybeihygetmlgnhawrbyswvpvv3wpztr2hlhxkljmohp4r7qcmvglpwdq
-- valory/market_resolver_abci:0.1.0:bafybeidypa4yjmgdlvbykjogmupnde5233cvv5k5bei2jraxgrwhmvdb3a
+- valory/market_resolver_abci:0.1.0:bafybeialuem7trmkemoj45ulc3o5i2lgi3optumvioj666cnwrmmda6jxu
 - valory/registration_abci:0.1.0:bafybeif3gpewppz5wr5mmgyvaowsamjufyons3oif7cb4x5ubvvfb6rtda
 - valory/reset_pause_abci:0.1.0:bafybeidcnf77bc3o7pssa5zesilpbm4ley2k45taii5j5rrvvty7uhu3lq
 - valory/termination_abci:0.1.0:bafybeia33hlouukdpwaxctunauudv5gpfdxndimra7yqiof4a3skcwdqkq
@@ -48,8 +48,7 @@ skills:
 - valory/identify_service_owner_abci:0.1.0:bafybeid3uz3zy2feigoyw47jknqg3m5nwettuazprefzmz57jgktdsumne
 - valory/funds_forwarder_abci:0.1.0:bafybeig4kflknvmbpbsaeeim4kurgpjvpduu36xfcjm3ehrjhxamt6byaa
 - valory/omen_funds_recoverer_abci:0.1.0:bafybeicr7c5pbar6qk5c45qgbkvbl4aaz7nqwxsbtcw2n45dcotukjme7i
-- valory/mech_interact_abci:0.1.0:bafybeibrmrdpys5xfivpmlyerbwlu2am2rmqb75bwub3cvcrvfwdbqxv54
-- valory/market_resolution_manager_abci:0.1.0:bafybeiciej6ryv566tihttlcyieyaaeb7g6ayajyz6yla54ae7txmgukgu
+- valory/market_resolution_manager_abci:0.1.0:bafybeidvlxtypu47nlnmvj4vnrtdjhvdg7eokfwr6kjbi25wutdme2hkxa
 default_ledger: ethereum
 required_ledgers:
 - ethereum
@@ -216,16 +215,6 @@ models:
       claim_bonds_batch_size: ${int:10}
       min_balance_withdraw_realitio: ${int:10000000000000000000}
       realitio_start_block: ${int:0}
-      mech_interact_round_timeout_seconds: ${int:1200}
-      mech_interaction_sleep_time: ${int:10}
-      use_mech_marketplace: ${bool:false}
-      mech_marketplace_config: ${dict:{"mech_marketplace_address":"0x0000000000000000000000000000000000000000","priority_mech_address":"0x0000000000000000000000000000000000000000","priority_mech_staking_instance_address":"0x0000000000000000000000000000000000000000","priority_mech_service_id":0,"requester_staking_instance_address":"0x0000000000000000000000000000000000000000","response_timeout":300,"use_dynamic_mech_selection":false}}
-      mech_contract_address: ${str:0x77af31de935740567cf4ff1986d04b2c964a786a}
-      mech_wrapped_native_token_address: ${str:0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d}
-      irrelevant_tools: []
-      ignored_mechs: []
-      penalize_mech_time_window: ${int:1800}
-      deliveries_lookback_days: ${int:30}
       watched_creator_addresses: ${list:[]}
       trusted_addresses: ${list:[]}
       mech_tool: ${str:resolve-market-jury-v1}
@@ -236,36 +225,6 @@ models:
       max_challenge_bond: ${int:100000000000000000000}
       max_escalation_rounds: ${int:5}
       max_mech_retries: ${int:3}
-  mech_response:
-    args:
-      headers:
-        Content-Type: ${str:application/json}
-      method: ${str:GET}
-      response_key: ${str:result}
-      response_type: ${str:str}
-      retries: ${int:5}
-      url: ${str:''}
-  mech_tools:
-    args:
-      headers:
-        Content-Type: ${str:application/json}
-      method: ${str:GET}
-      response_key: ${str:tools}
-      response_type: ${str:list}
-      retries: ${int:5}
-      url: ${str:''}
-  mechs_subgraph:
-    args:
-      headers:
-        Content-Type: ${str:application/json}
-      method: ${str:POST}
-      response_key: ${str:data:meches}
-      response_type: ${str:list}
-      error_key: ${str:errors}
-      error_index: ${int:0}
-      error_type: ${str:dict}
-      retries: ${int:5}
-      url: ${str:https://api.subgraph.autonolas.tech/api/proxy/marketplace-gnosis}
   conditional_tokens_subgraph:
     args:
       headers:

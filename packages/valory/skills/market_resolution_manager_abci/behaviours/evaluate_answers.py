@@ -20,7 +20,7 @@
 """This module contains the EvaluateAnswersBehaviour."""
 
 import json
-from typing import Any, Dict, Generator, Optional
+from typing import Generator, Optional
 
 from packages.valory.skills.market_resolution_manager_abci.behaviours.base import (
     MarketResolutionManagerBaseBehaviour,
@@ -31,126 +31,141 @@ from packages.valory.skills.market_resolution_manager_abci.payloads import (
 from packages.valory.skills.market_resolution_manager_abci.rounds import (
     EvaluateAnswersRound,
 )
-from packages.valory.skills.market_resolution_manager_abci.states.base import Event
 
 # Status constants
 NEEDS_EVALUATION = "NEEDS_EVALUATION"
 CHALLENGE_PENDING = "CHALLENGE_PENDING"
 
+# Simulated Mech answer: always NO
+# Realitio encoding: 0x00...00 = NO, 0x00...01 = YES
+SIMULATED_MECH_ANSWER = (
+    "0x0000000000000000000000000000000000000000000000000000000000000000"
+)
+SIMULATED_MECH_CONFIDENCE = 0.92
+
 
 class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
-    """Behaviour to decide: request Mech or reuse existing evaluation data."""
+    """Behaviour to decide: request Mech or reuse existing evaluation data.
+
+    Currently simulates Mech by hardcoding answer=NO.
+    TODO: integrate with MechInteract for real AI evaluation.
+
+    Payload convention (CollectSameUntilThresholdRound):
+    - questions_db=<json> → done_event → BuildChallengesTxRound (has evaluation data)
+    - questions_db=None → none_event → FinishedWithMechRequestRound (needs real Mech)
+    """
 
     matching_round = EvaluateAnswersRound
 
     def async_act(self) -> Generator:
-        """Build Mech request or skip to BuildChallenges if data exists."""
-        question_id = self.synchronized_data.selected_question_id
-        action = self.synchronized_data.selected_question_action
+        """Evaluate the selected question — simulate Mech or reuse existing data."""
+        market_id = self.synchronized_data.selected_market_id
+        action = self.synchronized_data.selected_market_action
 
-        if question_id is None:
+        if market_id is None:
             self.context.logger.info("No selected question — nothing to evaluate.")
-            yield from self._send_payload(Event.NONE)
+            yield from self._send_payload(None)
             return
 
-        questions_db = self.synchronized_data.questions_db
-        entry = questions_db.get(question_id)
+        questions_db = dict(self.questions_db)
+        entry = questions_db.get(market_id)
         if entry is None:
             self.context.logger.error(
-                f"Question {question_id} not found in DB."
+                f"Question {market_id} not found in DB."
             )
-            yield from self._send_payload(Event.NONE)
+            yield from self._send_payload(None)
             return
 
-        # Check if we already have Mech evaluation data
+        # Re-challenge scenario: already have Mech data, skip to BuildChallenges
         if action == CHALLENGE_PENDING and entry.get("evaluation") is not None:
-            # Re-challenge scenario: skip Mech, go straight to BuildChallenges
             self.context.logger.info(
-                f"Question {question_id}: reusing existing Mech evaluation "
+                f"Question {market_id}: reusing existing Mech evaluation "
                 f"for re-challenge (skipping Mech request)."
             )
-            yield from self._send_payload(Event.NONE)
+            yield from self._send_payload(CHALLENGE_PENDING)
             return
 
         # Check retry limit
         retries = entry.get("mech_retries", 0)
         if retries >= self.params.max_mech_retries:
             self.context.logger.warning(
-                f"Question {question_id}: max Mech retries ({retries}) reached. "
-                f"Skipping."
+                f"Question {market_id}: max Mech retries ({retries}) reached."
             )
-            yield from self._send_payload(Event.NONE)
+            yield from self._send_payload(None)
             return
 
-        # Build Mech request
-        question_data = entry.get("on_chain_answer")
-        question_title = self._get_question_title(question_id)
+        # --- SIMULATED MECH EVALUATION ---
+        # TODO: replace with real MechInteract (send questions_db to trigger done_event)
+        on_chain_answer = entry.get("on_chain_answer")
+        agrees = on_chain_answer == SIMULATED_MECH_ANSWER
 
-        prompt = self._build_mech_prompt(
-            question_id=question_id,
-            question_title=question_title,
-            current_answer=question_data,
-            current_bond=entry.get("on_chain_bond"),
+        on_chain_label = (
+            "NO" if on_chain_answer == SIMULATED_MECH_ANSWER
+            else "YES" if on_chain_answer else "unanswered"
+        )
+        self.context.logger.info(
+            f"Question {market_id}: [SIMULATED MECH] answer=NO, "
+            f"confidence={SIMULATED_MECH_CONFIDENCE}, "
+            f"on_chain={on_chain_label}, agrees={agrees}"
         )
 
-        mech_request = {
-            "prompt": prompt,
+        entry["evaluation"] = {
+            "answer": SIMULATED_MECH_ANSWER,
+            "confidence": SIMULATED_MECH_CONFIDENCE,
+            "agrees_with_on_chain": agrees,
+            "reasoning": "[SIMULATED] Mech always answers NO for testing.",
+        }
+        entry["mech_request"] = {
+            "prompt": f"[SIMULATED] Evaluate question {market_id}",
             "tool": self.params.mech_tool,
-            "nonce": question_id,
+            "nonce": market_id,
+        }
+        entry["mech_response"] = {
+            "nonce": market_id,
+            "data": "simulated",
+            "requestId": 0,
+            "result": json.dumps({
+                "answer": SIMULATED_MECH_ANSWER,
+                "confidence": SIMULATED_MECH_CONFIDENCE,
+            }),
+            "error": "Unknown",
         }
 
-        self.context.logger.info(
-            f"Question {question_id}: requesting Mech evaluation "
-            f"with tool '{self.params.mech_tool}'."
-        )
-
-        # Store mech_requests for MechInteract to pick up
-        # The MechInteract skill reads from synchronized_data.mech_requests
-        mech_requests = json.dumps([mech_request])
-        # TODO: write mech_requests to synchronized data via payload
-        # For now, emit DONE to route to MechInteract
-        yield from self._send_payload(Event.DONE)
-
-    def _build_mech_prompt(
-        self,
-        question_id: str,
-        question_title: Optional[str],
-        current_answer: Optional[str],
-        current_bond: Optional[str],
-    ) -> str:
-        """Build the Mech prompt for market evaluation."""
-        parts = []
-        if question_title:
-            parts.append(f"Question: {question_title}")
-        else:
-            parts.append(f"Question ID: {question_id}")
-
-        if current_answer is not None:
-            parts.append(f"Current on-chain answer: {current_answer}")
-            if current_bond:
-                parts.append(f"Current bond: {current_bond} wei")
-            parts.append(
-                "Evaluate whether this answer is correct. "
-                "Return your answer and confidence."
+        if on_chain_answer is None:
+            entry["status"] = CHALLENGE_PENDING
+            self.context.logger.info(
+                f"Question {market_id}: unanswered, will submit answer NO."
+            )
+        elif agrees:
+            entry["status"] = "VERIFIED_OK"
+            self.context.logger.info(
+                f"Question {market_id}: Mech agrees. Marked VERIFIED_OK."
             )
         else:
-            parts.append(
-                "This question has no answer yet. "
-                "Provide the correct answer with confidence."
+            entry["status"] = CHALLENGE_PENDING
+            entry["detected_at"] = self.last_synced_timestamp
+            self.context.logger.info(
+                f"Question {market_id}: Mech DISAGREES. "
+                f"Marked CHALLENGE_PENDING."
             )
 
-        return "\n".join(parts)
+        questions_db[market_id] = entry
+        self.questions_db = questions_db
 
-    def _get_question_title(self, question_id: str) -> Optional[str]:
-        """Get the question title from the DB or subgraph data."""
-        # TODO: store title in DB during scan phase
-        return None
+        # done_event → BuildChallengesTxRound
+        yield from self._send_payload(entry["status"])
 
-    def _send_payload(self, event: Event) -> Generator:
-        """Send the evaluate payload."""
-        payload_data = json.dumps({"event": event.value})
+    def _send_payload(self, result: Optional[str]) -> Generator:
+        """Send the evaluate payload.
+
+        result=<status> → done_event → BuildChallengesTxRound
+        result=None → none_event → FinishedWithMechRequestRound
+        """
         sender = self.context.agent_address
-        payload = EvaluateAnswersPayload(sender=sender, content=payload_data)
+        payload = EvaluateAnswersPayload(
+            sender=sender,
+            evaluation_result=result,
+        )
         yield from self.send_a2a_transaction(payload)
         yield from self.wait_until_round_end()
         self.set_done()

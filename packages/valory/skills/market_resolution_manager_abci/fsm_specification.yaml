@@ -7,7 +7,6 @@ default_start_state: ScanPendingMarketsRound
 final_states:
 - FinishedResolutionRound
 - FinishedWithChallengeTxRound
-- FinishedWithMechRequestRound
 label: MarketResolutionManagerAbciApp
 start_states:
 - BuildChallengesTxRound
@@ -19,7 +18,6 @@ states:
 - EvaluateAnswersRound
 - FinishedResolutionRound
 - FinishedWithChallengeTxRound
-- FinishedWithMechRequestRound
 - ScanPendingMarketsRound
 transition_func:
     (BuildChallengesTxRound, DONE): FinishedWithChallengeTxRound
@@ -30,8 +28,8 @@ transition_func:
     (CleanupTrackedMarketsRound, NONE): FinishedResolutionRound
     (CleanupTrackedMarketsRound, NO_MAJORITY): FinishedResolutionRound
     (CleanupTrackedMarketsRound, ROUND_TIMEOUT): FinishedResolutionRound
-    (EvaluateAnswersRound, DONE): FinishedWithMechRequestRound
-    (EvaluateAnswersRound, NONE): BuildChallengesTxRound
+    (EvaluateAnswersRound, DONE): BuildChallengesTxRound
+    (EvaluateAnswersRound, NONE): CleanupTrackedMarketsRound
     (EvaluateAnswersRound, NO_MAJORITY): CleanupTrackedMarketsRound
     (EvaluateAnswersRound, ROUND_TIMEOUT): CleanupTrackedMarketsRound
     (ScanPendingMarketsRound, DONE): EvaluateAnswersRound

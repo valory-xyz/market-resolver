@@ -19,7 +19,6 @@
 
 """This module contains the ScanPendingMarketsBehaviour."""
 
-import json
 from string import Template
 from typing import Any, Dict, Generator, List, Optional
 
@@ -32,7 +31,6 @@ from packages.valory.skills.market_resolution_manager_abci.payloads import (
 from packages.valory.skills.market_resolution_manager_abci.rounds import (
     ScanPendingMarketsRound,
 )
-from packages.valory.skills.market_resolution_manager_abci.states.base import Event
 
 # Status constants
 TRUSTED_ANSWER = "TRUSTED_ANSWER"
@@ -43,6 +41,7 @@ CHALLENGE_PENDING = "CHALLENGE_PENDING"
 # Omen subgraph query: pending markets from watched creators
 # answerFinalizedTimestamp: null = not yet finalized
 # openingTimestamp_lt: now = market is past opening time
+# Pending markets (no answer yet)
 PENDING_MARKETS_QUERY = Template(
     """{
     fixedProductMarketMakers(
@@ -50,6 +49,36 @@ PENDING_MARKETS_QUERY = Template(
             creator_in: [${creators}]
             openingTimestamp_lt: ${current_timestamp}
             answerFinalizedTimestamp: null
+        }
+        first: 1000
+        orderBy: openingTimestamp
+        orderDirection: asc
+    ) {
+        id
+        creator
+        currentAnswer
+        currentAnswerBond
+        currentAnswerTimestamp
+        openingTimestamp
+        timeout
+        question {
+            id
+            data
+            currentAnswerBond
+        }
+        title
+    }
+}"""
+)
+
+# Finalizing markets (answered but finalization still in the future — can still be challenged)
+FINALIZING_MARKETS_QUERY = Template(
+    """{
+    fixedProductMarketMakers(
+        where: {
+            creator_in: [${creators}]
+            openingTimestamp_lt: ${current_timestamp}
+            answerFinalizedTimestamp_gt: ${current_timestamp}
         }
         first: 1000
         orderBy: openingTimestamp
@@ -118,7 +147,7 @@ class ScanPendingMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         answerers = yield from self._fetch_latest_answerers(question_ids)
 
         # Step 3: Classify questions and update DB
-        questions_db = dict(self.synchronized_data.questions_db)
+        questions_db = dict(self.questions_db)
         trusted = set(
             addr.lower() for addr in self.params.trusted_addresses
         )
@@ -128,64 +157,64 @@ class ScanPendingMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         now = self.last_synced_timestamp
 
         for market in markets:
+            market_id = market["id"]
             question_id = market["question"]["id"]
             current_answer = market.get("currentAnswer")
             current_bond = market.get("currentAnswerBond")
             current_answer_ts = market.get("currentAnswerTimestamp")
             timeout = int(market.get("timeout", 86400))
-            opening_ts = int(market.get("openingTimestamp", 0))
             latest_answerer = answerers.get(question_id, "").lower()
 
             # Re-scan: update existing DB entries if answer changed
             if question_id in questions_db:
-                entry = questions_db[question_id]
+                entry = questions_db[market_id]
                 stored_ts = entry.get("last_answer_timestamp")
 
                 if current_answer_ts and stored_ts != current_answer_ts:
                     # Answer changed on-chain
                     if latest_answerer in trusted:
-                        questions_db[question_id] = self._update_entry(
+                        questions_db[market_id] = self._update_entry(
                             entry, market, latest_answerer, TRUSTED_ANSWER
                         )
                         continue
                     elif entry.get("evaluation") is not None:
                         # Have prior Mech data — go to CHALLENGE_PENDING
-                        questions_db[question_id] = self._update_entry(
+                        questions_db[market_id] = self._update_entry(
                             entry, market, latest_answerer, CHALLENGE_PENDING
                         )
                     else:
                         # Need fresh evaluation
-                        questions_db[question_id] = self._update_entry(
+                        questions_db[market_id] = self._update_entry(
                             entry, market, latest_answerer, NEEDS_EVALUATION
                         )
                 # else: answer unchanged, keep current status
 
-                entry = questions_db[question_id]
+                entry = questions_db[market_id]
             else:
                 # New question — not in DB yet
                 if current_answer is None:
                     # Unanswered — needs initial answer via Mech
                     entry = self._new_entry(market, "", NEEDS_EVALUATION, now)
-                    questions_db[question_id] = entry
+                    questions_db[market_id] = entry
                 elif latest_answerer in trusted:
                     # Trusted answerer — track but no action
                     entry = self._new_entry(
                         market, latest_answerer, TRUSTED_ANSWER, now
                     )
-                    questions_db[question_id] = entry
+                    questions_db[market_id] = entry
                     continue
                 else:
                     # Non-trusted answerer — needs evaluation
                     entry = self._new_entry(
                         market, latest_answerer, NEEDS_EVALUATION, now
                     )
-                    questions_db[question_id] = entry
+                    questions_db[market_id] = entry
 
             # Determine if actionable
             status = entry["status"]
             if status == NEEDS_EVALUATION:
                 actionable.append(
-                    {"question_id": question_id, "action": NEEDS_EVALUATION}
+                    {"market_id": market_id, "action": NEEDS_EVALUATION}
                 )
             elif status == CHALLENGE_PENDING:
                 cooldown = timeout * self.params.challenge_cooldown_fraction
@@ -203,12 +232,12 @@ class ScanPendingMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
 
                 if urgency or cooldown_elapsed:
                     actionable.append(
-                        {"question_id": question_id, "action": CHALLENGE_PENDING}
+                        {"market_id": market_id, "action": CHALLENGE_PENDING}
                     )
 
         # Sort: unanswered first, then by finalization urgency
         def sort_key(item: Dict[str, Any]) -> tuple:
-            entry = questions_db[item["question_id"]]
+            entry = questions_db[item["market_id"]]
             is_unanswered = entry.get("on_chain_answer") is None
             last_ts = int(entry.get("last_answer_timestamp") or 0)
             timeout = int(entry.get("realitio_timeout", 86400))
@@ -217,39 +246,102 @@ class ScanPendingMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
 
         actionable.sort(key=sort_key)
 
+        # Log summary
+        n_trusted = sum(
+            1 for e in questions_db.values() if e["status"] == TRUSTED_ANSWER
+        )
+        n_verified = sum(
+            1 for e in questions_db.values() if e["status"] == "VERIFIED_OK"
+        )
+        n_eval = sum(
+            1 for e in questions_db.values() if e["status"] == NEEDS_EVALUATION
+        )
+        n_challenge = sum(
+            1 for e in questions_db.values() if e["status"] == CHALLENGE_PENDING
+        )
+        self.context.logger.info(
+            f"Scan complete: {len(questions_db)} markets tracked — "
+            f"{n_trusted} trusted, {n_verified} verified, "
+            f"{n_eval} need evaluation, {n_challenge} challenge pending"
+        )
+        for mid, entry in questions_db.items():
+            status = entry["status"]
+            if status in (TRUSTED_ANSWER, "VERIFIED_OK"):
+                continue
+            answer = entry.get("on_chain_answer") or "unanswered"
+            bond = entry.get("on_chain_bond") or "0"
+            answerer = entry.get("last_answerer", "")[:10]
+            self.context.logger.info(
+                f"  [{status}] {mid[:18]}... "
+                f"answer={answer} bond={bond} answerer={answerer}..."
+            )
+
         if not actionable:
             self.context.logger.info("No actionable questions found.")
-            yield from self._send_payload(
-                Event.NONE, questions_db, None, None
-            )
+            yield from self._send_payload(questions_db)
             return
 
-        # Pick the first actionable question
+        # Pick the first actionable market
         selected = actionable[0]
         self.context.logger.info(
-            f"Selected question {selected['question_id']} "
+            f"Selected market {selected['market_id']} "
             f"for action: {selected['action']}"
         )
         yield from self._send_payload(
-            Event.DONE,
             questions_db,
-            selected["question_id"],
+            selected["market_id"],
             selected["action"],
         )
 
     def _fetch_pending_markets(
         self, watched: List[str]
     ) -> Generator[None, None, Optional[List[Dict[str, Any]]]]:
-        """Fetch pending markets from Omen subgraph."""
+        """Fetch pending + finalizing markets from Omen subgraph.
+
+        Two queries:
+        1. Pending: answerFinalizedTimestamp is null (no answer yet)
+        2. Finalizing: answerFinalizedTimestamp > now (answered but not yet finalized)
+        """
         creators_str = ", ".join(f'"{c.lower()}"' for c in watched)
-        query = PENDING_MARKETS_QUERY.substitute(
+        now = self.last_synced_timestamp
+
+        # Query 1: pending (unanswered)
+        query1 = PENDING_MARKETS_QUERY.substitute(
             creators=creators_str,
-            current_timestamp=self.last_synced_timestamp,
+            current_timestamp=now,
         )
-        result = yield from self.get_omen_subgraph_result(query)
-        if result is None:
-            return None
-        return result.get("data", {}).get("fixedProductMarketMakers", [])
+        result1 = yield from self.get_omen_subgraph_result(query1)
+        pending = (
+            result1.get("data", {}).get("fixedProductMarketMakers", [])
+            if result1 else []
+        )
+
+        # Query 2: finalizing (answered, finalization in the future)
+        query2 = FINALIZING_MARKETS_QUERY.substitute(
+            creators=creators_str,
+            current_timestamp=now,
+        )
+        result2 = yield from self.get_omen_subgraph_result(query2)
+        finalizing = (
+            result2.get("data", {}).get("fixedProductMarketMakers", [])
+            if result2 else []
+        )
+
+        # Merge and deduplicate by market id
+        seen = set()
+        markets = []
+        for m in pending + finalizing:
+            mid = m.get("id")
+            if mid and mid not in seen:
+                seen.add(mid)
+                markets.append(m)
+
+        self.context.logger.info(
+            f"Fetched {len(pending)} pending + "
+            f"{len(finalizing)} finalizing = "
+            f"{len(markets)} total pending markets."
+        )
+        return markets
 
     def _fetch_latest_answerers(
         self, question_ids: List[str]
@@ -283,6 +375,8 @@ class ScanPendingMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         """Create a new questions_db entry."""
         return {
             "status": status,
+            "market_id": market.get("id"),
+            "question_id": market.get("question", {}).get("id"),
             "detected_at": now,
             "on_chain_answer": market.get("currentAnswer"),
             "on_chain_bond": market.get("currentAnswerBond"),
@@ -324,31 +418,29 @@ class ScanPendingMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
 
     def _send_payload(
         self,
-        event: Event,
         questions_db: Dict[str, Any],
-        selected_id: Optional[str],
-        selected_action: Optional[str],
+        selected_id: Optional[str] = None,
+        selected_action: Optional[str] = None,
     ) -> Generator:
-        """Send the scan payload."""
-        payload_data = json.dumps(
-            {
-                "event": event.value,
-                "questions_db": json.dumps(questions_db),
-                "selected_question_id": selected_id,
-                "selected_question_action": selected_action,
-            }
-        )
+        """Save DB locally and send lightweight payload for consensus."""
+        # Persist DB on shared state (local, not through Tendermint)
+        self.questions_db = questions_db
+
         sender = self.context.agent_address
-        payload = ScanPendingMarketsPayload(sender=sender, content=payload_data)
+        payload = ScanPendingMarketsPayload(
+            sender=sender,
+            n_markets=len(questions_db),
+            selected_market_id=selected_id,
+            selected_market_action=selected_action,
+        )
         yield from self.send_a2a_transaction(payload)
         yield from self.wait_until_round_end()
         self.set_done()
 
     def _send_none_payload(self) -> Generator:
         """Send a NONE payload (nothing to do)."""
-        yield from self._send_payload(
-            Event.NONE,
-            self.synchronized_data.questions_db,
-            None,
-            None,
-        )
+        sender = self.context.agent_address
+        payload = ScanPendingMarketsPayload(sender=sender)
+        yield from self.send_a2a_transaction(payload)
+        yield from self.wait_until_round_end()
+        self.set_done()

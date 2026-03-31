@@ -37,9 +37,6 @@ from packages.valory.skills.market_resolution_manager_abci.behaviours.round_beha
 from packages.valory.skills.market_resolver_abci.composition import (
     MarketResolverAbciApp,
 )
-from packages.valory.skills.mech_interact_abci.behaviours.round_behaviour import (
-    MechInteractRoundBehaviour,
-)
 from packages.valory.skills.omen_funds_recoverer_abci.behaviours.round_behaviour import (
     OmenFundsRecovererRoundBehaviour,
 )
@@ -73,6 +70,6 @@ class MarketResolverRoundBehaviour(AbstractRoundBehaviour):
         *TransactionSettlementRoundBehaviour.behaviours,
         *ResetPauseABCIConsensusBehaviour.behaviours,
         *TerminationAbciBehaviours.behaviours,
-        *MechInteractRoundBehaviour.behaviours,
+        # *MechInteractRoundBehaviour.behaviours,  # TODO: re-enable with real Mech
     }
     background_behaviours_cls = {BackgroundBehaviour}

@@ -56,6 +56,16 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
         return cast(MarketResolutionManagerParams, super().params)
 
     @property
+    def questions_db(self) -> Dict[str, Any]:
+        """Get the questions database from shared state."""
+        return self.context.state.questions_db
+
+    @questions_db.setter
+    def questions_db(self, value: Dict[str, Any]) -> None:
+        """Set the questions database on shared state."""
+        self.context.state.questions_db = value
+
+    @property
     def last_synced_timestamp(self) -> int:
         """Get last synced timestamp."""
         state = cast(SharedState, self.context.state)

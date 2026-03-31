@@ -19,9 +19,7 @@
 
 """This module contains the rounds for the market resolution manager."""
 
-import json
-from enum import Enum
-from typing import Any, Dict, FrozenSet, Optional, Set, Tuple
+from typing import Dict, FrozenSet, Optional, Set
 
 from packages.valory.skills.abstract_round_abci.base import (
     AbciApp,
@@ -46,88 +44,56 @@ from packages.valory.skills.market_resolution_manager_abci.states.base import (
 class SynchronizedData(BaseSynchronizedData):
     """Class to represent the synchronized data.
 
-    This data is replicated by the tendermint application.
+    The questions_db is NOT stored here — it lives on SharedState (context.state)
+    to avoid passing large data through Tendermint consensus.
+    Only lightweight consensus fields are stored here.
     """
 
     @property
-    def questions_db(self) -> Dict[str, Any]:
-        """Get the questions database."""
-        serialized = self.db.get("questions_db", "{}")
-        if serialized is None:
-            return {}
-        return json.loads(serialized)
-
-    @property
-    def selected_question_id(self) -> Optional[str]:
+    def selected_market_id(self) -> Optional[str]:
         """Get the selected question ID for this cycle."""
-        return self.db.get("selected_question_id", None)
+        return self.db.get("selected_market_id", None)
 
     @property
-    def selected_question_action(self) -> Optional[str]:
+    def selected_market_action(self) -> Optional[str]:
         """Get the action for the selected question."""
-        return self.db.get("selected_question_action", None)
+        return self.db.get("selected_market_action", None)
 
 
 class ScanPendingMarketsRound(CollectSameUntilThresholdRound):
-    """Round to scan pending markets and classify questions."""
+    """Round to scan pending markets and classify questions.
+
+    Agents agree on: n_markets, selected_market_id, selected_market_action.
+    The full questions_db is computed deterministically by each agent locally.
+    """
 
     payload_class = ScanPendingMarketsPayload
     synchronized_data_class = SynchronizedData
     done_event = Event.DONE
     none_event = Event.NONE
     no_majority_event = Event.NO_MAJORITY
-    collection_key = "scan_pending_markets"
-    selection_key = ("content",)
-
-    def end_block(self) -> Optional[Tuple[BaseSynchronizedData, Enum]]:
-        """Process the end of the block."""
-        if self.threshold_reached:
-            payload = json.loads(self.most_voted_payload)
-            event = Event(payload["event"])
-            synchronized_data = self.synchronized_data.update(
-                synchronized_data_class=SynchronizedData,
-                **{
-                    get_name(SynchronizedData.questions_db): payload.get(
-                        "questions_db", "{}"
-                    ),
-                    get_name(SynchronizedData.selected_question_id): payload.get(
-                        "selected_question_id"
-                    ),
-                    get_name(SynchronizedData.selected_question_action): payload.get(
-                        "selected_question_action"
-                    ),
-                },
-            )
-            return synchronized_data, event
-        if not self.is_majority_possible(
-            self.collection, self.synchronized_data.nb_participants
-        ):
-            return self.synchronized_data, Event.NO_MAJORITY
-        return None
+    collection_key = "participant_to_scan"
+    selection_key = (
+        "n_markets",
+        get_name(SynchronizedData.selected_market_id),
+        get_name(SynchronizedData.selected_market_action),
+    )
 
 
 class EvaluateAnswersRound(CollectSameUntilThresholdRound):
-    """Round to build Mech requests for questions needing evaluation."""
+    """Round to evaluate answers — simulated Mech or reuse existing data.
+
+    done_event → BuildChallengesTxRound (has evaluation)
+    none_event → FinishedWithMechRequestRound (needs real Mech — not used yet)
+    """
 
     payload_class = EvaluateAnswersPayload
     synchronized_data_class = SynchronizedData
     done_event = Event.DONE
     none_event = Event.NONE
     no_majority_event = Event.NO_MAJORITY
-    collection_key = "evaluate_answers"
-    selection_key = ("content",)
-
-    def end_block(self) -> Optional[Tuple[BaseSynchronizedData, Enum]]:
-        """Process the end of the block."""
-        if self.threshold_reached:
-            payload = json.loads(self.most_voted_payload)
-            event = Event(payload["event"])
-            return self.synchronized_data, event
-        if not self.is_majority_possible(
-            self.collection, self.synchronized_data.nb_participants
-        ):
-            return self.synchronized_data, Event.NO_MAJORITY
-        return None
+    collection_key = "participant_to_evaluate"
+    selection_key = ("evaluation_result",)
 
 
 class BuildChallengesTxRound(CollectSameUntilThresholdRound):
@@ -138,28 +104,8 @@ class BuildChallengesTxRound(CollectSameUntilThresholdRound):
     done_event = Event.DONE
     none_event = Event.NONE
     no_majority_event = Event.NO_MAJORITY
-    collection_key = "build_challenges"
-    selection_key = ("content",)
-
-    def end_block(self) -> Optional[Tuple[BaseSynchronizedData, Enum]]:
-        """Process the end of the block."""
-        if self.threshold_reached:
-            payload = json.loads(self.most_voted_payload)
-            event = Event(payload["event"])
-            synchronized_data = self.synchronized_data.update(
-                synchronized_data_class=SynchronizedData,
-                **{
-                    get_name(SynchronizedData.questions_db): payload.get(
-                        "questions_db", "{}"
-                    ),
-                },
-            )
-            return synchronized_data, event
-        if not self.is_majority_possible(
-            self.collection, self.synchronized_data.nb_participants
-        ):
-            return self.synchronized_data, Event.NO_MAJORITY
-        return None
+    collection_key = "participant_to_challenges"
+    selection_key = ("challenge_data",)
 
 
 class CleanupTrackedMarketsRound(CollectSameUntilThresholdRound):
@@ -170,27 +116,8 @@ class CleanupTrackedMarketsRound(CollectSameUntilThresholdRound):
     done_event = Event.DONE
     none_event = Event.NONE
     no_majority_event = Event.NO_MAJORITY
-    collection_key = "cleanup_tracked_markets"
-    selection_key = ("content",)
-
-    def end_block(self) -> Optional[Tuple[BaseSynchronizedData, Enum]]:
-        """Process the end of the block."""
-        if self.threshold_reached:
-            payload = json.loads(self.most_voted_payload)
-            synchronized_data = self.synchronized_data.update(
-                synchronized_data_class=SynchronizedData,
-                **{
-                    get_name(SynchronizedData.questions_db): payload.get(
-                        "questions_db", "{}"
-                    ),
-                },
-            )
-            return synchronized_data, Event.DONE
-        if not self.is_majority_possible(
-            self.collection, self.synchronized_data.nb_participants
-        ):
-            return self.synchronized_data, Event.NO_MAJORITY
-        return None
+    collection_key = "participant_to_cleanup"
+    selection_key = ("n_cleaned",)
 
 
 class FinishedWithMechRequestRound(DegenerateRound):
@@ -210,7 +137,7 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
 
     Initial round: ScanPendingMarketsRound
 
-    Initial states: {BuildChallengesTxRound, ScanPendingMarketsRound}
+    Initial states: {BuildChallengesTxRound, CleanupTrackedMarketsRound, ScanPendingMarketsRound}
 
     Transition states:
         0. ScanPendingMarketsRound
@@ -219,8 +146,8 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
             - no majority: 0.
             - round timeout: 0.
         1. EvaluateAnswersRound
-            - done: 4.
-            - none: 2.
+            - done: 2.
+            - none: 4.
             - no majority: 3.
             - round timeout: 3.
         2. BuildChallengesTxRound
@@ -257,8 +184,8 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
             Event.ROUND_TIMEOUT: ScanPendingMarketsRound,
         },
         EvaluateAnswersRound: {
-            Event.DONE: FinishedWithMechRequestRound,
-            Event.NONE: BuildChallengesTxRound,
+            Event.DONE: BuildChallengesTxRound,
+            Event.NONE: CleanupTrackedMarketsRound,
             Event.NO_MAJORITY: CleanupTrackedMarketsRound,
             Event.ROUND_TIMEOUT: CleanupTrackedMarketsRound,
         },
@@ -274,28 +201,25 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
             Event.NO_MAJORITY: FinishedResolutionRound,
             Event.ROUND_TIMEOUT: FinishedResolutionRound,
         },
-        FinishedWithMechRequestRound: {},
+        # FinishedWithMechRequestRound: {},  # TODO: re-enable with real Mech
         FinishedWithChallengeTxRound: {},
         FinishedResolutionRound: {},
     }
     final_states: Set[AppState] = {
-        FinishedWithMechRequestRound,
+        # FinishedWithMechRequestRound,  # TODO: re-enable with real Mech
         FinishedWithChallengeTxRound,
         FinishedResolutionRound,
     }
     event_to_timeout: Dict[Event, float] = {
         Event.ROUND_TIMEOUT: 180.0,
     }
-    cross_period_persisted_keys: FrozenSet[str] = frozenset(
-        {get_name(SynchronizedData.questions_db)}
-    )
+    cross_period_persisted_keys: FrozenSet[str] = frozenset()
     db_pre_conditions: Dict[AppState, Set[str]] = {
         ScanPendingMarketsRound: set(),
         BuildChallengesTxRound: set(),
         CleanupTrackedMarketsRound: set(),
     }
     db_post_conditions: Dict[AppState, Set[str]] = {
-        FinishedWithMechRequestRound: set(),
         FinishedWithChallengeTxRound: {"most_voted_tx_hash"},
         FinishedResolutionRound: set(),
     }
