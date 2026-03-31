@@ -1,0 +1,115 @@
+# -*- coding: utf-8 -*-
+# ------------------------------------------------------------------------------
+#
+#   Copyright 2026 Valory AG
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+#
+# ------------------------------------------------------------------------------
+
+"""This module contains the shared state for the market resolver ABCI application."""
+
+from packages.valory.skills.abstract_round_abci.models import ApiSpecs
+from packages.valory.skills.abstract_round_abci.models import (
+    BenchmarkTool as BaseBenchmarkTool,
+)
+from packages.valory.skills.abstract_round_abci.models import Requests as BaseRequests
+from packages.valory.skills.abstract_round_abci.models import (
+    SharedState as BaseSharedState,
+)
+from packages.valory.skills.funds_forwarder_abci.models import FundsForwarderParams
+from packages.valory.skills.funds_forwarder_abci.rounds import (
+    Event as FundsForwarderEvent,
+)
+from packages.valory.skills.identify_service_owner_abci.rounds import (
+    Event as IdentifyServiceOwnerEvent,
+)
+from packages.valory.skills.market_resolver_abci.composition import (
+    MarketResolverAbciApp,
+)
+from packages.valory.skills.omen_funds_recoverer_abci.models import (
+    OmenFundsRecovererParams,
+)
+from packages.valory.skills.omen_funds_recoverer_abci.models import (
+    ConditionalTokensSubgraph as BaseConditionalTokensSubgraph,
+)
+from packages.valory.skills.omen_funds_recoverer_abci.models import (
+    OmenSubgraph as BaseOmenSubgraph,
+)
+from packages.valory.skills.omen_funds_recoverer_abci.models import (
+    RealitioSubgraph as BaseRealitioSubgraph,
+)
+from packages.valory.skills.omen_funds_recoverer_abci.rounds import (
+    Event as OmenFundsRecovererEvent,
+)
+from packages.valory.skills.reset_pause_abci.rounds import Event as ResetPauseEvent
+from packages.valory.skills.termination_abci.models import TerminationParams
+from packages.valory.skills.transaction_settlement_abci.rounds import Event as TSEvent
+
+MARGIN = 5
+MULTIPLIER = 2
+
+Requests = BaseRequests
+BenchmarkTool = BaseBenchmarkTool
+RandomnessApi = ApiSpecs
+OmenSubgraph = BaseOmenSubgraph
+ConditionalTokensSubgraph = BaseConditionalTokensSubgraph
+RealitioSubgraph = BaseRealitioSubgraph
+
+
+class SharedState(BaseSharedState):
+    """Keep the current shared state of the skill."""
+
+    abci_app_cls = MarketResolverAbciApp
+
+    def setup(self) -> None:
+        """Set up."""
+        super().setup()
+        MarketResolverAbciApp.event_to_timeout[TSEvent.ROUND_TIMEOUT] = (
+            self.context.params.round_timeout_seconds
+        )
+        MarketResolverAbciApp.event_to_timeout[ResetPauseEvent.ROUND_TIMEOUT] = (
+            self.context.params.round_timeout_seconds
+        )
+        MarketResolverAbciApp.event_to_timeout[TSEvent.RESET_TIMEOUT] = (
+            self.context.params.round_timeout_seconds * MULTIPLIER
+        )
+        MarketResolverAbciApp.event_to_timeout[TSEvent.VALIDATE_TIMEOUT] = (
+            self.context.params.validate_timeout
+        )
+        MarketResolverAbciApp.event_to_timeout[TSEvent.FINALIZE_TIMEOUT] = (
+            self.context.params.finalize_timeout
+        )
+        MarketResolverAbciApp.event_to_timeout[TSEvent.CHECK_TIMEOUT] = (
+            self.context.params.history_check_timeout
+        )
+        MarketResolverAbciApp.event_to_timeout[
+            ResetPauseEvent.RESET_AND_PAUSE_TIMEOUT
+        ] = (self.context.params.reset_pause_duration + MARGIN)
+        MarketResolverAbciApp.event_to_timeout[
+            IdentifyServiceOwnerEvent.ROUND_TIMEOUT
+        ] = self.context.params.round_timeout_seconds
+        MarketResolverAbciApp.event_to_timeout[FundsForwarderEvent.ROUND_TIMEOUT] = (
+            self.context.params.round_timeout_seconds
+        )
+        MarketResolverAbciApp.event_to_timeout[
+            OmenFundsRecovererEvent.ROUND_TIMEOUT
+        ] = self.context.params.round_timeout_seconds
+
+
+class Params(
+    OmenFundsRecovererParams,
+    FundsForwarderParams,
+    TerminationParams,
+):
+    """A model to represent params for multiple abci apps."""
