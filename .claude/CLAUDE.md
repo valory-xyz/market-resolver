@@ -4,8 +4,27 @@
 
 Market Resolver is an **autonomous service** built on the [Open Autonomy](https://stack.olas.network/open-autonomy/) framework. It resolves prediction markets on Gnosis Chain by answering Realitio questions, challenging incorrect answers, and recovering locked funds (bonds, conditional tokens, LP tokens).
 
-**Reference repo:** [valory-xyz/market-creator](https://github.com/valory-xyz/market-creator) — sibling service that creates the markets this service resolves.
+**Sibling repo:** [valory-xyz/market-creator](https://github.com/valory-xyz/market-creator) — creates the markets this service resolves. Local clone at `/home/jose/git/market-creator`.
 **Framework reference:** [valory-xyz/trader](https://github.com/valory-xyz/trader) (develop branch) — follow the same patterns for CI, tox, and package structure.
+
+## Plans & Domain Documentation (in market-creator repo)
+
+These files live in the market-creator repository and are the **single source of truth** — do not copy them here.
+
+### Plans (`/home/jose/git/market-creator/.claude/plans/`)
+
+- **`service_split.md`** — Architecture for splitting into market-creator + market-resolver. Contains composed FSM specs, transition mappings, and round assignments for both services.
+- **`omen_funds_recoverer.md`** — The shared `omen_funds_recoverer_abci` skill that both services compose for fund recovery (LP tokens, conditional tokens, Realitio bonds).
+- **`claim_winnings.md`** — Realitio `claimWinnings` implementation plan. Bond claiming logic used by the recovery skill.
+
+### Domain docs (`/home/jose/git/market-creator/.claude/docs/`)
+
+- **`omen_lifecycle.md`** — Full Omen prediction market lifecycle: contracts, phases, the two independent value flows (conditional tokens vs Realitio bonds), and FSM round mapping.
+- **`ct_omen_realitio.md`** — Tutorial on Conditional Tokens framework, Omen, and Realitio: how they work together, contract interactions at each stage, fund recovery mechanisms.
+
+### Local plan (`.claude/plans/`)
+
+- **`market_resolver.md`** — The resolver-specific watchdog FSM: scan, evaluate, challenge, cleanup. Round details, fraud detection strategy, configuration parameters.
 
 ## What the Service Does
 
