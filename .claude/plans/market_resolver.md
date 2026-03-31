@@ -48,18 +48,20 @@ All operations in this skill are **deterministic**: subgraph queries return the 
 Rounds:
   0. ScanMarketsRound              # scan pending markets, classify answers
   1. EvaluateAnswersRound          # prepare Mech request for one unverified answer
-  2. BuildChallengesTxRound        # after Mech: answer/challenge or mark OK
+  2. BuildChallengesTxRound        # after Mech OR direct from Scan: build tx or mark OK
   3. CleanupTrackingRound          # purge finalized markets from DB
   4. FinishedWithMechRequestRound  (degenerate → MechInteract)
   5. FinishedWithChallengeTxRound  (degenerate → TxSettlement)
   6. FinishedResolutionRound       (degenerate → ResetPause)
 
 Initial state: ScanMarketsRound
+Initial states: {ScanMarketsRound, BuildChallengesTxRound}
 
 Transition function:
   ScanMarketsRound:
-    DONE          → EvaluateAnswersRound     # found unverified answer to evaluate
-    NONE          → CleanupTrackingRound     # all answers OK or no pending markets
+    DONE          → EvaluateAnswersRound          # NEEDS_EVALUATION: needs Mech
+    CHALLENGE     → BuildChallengesTxRound        # NEEDS_CHALLENGE: has Mech data, skip to tx
+    NONE          → CleanupTrackingRound          # all OK or no pending markets
     NO_MAJORITY   → ScanMarketsRound
     ROUND_TIMEOUT → ScanMarketsRound
 
@@ -69,7 +71,7 @@ Transition function:
     NO_MAJORITY   → CleanupTrackingRound
     ROUND_TIMEOUT → CleanupTrackingRound
 
-  BuildChallengesTxRound:                         # entry point after MechInteract returns
+  BuildChallengesTxRound:                         # entered after MechInteract OR directly from Scan
     DONE          → FinishedWithChallengeTxRound  # → TxSettlement → Cleanup
     NONE          → CleanupTrackingRound          # Mech agreed, no challenge needed
     NO_MAJORITY   → CleanupTrackingRound
@@ -85,13 +87,14 @@ Transition function:
 
 ```
 ScanMarkets ──DONE──► EvaluateAnswers ──DONE──► [MechInteract]
-    │                       │                         │
-    │──NONE──┐              │──NONE──┐                ▼
-             │                       │         BuildChallengesTx
-             │                       │                │
-             │                       │     ──DONE──► [TxSettlement]
-             │                       │                │
-             ▼                       ▼                ▼
+    │     │                 │                         │
+    │     │──CHALLENGE──┐   │──NONE──┐                ▼
+    │                   ▼            │         BuildChallengesTx
+    │──NONE──┐   BuildChallengesTx   │                │
+             │          │            │     ──DONE──► [TxSettlement]
+             │   ──DONE──► [TxSettl] │                │
+             │          │            │                │
+             ▼          ▼            ▼                ▼
          CleanupTracking ◄────────────────────────────┘
              │
              ▼
@@ -124,54 +127,63 @@ fixedProductMarketMakers(
 
 Then for each answered market, fetch the latest answerer from Realitio subgraph.
 
-**Classification logic** (questions sorted by closest to finalization first):
+**Classification logic** (unanswered questions first, then by finalization urgency):
 
 ```
-for each pending question (sorted by currentAnswerTimestamp + timeout, ascending):
+for each pending question (unanswered first, then sorted by finalization_deadline ascending):
 
-    if no answer yet:
-        → status = NEEDS_ANSWER (needs Mech + initial answer)
+    # Apply re-scan logic first (update DB entries based on on-chain changes)
+    if question_id in questions_db:
+        if last_answer_timestamp changed:
+            apply re-scan transitions (see "Re-scan logic" above)
 
-    elif latest_answerer == our_safe OR latest_answerer in trusted_addresses:
-        → status = OK (trusted answer, skip)
+    # Classify
+    if question_id in questions_db AND status == TRUSTED_ANSWER:
+        → skip (no action needed)
 
-    elif question_id in questions_db AND db_entry.status == VERIFIED_OK
-         AND db_entry.on_chain_answer == current_on_chain_answer:
-        → status = OK (already verified by Mech in a previous cycle)
+    elif question_id in questions_db AND status == VERIFIED_OK:
+        → skip (Mech confirmed answer is correct)
 
-    elif question_id in questions_db AND db_entry.status == VERIFIED_OK
-         AND db_entry.on_chain_answer != current_on_chain_answer:
-        → status = NEEDS_EVALUATION (answer changed since we verified — re-check)
-        → invalidate DB entry
+    elif question_id in questions_db AND status == CHALLENGE_PENDING:
+        → check if cooldown has elapsed
+        → if elapsed: actionable = NEEDS_CHALLENGE (has Mech data, go straight to tx)
+        → if not elapsed: skip (waiting)
 
-    elif question_id in questions_db AND db_entry.status == CHALLENGE_PENDING:
-        → check if cooldown has elapsed (see Challenge Timing below)
-        → if elapsed: status = NEEDS_CHALLENGE
-        → if not elapsed: status = WAITING (skip this cycle)
+    elif question_id in questions_db AND status == NEEDS_EVALUATION:
+        → actionable = NEEDS_EVALUATION (needs Mech request)
 
-    else:
-        → status = NEEDS_EVALUATION (first time seeing this non-trusted answer)
+    elif question_id NOT in questions_db:
+        if latest_answerer is trusted:
+            → add to DB as TRUSTED_ANSWER, skip
+        else:
+            → add to DB as NEEDS_EVALUATION, actionable
 ```
 
-**Pick first actionable**: Select the first question with status `NEEDS_ANSWER`, `NEEDS_EVALUATION`, or `NEEDS_CHALLENGE` (in finalization-urgency order). Only one question is processed per cycle to avoid missing urgent ones.
+**Pick first actionable**: Select the first question with `NEEDS_EVALUATION` or `NEEDS_CHALLENGE` (in finalization-urgency order). Only one question is processed per cycle.
 
-**Events**: `DONE` (found one question to process), `NONE` (all OK or no pending markets)
+**Routing**:
+- `NEEDS_EVALUATION` → `EvaluateAnswersRound` (needs Mech) → emit `DONE`
+- `NEEDS_CHALLENGE` → `BuildChallengesTxRound` (skip Mech, go straight to tx) → emit `CHALLENGE`
+- Nothing actionable → `CleanupTrackingRound` → emit `NONE`
+
+**Events**: `DONE` (needs Mech evaluation), `CHALLENGE` (skip Mech, build tx directly), `NONE` (nothing to do)
 
 ### `EvaluateAnswersRound`
 
-**Purpose**: Build a Mech request for the selected question.
+**Purpose**: Build a Mech request for the selected question. **Only entered for `NEEDS_EVALUATION` — never for questions that already have Mech data.**
 
 **Logic**:
 1. Read the selected question from SynchronizedData
-2. If `NEEDS_ANSWER`: build standard Mech request (question text, resolution date)
-3. If `NEEDS_EVALUATION`: build evaluation request (question text + current answer + bond + market context)
-4. Store as `mech_requests` → route to MechInteract
+2. Build Mech request (question text + current answer context + resolution date)
+3. Store as `mech_requests` → route to MechInteract
 
-**Events**: `DONE` (mech request ready), `NONE` (nothing to evaluate)
+**Events**: `DONE` (mech request ready → MechInteract), `NONE` (nothing to evaluate)
 
 ### `BuildChallengesTxRound`
 
-**Purpose**: After MechInteract returns, decide action based on Mech response.
+**Purpose**: Build answer/challenge transaction. Entered in two ways:
+- After MechInteract returns (`FinishedMechResponseRound` → here): fresh Mech data to process
+- Directly from ScanMarkets (`CHALLENGE` event): existing Mech data, re-challenge scenario
 
 **Logic**:
 
@@ -217,42 +229,109 @@ Persistent cross-period state stored in `SynchronizedData` (`cross_period_persis
 ```python
 questions_db: Dict[str, QuestionEntry] = {
     "<question_id_hex>": {
-        "status": "NEEDS_EVALUATION" | "VERIFIED_OK" | "CHALLENGE_PENDING" | "ANSWERED_BY_US",
-        "on_chain_answer": "0x00...00",           # answer when last examined
-        "on_chain_bond": 10000000000000000000,     # bond in wei when last examined
-        "last_answerer": "0xabc...",               # who posted the current answer
-        "detected_at": 1711900000,                 # timestamp when we first saw this state
-        "mech_answer": "0x00...01",                # Mech's answer (if evaluated). null if not yet evaluated
-        "mech_confidence": 0.91,                   # Mech confidence (if evaluated). null if not yet evaluated
-        "market_closing_timestamp": 1712000000,    # openingTimestamp of the market (when question opens)
-        "realitio_timeout": 86400,                 # Realitio timeout for this question (seconds)
+        # Status
+        "status": "TRUSTED_ANSWER" | "NEEDS_EVALUATION" | "VERIFIED_OK" | "CHALLENGE_PENDING",
+        "detected_at": 1711900000,               # timestamp when we first saw this state
+
+        # On-chain state (from subgraph, refreshed each scan)
+        "on_chain_answer": "0x00...00",          # current answer on Realitio
+        "on_chain_bond": 10000000000000000000,   # current bond in wei
+        "last_answerer": "0xabc...",             # who posted the current answer
+        "last_answer_timestamp": 1711900000,     # when the current answer was posted (from Realitio subgraph)
+        "market_closing_timestamp": 1712000000,  # openingTimestamp of the market
+        "realitio_timeout": 86400,               # Realitio timeout for this question (seconds)
+        # Derived (not stored, computed at scan time):
+        #   finalization_deadline = last_answer_timestamp + realitio_timeout
+        #   cooldown_elapsed = now > detected_at + (realitio_timeout * challenge_cooldown_fraction)
+        #   is_challengeable = cooldown_elapsed AND now < finalization_deadline
+        #   urgency_sort_key = finalization_deadline (ascending = most urgent first)
+
+        # Mech interaction — stores the framework objects directly
+        # Populated by EvaluateAnswersRound (request) and BuildChallengesTxRound (response)
+        "mech_request": {                        # MechMetadata dict (null if not yet requested)
+            "prompt": "Question: Will...",       #   the prompt sent to Mech
+            "tool": "resolve-market-reasoning-gpt-4.1",  #   which Mech tool
+            "nonce": "abc123",                   #   unique request nonce
+        },
+        "mech_response": {                       # MechInteractionResponse dict (null if not yet received)
+            "nonce": "abc123",
+            "data": "Qm...",                     #   IPFS hash of request data
+            "requestId": 12345,                  #   on-chain Mech request ID
+            "result": "{\"answer\": ...}",       #   raw Mech response (JSON string)
+            "error": "Unknown",                  #   error message if failed
+        },
+
+        # Parsed evaluation result (extracted from mech_response.result)
+        "evaluation": {                          # null if not yet evaluated
+            "answer": "0x00...01",               #   Mech's answer (encoded)
+            "confidence": 0.91,                  #   Mech confidence score
+            "agrees_with_on_chain": false,        #   whether Mech agrees with current on-chain answer
+            "reasoning": "Based on...",          #   Mech's reasoning text
+        },
+
+        # Challenge tracking
+        "challenge": {                           # null if not yet challenged
+            "tx_hash": "0xdef...",               #   tx hash of our submitAnswer
+            "bond": 20000000000000000000,        #   bond we posted in wei
+            "answer": "0x00...01",               #   the answer we submitted
+            "escalation_count": 0,               #   how many times we've re-challenged
+        },
+
+        # Retry tracking
+        "mech_retries": 0,                       # how many times Mech request failed/timed out
     }
 }
 ```
 
 ### Entry Lifecycle
 
+The DB tracks all pending questions we've seen. Entries persist until the question finalizes, preserving Mech evaluation data across re-challenges.
+
 ```
-First seen (non-trusted answer) → NEEDS_EVALUATION
-  ↓ Mech agrees                → VERIFIED_OK (stays until finalized or answer changes)
-  ↓ Mech disagrees             → CHALLENGE_PENDING (waits for cooldown, then challenged)
-  ↓ We answer/challenge        → ANSWERED_BY_US (until someone re-challenges)
-  ↓ Someone re-challenges us   → NEEDS_EVALUATION (re-evaluate with Mech)
-  ↓ Question finalizes         → removed from DB (CleanupTrackingRound)
+First seen (trusted answerer)     → TRUSTED_ANSWER (no action, but tracked)
+First seen (non-trusted answerer) → NEEDS_EVALUATION (queue for Mech)
+  ↓ Mech agrees                  → VERIFIED_OK (no action)
+  ↓ Mech disagrees               → CHALLENGE_PENDING (wait for cooldown)
+  ↓ Cooldown elapsed, challenged → TRUSTED_ANSWER (we are now the answerer)
+  ↓ Someone re-challenges us     → CHALLENGE_PENDING (re-challenge using existing Mech data, no new request)
+  ↓ Question finalizes           → removed from DB (CleanupTrackingRound)
 ```
+
+### Re-scan logic (each cycle)
+
+On each scan, the behaviour checks every pending market from the subgraph:
+
+**Questions NOT in DB:**
+
+- Trusted answerer → add as `TRUSTED_ANSWER`
+- Non-trusted answerer or unanswered → add as `NEEDS_EVALUATION`
+
+**Questions already in DB** (compare `last_answer_timestamp` to detect changes):
+
+- Answer unchanged → keep current status
+- Answer changed, new answerer is trusted → status → `TRUSTED_ANSWER`
+- Answer changed, new answerer is NOT trusted:
+  - If we have prior Mech evaluation (`evaluation` is not null) → `CHALLENGE_PENDING` (reuse existing Mech answer, no new request)
+  - Otherwise → `NEEDS_EVALUATION` (first time seeing a non-trusted answer, need Mech)
 
 ### State Transitions
 
 | Current Status | Trigger | New Status |
 |---|---|---|
-| (new entry) | Non-trusted answer seen | `NEEDS_EVALUATION` |
+| (not in DB) | Trusted answerer | `TRUSTED_ANSWER` |
+| (not in DB) | Non-trusted answerer or unanswered | `NEEDS_EVALUATION` |
+| `TRUSTED_ANSWER` | Answer unchanged | do nothing |
+| `TRUSTED_ANSWER` | Answer changed by trusted | update timestamps, stay `TRUSTED_ANSWER` |
+| `TRUSTED_ANSWER` | Answer changed by non-trusted, have evaluation | `CHALLENGE_PENDING` (reuse Mech answer) |
+| `TRUSTED_ANSWER` | Answer changed by non-trusted, no evaluation | `NEEDS_EVALUATION` |
 | `NEEDS_EVALUATION` | Mech agrees | `VERIFIED_OK` |
 | `NEEDS_EVALUATION` | Mech disagrees | `CHALLENGE_PENDING` |
-| `CHALLENGE_PENDING` | Cooldown elapsed + tx submitted | `ANSWERED_BY_US` |
-| `VERIFIED_OK` | On-chain answer changed | `NEEDS_EVALUATION` |
-| `ANSWERED_BY_US` | We're still latest answerer | skip (OK) |
-| `ANSWERED_BY_US` | Someone re-challenged | `NEEDS_EVALUATION` |
-| any | `answerFinalizedTimestamp != null` | removed |
+| `CHALLENGE_PENDING` | Cooldown elapsed + tx submitted | `TRUSTED_ANSWER` |
+| `CHALLENGE_PENDING` | Answer changed by non-trusted | `NEEDS_EVALUATION` (different answer, need re-eval) |
+| `VERIFIED_OK` | Answer unchanged | do nothing |
+| `VERIFIED_OK` | Answer changed by trusted | `TRUSTED_ANSWER` |
+| `VERIFIED_OK` | Answer changed by non-trusted | `NEEDS_EVALUATION` |
+| any | `answerFinalizedTimestamp != null` | removed from DB |
 
 ---
 
@@ -387,19 +466,20 @@ Answer finalizes after timeout. Next cycle: CleanupTracking removes q5.
 watched_creator_addresses: []          # market creator safes to monitor (required)
 trusted_addresses: []                  # trusted answerers (our safe auto-included)
 
-# Answering (for unanswered questions)
-initial_answer_bond: 10000000000000000000   # 10 xDAI in wei
-mech_tool_resolve: "resolve-market-reasoning-gpt-4.1"
+# Mech
+mech_tool: "resolve-market-reasoning-gpt-4.1"  # single tool for both answering and evaluating
+                                                # will migrate to "resolve-market-jury" when live
 
-# Challenging
+# Answering & Challenging
+initial_answer_bond: 10000000000000000000   # 10 xDAI in wei (for unanswered questions)
 challenge_cooldown_fraction: 0.25      # wait this fraction of realitio_timeout before challenging
 challenge_urgency_buffer: 3600         # 1 hour — challenge immediately if less than this remains
-challenge_confidence_threshold: 0.85   # minimum Mech confidence to challenge
+challenge_confidence_threshold: 0.85   # minimum Mech confidence to act
 max_challenge_bond: 100000000000000000000  # 100 xDAI absolute cap in wei
-mech_tool_evaluate: "evaluate-answer-reasoning-gpt-4.1"
 
-# Escalation limits
+# Limits
 max_escalation_rounds: 5               # stop re-challenging after this many rounds
+max_mech_retries: 3                    # max Mech request retries before giving up on a question
 ```
 
 ---
@@ -463,26 +543,59 @@ FinishedResetAndPauseErrorRound         → RegistrationRound
 
 ## Implementation Phases
 
-### Phase 1: Shared Skills + Runnable Agent
+### Phase 1: Shared Skills + Runnable Agent ✅ COMPLETE
 
 **Goal**: A running agent that recovers funds and forwards excess — no resolver logic yet.
 
-1. Shared skills (`identify_service_owner_abci`, `funds_forwarder_abci`, `omen_funds_recoverer_abci`) consumed as **third_party** packages — must be `autonomy push`-ed from market-creator first.
-2. Create a minimal composed app (`market_resolver_abci`) that chains:
-   - `AgentRegistrationAbciApp` → `IdentifyServiceOwnerAbciApp` → `FundsForwarderAbciApp` → `OmenFundsRecovererAbciApp` → `ResetPauseAbciApp` + `TerminationAbciApp`
-   - No `MarketResolutionManagerAbciApp` yet — recovery feeds directly into reset
-3. Create `packages/valory/agents/market_resolver/` — agent config
-4. Create `packages/valory/services/market_resolver/` — service config
-5. Update `.coveragerc` source paths, `tox.ini` (`SERVICE_SPECIFIC_PACKAGES`, test commands), `.gitignore`
-6. Run `autonomy packages sync --all && autonomy packages lock`
-7. Verify: `tox -e check-packages`, `tox -e check-hash`, `tox -e check-abciapp-specs`, `tox -e check-handlers`, linters pass
-8. Deploy and run locally via `make run-agent` — confirm the agent cycles through Registration → Owner → Funds → Recovery → Reset
+1. ✅ Shared skills (`identify_service_owner_abci`, `funds_forwarder_abci`, `omen_funds_recoverer_abci`) consumed as **third_party** packages — pushed from market-creator via `autonomy push-all`.
+2. ✅ Created composed app (`market_resolver_abci`) chaining: `AgentRegistrationAbciApp` → `IdentifyServiceOwnerAbciApp` → `FundsForwarderAbciApp` → `OmenFundsRecovererAbciApp` → `TxSettlementAbciApp` → `ResetPauseAbciApp` + `TerminationAbciApp`
+3. ✅ Created `packages/valory/agents/market_resolver/` — agent config with connection overrides (abci, ledger, p2p, http_server) and skill model overrides
+4. ✅ Created `packages/valory/services/market_resolver/` — service config mirroring all overridable params with `${ENV_VAR:type:default}` syntax
+5. ✅ Created repo scaffolding: `pyproject.toml`, `tox.ini`, `.coveragerc`, `.gitignore`, `Makefile` (with `run-agent`), `config-mapping.json`, `.github/workflows/`, `.claude/`
+6. ✅ Packages synced and locked
+7. ✅ Agent boots and cycles through Registration → IdentifyServiceOwner → FundsForwarder → OmenFundsRecoverer → TxSettlement → ResetPause via `make run-agent`
 
-**Deliverable**: Running agent that recovers Omen funds and sweeps excess to service owner. Green CI.
+**Key decisions made during Phase 1:**
+- Subgraph URLs use TheGraph gateway with API key in URL path (set via `.env`): Omen (`9fUV...bbz`), Realitio (`E7ym...Nh`), CT (`7s9r...Vp2`)
+- Ledger config uses both `ethereum` (for `default_ledger` fallback) and `gnosis` entries in `ledger_apis`, both pointing to Gnosis RPC — follows market-creator pattern (to be cleaned up later)
+- No `scripts/` directory — all tox references removed
+- All shared skills are third_party (not dev) — repo only owns `market_resolver_abci`, agent, and service packages
 
 ### Phase 2: Build `market_resolution_manager_abci`
 
 **Goal**: Fully implemented core skill with all rounds working.
+
+#### MechInteract integration pattern
+
+The resolver uses `mech_interact_abci` the same way market-creator does. The core skill does NOT contain Mech rounds — it routes to/from the external `MechInteractAbciApp` via degenerate final states and composition transition mappings.
+
+**How it works (from market-creator):**
+
+1. Core skill's `EvaluateAnswersRound` prepares `mech_requests` in SynchronizedData and emits `DONE` → transitions to `FinishedWithMechRequestRound` (degenerate)
+2. Composition maps `FinishedWithMechRequestRound` → `MechVersionDetectionRound` (start of MechInteract)
+3. MechInteract handles the full request/response cycle internally:
+   - `MechVersionDetectionRound` → detects mech type
+   - `MechRequestRound` → submits request on-chain (via TxSettlement)
+   - `MechResponseRound` → polls for response
+4. MechInteract final states route back to core skill via composition:
+   - `FinishedMechResponseRound` → `BuildChallengesTxRound` (success — Mech answered)
+   - `FinishedMechRequestSkipRound` → `CleanupTrackingRound` (no request needed)
+   - `FinishedMechResponseTimeoutRound` → `CleanupTrackingRound` (Mech timed out)
+   - `FinishedMechRequestRound` → `TxSettlement` (Mech request needs on-chain tx)
+   - `FinishedMechPurchaseSubscriptionRound` → `TxSettlement` (subscription purchase)
+   - `FailedMechInformationRound` → `MechVersionDetectionRound` (retry)
+   - Various marketplace/legacy detection rounds → `MechRequestRound`
+
+**Key models needed from MechInteract:**
+- `MechResponseSpecs` — API specs for polling Mech responses
+- `MechToolsSpecs` — API specs for querying available tools
+- `MechsSubgraph` — subgraph for Mech marketplace
+- `MechInteractParams` — Mech-specific params (`mech_interact_round_timeout_seconds`, `mech_interaction_sleep_time`, `use_mech_marketplace`, `mech_marketplace_config`, etc.)
+
+**Key data flow:**
+- Core skill writes `mech_requests` to SynchronizedData before transitioning to MechInteract
+- MechInteract writes `mech_responses` to SynchronizedData before transitioning back
+- `BuildChallengesTxRound` reads `mech_responses` to decide what to do
 
 #### 2a. Scaffold
 
@@ -509,7 +622,7 @@ FinishedResetAndPauseErrorRound         → RegistrationRound
    └── skill.yaml
    ```
 
-2. Define `Event` enum: `DONE`, `NONE`, `NO_MAJORITY`, `ROUND_TIMEOUT`
+2. Define `Event` enum: `DONE`, `CHALLENGE`, `NONE`, `NO_MAJORITY`, `ROUND_TIMEOUT`
 3. Define all 7 rounds (4 active + 3 degenerate) with transition function
 4. Stub behaviours — each returns `NONE` (no-op pass-through)
 5. Wire `fsm_specification.yaml`
@@ -536,14 +649,17 @@ FinishedResetAndPauseErrorRound         → RegistrationRound
    - Read selected question from SynchronizedData
    - If `NEEDS_ANSWER`: build resolve Mech request (question text + resolution date)
    - If `NEEDS_EVALUATION`: build evaluation Mech request (question + current answer + context)
-   - Store `mech_requests` for MechInteract
+   - Write `mech_requests` to SynchronizedData (format must match what `mech_interact_abci` expects)
+   - Emit `DONE` → `FinishedWithMechRequestRound` → composition routes to MechInteract
 
 **Checkpoint**: Mech requests correctly formatted for both answering and evaluation.
 
 #### 2d. `BuildChallengesTxRound` — Decision & Tx Construction
 
+**Entry**: This round is entered after MechInteract returns (`FinishedMechResponseRound` → `BuildChallengesTxRound` via composition).
+
 1. Implement `BuildChallengesTxBehaviour`:
-   - Read Mech response from SynchronizedData
+   - Read `mech_responses` from SynchronizedData (written by MechInteract)
    - If `NEEDS_ANSWER`: build `submitAnswer` tx with initial bond
    - If Mech agrees: update DB → `VERIFIED_OK`, emit NONE
    - If Mech disagrees: update DB → `CHALLENGE_PENDING`, check cooldown timing
@@ -567,17 +683,60 @@ FinishedResetAndPauseErrorRound         → RegistrationRound
 
 ### Phase 3: Integrate `market_resolution_manager_abci` into Composed App
 
-**Goal**: Wire the core skill into the running agent from Phase 1.
+**Goal**: Wire the core skill and MechInteract into the running agent from Phase 1.
 
 1. Update `market_resolver_abci/composition.py`:
-   - Insert `MarketResolutionManagerAbciApp` between `OmenFundsRecovererAbciApp` and `TransactionSettlementAbciApp`
    - Add `MechInteractAbciApp` to the chain
-   - Wire all transition mappings (see "Composed App Transition Mapping" above)
-2. Update agent and service configs with new parameters (`watched_creator_addresses`, `trusted_addresses`, challenge config, etc.)
-3. Verify: `autonomy analyse fsm-specs`, `tox -e check-abciapp-specs`, `tox -e analyse-service`, `tox -e check-handlers`
-4. Deploy and run locally via `make run-agent` — confirm full cycle: Registration → Owner → Funds → Recovery → Scan → Evaluate → Challenge → Reset
+   - Insert `MarketResolutionManagerAbciApp` between `OmenFundsRecovererAbciApp` and `TransactionSettlementAbciApp`
+   - Wire all transition mappings including MechInteract round routing:
 
-**Deliverable**: Fully integrated agent with resolver logic active.
+     ```python
+     # Fund recovery → Core skill
+     OmenFundsRecovererAbci.FinishedWithoutRecoveryTxRound → ScanMarketsRound
+
+     # Core skill → MechInteract
+     MarketResolutionManagerAbci.FinishedWithMechRequestRound → MechVersionDetectionRound
+
+     # MechInteract internal routing
+     MechFinalStates.FinishedMarketplaceLegacyDetectedRound → MechRequestRound
+     MechFinalStates.FinishedMechLegacyDetectedRound → MechRequestRound
+     MechFinalStates.FinishedMechInformationRound → MechRequestRound
+     FailedMechInformationRound → MechVersionDetectionRound
+
+     # MechInteract → TxSettlement (for on-chain Mech request)
+     MechFinalStates.FinishedMechRequestRound → TxSettlement
+     MechFinalStates.FinishedMechPurchaseSubscriptionRound → TxSettlement
+
+     # MechInteract → Core skill (response received)
+     MechFinalStates.FinishedMechResponseRound → BuildChallengesTxRound
+     MechFinalStates.FinishedMechRequestSkipRound → CleanupTrackingRound
+     MechFinalStates.FinishedMechResponseTimeoutRound → CleanupTrackingRound
+
+     # Core skill → TxSettlement (challenge tx)
+     MarketResolutionManagerAbci.FinishedWithChallengeTxRound → TxSettlement
+
+     # TxSettlement → CleanupTracking (after any tx)
+     TxSettlement.FinishedTransactionSubmissionRound → CleanupTrackingRound
+
+     # Core skill → Reset
+     MarketResolutionManagerAbci.FinishedResolutionRound → ResetAndPauseRound
+     ```
+
+2. Update `market_resolver_abci/models.py`:
+   - Add MechInteract models: `MechResponseSpecs`, `MechToolsSpecs`, `MechsSubgraph`
+   - Add `MechInteractParams` to the `Params` class inheritance
+   - Add `MechInteractEvent` timeout to `SharedState.setup()`
+3. Update `market_resolver_abci/behaviours.py`:
+   - Add `MechInteractRoundBehaviour` to the behaviours set
+4. Update `market_resolver_abci/skill.yaml`:
+   - Add `mech_interact_abci` as a skill dependency
+   - Add MechInteract model configs (`mech_response`, `mech_tools`, `mechs_subgraph`)
+   - Add Mech params (`mech_interact_round_timeout_seconds`, `mech_interaction_sleep_time`, `use_mech_marketplace`, `mech_marketplace_config`, `mech_contract_address`, etc.)
+5. Update agent `aea-config.yaml` and `service.yaml` with Mech overrides
+6. Verify: `autonomy analyse fsm-specs`, `tox -e check-abciapp-specs`, `tox -e analyse-service`, `tox -e check-handlers`
+7. Deploy and run locally via `make run-agent` — confirm full cycle including Mech interaction
+
+**Deliverable**: Fully integrated agent with resolver logic and Mech AI evaluation active.
 
 ### Phase 4: Unit Tests & Coverage
 
