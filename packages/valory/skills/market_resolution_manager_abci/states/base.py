@@ -29,3 +29,15 @@ class Event(Enum):
     DONE = "done"
     NONE = "none"
     ROUND_TIMEOUT = "round_timeout"
+    MECH_REQUEST_DONE = "mech_request_done"
+    ANSWER_TX_DONE = "answer_tx_done"
+
+
+class AnswerStatus(str, Enum):
+    """Status of a tracked market answer in the questions database."""
+
+    NEEDS_ANSWER = "NEEDS_ANSWER"
+    NEEDS_VERIFICATION = "NEEDS_VERIFICATION"
+    TRUSTED_ANSWER = "TRUSTED_ANSWER"
+    VERIFIED = "VERIFIED"
+    CHALLENGE_PENDING = "CHALLENGE_PENDING"

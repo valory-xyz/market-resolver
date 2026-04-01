@@ -25,14 +25,17 @@ from packages.valory.skills.abstract_round_abci.behaviours import (
     AbstractRoundBehaviour,
     BaseBehaviour,
 )
-from packages.valory.skills.market_resolution_manager_abci.behaviours.build_challenges import (
-    BuildChallengesTxBehaviour,
+from packages.valory.skills.market_resolution_manager_abci.behaviours.build_answer_tx import (
+    BuildAnswerTxBehaviour,
 )
 from packages.valory.skills.market_resolution_manager_abci.behaviours.cleanup_tracked_markets import (
     CleanupTrackedMarketsBehaviour,
 )
 from packages.valory.skills.market_resolution_manager_abci.behaviours.evaluate_answers import (
     EvaluateAnswersBehaviour,
+)
+from packages.valory.skills.market_resolution_manager_abci.behaviours.post_transaction import (
+    PostTransactionBehaviour,
 )
 from packages.valory.skills.market_resolution_manager_abci.behaviours.scan_pending_markets import (
     ScanPendingMarketsBehaviour,
@@ -50,6 +53,7 @@ class MarketResolutionManagerRoundBehaviour(AbstractRoundBehaviour):
     behaviours: Set[Type[BaseBehaviour]] = {
         ScanPendingMarketsBehaviour,
         EvaluateAnswersBehaviour,
-        BuildChallengesTxBehaviour,
+        BuildAnswerTxBehaviour,
+        PostTransactionBehaviour,
         CleanupTrackedMarketsBehaviour,
     }

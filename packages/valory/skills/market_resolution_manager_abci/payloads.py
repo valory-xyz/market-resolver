@@ -48,10 +48,18 @@ class EvaluateAnswersPayload(BaseTxPayload):
 
 
 @dataclass(frozen=True)
-class BuildChallengesTxPayload(BaseTxPayload):
-    """Payload for the BuildChallengesTxRound."""
+class BuildAnswerTxPayload(BaseTxPayload):
+    """Payload for the BuildAnswerTxRound."""
 
-    challenge_data: Optional[str] = None
+    tx_submitter: Optional[str] = None
+    tx_hash: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class PostTransactionPayload(BaseTxPayload):
+    """Payload for the PostTransactionRound."""
+
+    content: str = ""
 
 
 @dataclass(frozen=True)

@@ -33,9 +33,10 @@ from packages.valory.skills.abstract_round_abci.base import (
     get_name,
 )
 from packages.valory.skills.market_resolution_manager_abci.payloads import (
-    BuildChallengesTxPayload,
+    BuildAnswerTxPayload,
     CleanupTrackedMarketsPayload,
     EvaluateAnswersPayload,
+    PostTransactionPayload,
     ScanPendingMarketsPayload,
 )
 from packages.valory.skills.market_resolution_manager_abci.states.base import (
@@ -53,6 +54,16 @@ class SynchronizedData(BaseSynchronizedData):
     The questions_db lives on SharedState (not here) — too heavy for Tendermint.
     Mech requests/responses are stored here for MechInteract integration.
     """
+
+    @property
+    def tx_submitter(self) -> Optional[str]:
+        """Get the round that submitted the tx through TxSettlement."""
+        return self.db.get("tx_submitter", None)
+
+    @property
+    def final_tx_hash(self) -> Optional[str]:
+        """Get the final settled tx hash."""
+        return self.db.get("final_tx_hash", None)
 
     @property
     def selected_market_id(self) -> Optional[str]:
@@ -104,7 +115,7 @@ class EvaluateAnswersRound(CollectSameUntilThresholdRound):
 
     Custom end_block to handle two "data present" paths:
     - mech_requests set → DONE → FinishedWithMechRequestRound (needs Mech)
-    - evaluation_result set → NONE → BuildChallengesTxRound (has data, skip Mech)
+    - evaluation_result set → NONE → BuildAnswerTxRound (has data, skip Mech)
     - both None → NO_MAJORITY fallback
     """
 
@@ -124,7 +135,7 @@ class EvaluateAnswersRound(CollectSameUntilThresholdRound):
 
         Routes based on which field is set:
         - mech_requests → DONE → FinishedWithMechRequestRound
-        - evaluation_result → NONE → BuildChallengesTxRound
+        - evaluation_result → NONE → BuildAnswerTxRound
         """
         if self.threshold_reached:
             values = dict(
@@ -147,16 +158,23 @@ class EvaluateAnswersRound(CollectSameUntilThresholdRound):
         return None
 
 
-class BuildChallengesTxRound(CollectSameUntilThresholdRound):
-    """Round to build challenge/answer transactions."""
+class BuildAnswerTxRound(CollectSameUntilThresholdRound):
+    """Round to build challenge/answer transactions.
 
-    payload_class = BuildChallengesTxPayload
+    Payload has tx_submitter and tx_hash. When tx_hash is set,
+    done_event fires and TxSettlement picks up most_voted_tx_hash.
+    """
+
+    payload_class = BuildAnswerTxPayload
     synchronized_data_class = SynchronizedData
     done_event = Event.DONE
     none_event = Event.NONE
     no_majority_event = Event.NO_MAJORITY
-    collection_key = "participant_to_challenges"
-    selection_key = ("challenge_data",)
+    collection_key = "participant_to_answer_tx"
+    selection_key = (
+        "tx_submitter",
+        "most_voted_tx_hash",
+    )
 
 
 class CleanupTrackedMarketsRound(CollectSameUntilThresholdRound):
@@ -171,11 +189,51 @@ class CleanupTrackedMarketsRound(CollectSameUntilThresholdRound):
     selection_key = ("n_cleaned",)
 
 
+class PostTransactionRound(CollectSameUntilThresholdRound):
+    """Route after TxSettlement based on which tx was submitted.
+
+    Custom end_block checks the payload content to emit the right event:
+    - MECH_REQUEST_DONE → MechResponseRound (poll for Mech delivery)
+    - ANSWER_TX_DONE → CleanupTrackedMarketsRound
+    - ERROR / anything else → CleanupTrackedMarketsRound
+    """
+
+    MECH_REQUEST_DONE_PAYLOAD = "MECH_REQUEST_DONE"
+    ANSWER_TX_DONE_PAYLOAD = "ANSWER_TX_DONE"
+    ERROR_PAYLOAD = "ERROR"
+
+    payload_class = PostTransactionPayload
+    synchronized_data_class = SynchronizedData
+    done_event = Event.DONE
+    none_event = Event.NONE
+    no_majority_event = Event.NO_MAJORITY
+    collection_key = "participant_to_post_tx"
+    selection_key: Tuple[str, ...] = ("ignored",)
+
+    def end_block(self) -> Optional[Tuple[BaseSynchronizedData, Enum]]:
+        """Route based on which tx was settled."""
+        if self.threshold_reached:
+            if self.most_voted_payload == self.MECH_REQUEST_DONE_PAYLOAD:
+                return self.synchronized_data, Event.MECH_REQUEST_DONE
+            if self.most_voted_payload == self.ANSWER_TX_DONE_PAYLOAD:
+                return self.synchronized_data, Event.ANSWER_TX_DONE
+            return self.synchronized_data, Event.DONE
+        if not self.is_majority_possible(
+            self.collection, self.synchronized_data.nb_participants
+        ):
+            return self.synchronized_data, self.no_majority_event
+        return None
+
+
 class FinishedWithMechRequestRound(DegenerateRound):
-    """Degenerate round: transition to MechInteract."""
+    """Degenerate round: transition to MechInteract (start Mech flow)."""
 
 
-class FinishedWithChallengeTxRound(DegenerateRound):
+class FinishedWithMechPollRound(DegenerateRound):
+    """Degenerate round: transition to MechResponseRound (poll for delivery)."""
+
+
+class FinishedWithAnswerTxRound(DegenerateRound):
     """Degenerate round: transition to TxSettlement."""
 
 
@@ -188,7 +246,7 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
 
     Initial round: ScanPendingMarketsRound
 
-    Initial states: {BuildChallengesTxRound, CleanupTrackedMarketsRound, ScanPendingMarketsRound}
+    Initial states: {BuildAnswerTxRound, CleanupTrackedMarketsRound, ScanPendingMarketsRound}
 
     Transition states:
         0. ScanPendingMarketsRound
@@ -201,7 +259,7 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
             - none: 2.
             - no majority: 3.
             - round timeout: 3.
-        2. BuildChallengesTxRound
+        2. BuildAnswerTxRound
             - done: 5.
             - none: 3.
             - no majority: 3.
@@ -212,10 +270,10 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
             - no majority: 6.
             - round timeout: 6.
         4. FinishedWithMechRequestRound
-        5. FinishedWithChallengeTxRound
+        5. FinishedWithAnswerTxRound
         6. FinishedResolutionRound
 
-    Final states: {FinishedResolutionRound, FinishedWithChallengeTxRound, FinishedWithMechRequestRound}
+    Final states: {FinishedResolutionRound, FinishedWithAnswerTxRound, FinishedWithMechRequestRound}
 
     Timeouts:
         round timeout: 180.0
@@ -224,8 +282,9 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
     initial_round_cls: AppState = ScanPendingMarketsRound
     initial_states: Set[AppState] = {
         ScanPendingMarketsRound,
-        BuildChallengesTxRound,
+        BuildAnswerTxRound,
         CleanupTrackedMarketsRound,
+        PostTransactionRound,
     }
     transition_function: AbciAppTransitionFunction = {
         ScanPendingMarketsRound: {
@@ -236,12 +295,20 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
         },
         EvaluateAnswersRound: {
             Event.DONE: FinishedWithMechRequestRound,
-            Event.NONE: BuildChallengesTxRound,
+            Event.NONE: BuildAnswerTxRound,
             Event.NO_MAJORITY: CleanupTrackedMarketsRound,
             Event.ROUND_TIMEOUT: CleanupTrackedMarketsRound,
         },
-        BuildChallengesTxRound: {
-            Event.DONE: FinishedWithChallengeTxRound,
+        BuildAnswerTxRound: {
+            Event.DONE: FinishedWithAnswerTxRound,
+            Event.NONE: CleanupTrackedMarketsRound,
+            Event.NO_MAJORITY: CleanupTrackedMarketsRound,
+            Event.ROUND_TIMEOUT: CleanupTrackedMarketsRound,
+        },
+        PostTransactionRound: {
+            Event.MECH_REQUEST_DONE: FinishedWithMechPollRound,
+            Event.ANSWER_TX_DONE: CleanupTrackedMarketsRound,
+            Event.DONE: CleanupTrackedMarketsRound,
             Event.NONE: CleanupTrackedMarketsRound,
             Event.NO_MAJORITY: CleanupTrackedMarketsRound,
             Event.ROUND_TIMEOUT: CleanupTrackedMarketsRound,
@@ -253,12 +320,14 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
             Event.ROUND_TIMEOUT: FinishedResolutionRound,
         },
         FinishedWithMechRequestRound: {},
-        FinishedWithChallengeTxRound: {},
+        FinishedWithMechPollRound: {},
+        FinishedWithAnswerTxRound: {},
         FinishedResolutionRound: {},
     }
     final_states: Set[AppState] = {
         FinishedWithMechRequestRound,
-        FinishedWithChallengeTxRound,
+        FinishedWithMechPollRound,
+        FinishedWithAnswerTxRound,
         FinishedResolutionRound,
     }
     event_to_timeout: Dict[Event, float] = {
@@ -267,13 +336,15 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
     cross_period_persisted_keys: FrozenSet[str] = frozenset()
     db_pre_conditions: Dict[AppState, Set[str]] = {
         ScanPendingMarketsRound: set(),
-        BuildChallengesTxRound: set(),
+        BuildAnswerTxRound: set(),
         CleanupTrackedMarketsRound: set(),
+        PostTransactionRound: set(),
     }
     db_post_conditions: Dict[AppState, Set[str]] = {
         FinishedWithMechRequestRound: {
             get_name(SynchronizedData.mech_requests)
         },
-        FinishedWithChallengeTxRound: {"most_voted_tx_hash"},
+        FinishedWithMechPollRound: set(),
+        FinishedWithAnswerTxRound: {"most_voted_tx_hash"},
         FinishedResolutionRound: set(),
     }

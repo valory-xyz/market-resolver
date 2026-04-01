@@ -31,12 +31,9 @@ from packages.valory.skills.market_resolution_manager_abci.payloads import (
 from packages.valory.skills.market_resolution_manager_abci.rounds import (
     ScanPendingMarketsRound,
 )
-
-# Status constants
-TRUSTED_ANSWER = "TRUSTED_ANSWER"
-NEEDS_EVALUATION = "NEEDS_EVALUATION"
-VERIFIED_OK = "VERIFIED_OK"
-CHALLENGE_PENDING = "CHALLENGE_PENDING"
+from packages.valory.skills.market_resolution_manager_abci.states.base import (
+    AnswerStatus,
+)
 
 # Omen subgraph query: pending markets from watched creators
 # answerFinalizedTimestamp: null = not yet finalized
@@ -153,6 +150,16 @@ class ScanPendingMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         )
         trusted.add(self.synchronized_data.safe_contract_address.lower())
 
+        # Get safe balance once for bond affordability check
+        safe_address = self.synchronized_data.safe_contract_address
+        safe_balance = yield from self.get_native_balance(safe_address)
+        if safe_balance is None:
+            safe_balance = 0
+        self.context.logger.info(
+            f"Safe {safe_address} balance: "
+            f"{safe_balance / 10 ** 18:.4f} xDAI"
+        )
+
         actionable: List[Dict[str, Any]] = []
         now = self.last_synced_timestamp
 
@@ -166,7 +173,7 @@ class ScanPendingMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             latest_answerer = answerers.get(question_id, "").lower()
 
             # Re-scan: update existing DB entries if answer changed
-            if question_id in questions_db:
+            if market_id in questions_db:
                 entry = questions_db[market_id]
                 stored_ts = entry.get("last_answer_timestamp")
 
@@ -174,18 +181,18 @@ class ScanPendingMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
                     # Answer changed on-chain
                     if latest_answerer in trusted:
                         questions_db[market_id] = self._update_entry(
-                            entry, market, latest_answerer, TRUSTED_ANSWER
+                            entry, market, latest_answerer, AnswerStatus.TRUSTED_ANSWER
                         )
                         continue
                     elif entry.get("evaluation") is not None:
-                        # Have prior Mech data — go to CHALLENGE_PENDING
+                        # Have prior Mech data — go to AnswerStatus.CHALLENGE_PENDING
                         questions_db[market_id] = self._update_entry(
-                            entry, market, latest_answerer, CHALLENGE_PENDING
+                            entry, market, latest_answerer, AnswerStatus.CHALLENGE_PENDING
                         )
                     else:
                         # Need fresh evaluation
                         questions_db[market_id] = self._update_entry(
-                            entry, market, latest_answerer, NEEDS_EVALUATION
+                            entry, market, latest_answerer, AnswerStatus.NEEDS_VERIFICATION
                         )
                 # else: answer unchanged, keep current status
 
@@ -194,31 +201,65 @@ class ScanPendingMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
                 # New question — not in DB yet
                 if current_answer is None:
                     # Unanswered — needs initial answer via Mech
-                    entry = self._new_entry(market, "", NEEDS_EVALUATION, now)
+                    entry = self._new_entry(market, "", AnswerStatus.NEEDS_ANSWER, now)
                     questions_db[market_id] = entry
                 elif latest_answerer in trusted:
                     # Trusted answerer — track but no action
                     entry = self._new_entry(
-                        market, latest_answerer, TRUSTED_ANSWER, now
+                        market, latest_answerer, AnswerStatus.TRUSTED_ANSWER, now
                     )
                     questions_db[market_id] = entry
                     continue
                 else:
                     # Non-trusted answerer — needs evaluation
                     entry = self._new_entry(
-                        market, latest_answerer, NEEDS_EVALUATION, now
+                        market, latest_answerer, AnswerStatus.NEEDS_VERIFICATION, now
                     )
                     questions_db[market_id] = entry
 
             # Determine if actionable
             status = entry["status"]
-            if status == NEEDS_EVALUATION:
-                actionable.append(
-                    {"market_id": market_id, "action": NEEDS_EVALUATION}
+            # Check if the required bond exceeds our limit (skip before Mech)
+            on_chain_bond = int(entry.get("on_chain_bond") or 0)
+            # Compute required bond
+            if on_chain_bond > 0:
+                required_bond = on_chain_bond * 2
+            else:
+                required_bond = self.params.initial_answer_bond
+
+            # Skip if bond exceeds config limit
+            if required_bond > self.params.max_challenge_bond:
+                self.context.logger.info(
+                    f"  Skipping [{status}] {market_id} — "
+                    f"required bond {required_bond / 10**18:.4f} xDAI "
+                    f"exceeds max {self.params.max_challenge_bond / 10**18:.4f} xDAI"
                 )
-            elif status == CHALLENGE_PENDING:
-                cooldown = timeout * self.params.challenge_cooldown_fraction
-                detected_at = entry.get("detected_at", 0)
+                continue
+
+            # Skip if safe can't afford the bond
+            if required_bond > safe_balance:
+                self.context.logger.info(
+                    f"  Skipping [{status}] {market_id} — "
+                    f"required bond {required_bond / 10**18:.4f} xDAI "
+                    f"exceeds safe balance {safe_balance / 10**18:.4f} xDAI"
+                )
+                continue
+
+            if status == AnswerStatus.NEEDS_ANSWER:
+                retry_after = entry.get("retry_after", 0)
+                if retry_after and now < retry_after:
+                    continue  # cooldown not elapsed yet
+                actionable.append(
+                    {"market_id": market_id, "action": AnswerStatus.NEEDS_ANSWER}
+                )
+            elif status == AnswerStatus.NEEDS_VERIFICATION:
+                retry_after = entry.get("retry_after", 0)
+                if retry_after and now < retry_after:
+                    continue  # cooldown not elapsed yet
+                actionable.append(
+                    {"market_id": market_id, "action": AnswerStatus.NEEDS_VERIFICATION}
+                )
+            elif status == AnswerStatus.CHALLENGE_PENDING:
                 finalization_deadline = (
                     int(entry.get("last_answer_timestamp") or 0) + timeout
                 )
@@ -227,53 +268,66 @@ class ScanPendingMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
                     # Too late — answer already finalized
                     continue
 
-                urgency = now >= finalization_deadline - self.params.challenge_urgency_buffer
-                cooldown_elapsed = now >= detected_at + cooldown
+                # First challenge: act immediately
+                # Re-challenge (after counter): apply cooldown
+                prior_challenge = entry.get("challenge") or {}
+                if prior_challenge.get("escalation_count", 0) > 0:
+                    cooldown = timeout * self.params.challenge_cooldown_fraction
+                    last_challenge_ts = prior_challenge.get("timestamp", 0)
+                    urgency = now >= finalization_deadline - self.params.challenge_urgency_buffer
+                    cooldown_elapsed = now >= last_challenge_ts + cooldown
+                    if not (urgency or cooldown_elapsed):
+                        continue
 
-                if urgency or cooldown_elapsed:
-                    actionable.append(
-                        {"market_id": market_id, "action": CHALLENGE_PENDING}
-                    )
+                actionable.append(
+                    {"market_id": market_id, "action": AnswerStatus.CHALLENGE_PENDING}
+                )
 
-        # Sort: unanswered first, then by finalization urgency
+        # Sort: urgent challenges first (closest to finalization), then unanswered
         def sort_key(item: Dict[str, Any]) -> tuple:
             entry = questions_db[item["market_id"]]
             is_unanswered = entry.get("on_chain_answer") is None
             last_ts = int(entry.get("last_answer_timestamp") or 0)
             timeout = int(entry.get("realitio_timeout", 86400))
             finalization = last_ts + timeout if last_ts else float("inf")
-            return (0 if is_unanswered else 1, finalization)
+            # Challenges sort first (0), unanswered second (1)
+            # Within each group, sort by finalization deadline (soonest first)
+            return (1 if is_unanswered else 0, finalization)
 
         actionable.sort(key=sort_key)
 
         # Log summary
         n_trusted = sum(
-            1 for e in questions_db.values() if e["status"] == TRUSTED_ANSWER
+            1 for e in questions_db.values() if e["status"] == AnswerStatus.TRUSTED_ANSWER
         )
         n_verified = sum(
-            1 for e in questions_db.values() if e["status"] == "VERIFIED_OK"
+            1 for e in questions_db.values() if e["status"] == AnswerStatus.VERIFIED
+        )
+        n_answer = sum(
+            1 for e in questions_db.values() if e["status"] == AnswerStatus.NEEDS_ANSWER
         )
         n_eval = sum(
-            1 for e in questions_db.values() if e["status"] == NEEDS_EVALUATION
+            1 for e in questions_db.values() if e["status"] == AnswerStatus.NEEDS_VERIFICATION
         )
         n_challenge = sum(
-            1 for e in questions_db.values() if e["status"] == CHALLENGE_PENDING
+            1 for e in questions_db.values() if e["status"] == AnswerStatus.CHALLENGE_PENDING
         )
         self.context.logger.info(
             f"Scan complete: {len(questions_db)} markets tracked — "
             f"{n_trusted} trusted, {n_verified} verified, "
-            f"{n_eval} need evaluation, {n_challenge} challenge pending"
+            f"{n_answer} need answer, {n_eval} need evaluation, "
+            f"{n_challenge} challenge pending"
         )
         for mid, entry in questions_db.items():
             status = entry["status"]
-            if status in (TRUSTED_ANSWER, "VERIFIED_OK"):
+            if status in (AnswerStatus.TRUSTED_ANSWER, AnswerStatus.VERIFIED):
                 continue
             answer = entry.get("on_chain_answer") or "unanswered"
             bond = entry.get("on_chain_bond") or "0"
-            answerer = entry.get("last_answerer", "")[:10]
+            answerer = entry.get("last_answerer", "")
             self.context.logger.info(
-                f"  [{status}] {mid[:18]}... "
-                f"answer={answer} bond={bond} answerer={answerer}..."
+                f"  [{status}] {mid} "
+                f"answer={answer} bond={bond} answerer={answerer}"
             )
 
         if not actionable:
@@ -376,6 +430,7 @@ class ScanPendingMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         return {
             "status": status,
             "market_id": market.get("id"),
+            "title": market.get("title", ""),
             "question_id": market.get("question", {}).get("id"),
             "detected_at": now,
             "on_chain_answer": market.get("currentAnswer"),
@@ -408,7 +463,7 @@ class ScanPendingMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         updated["realitio_timeout"] = int(market.get("timeout", 86400))
 
         # Clear Mech data if re-evaluating (new non-trusted answer)
-        if new_status == NEEDS_EVALUATION and entry.get("evaluation") is not None:
+        if new_status == AnswerStatus.NEEDS_VERIFICATION and entry.get("evaluation") is not None:
             updated["mech_request"] = None
             updated["mech_response"] = None
             updated["evaluation"] = None

@@ -81,22 +81,21 @@ abci_app_transition_mapping: AbciAppTransitionMapping = {
     MechFinalStates.FinishedMechPurchaseSubscriptionRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
 
     # MechInteract → Core skill (response received)
-    MechFinalStates.FinishedMechResponseRound: MarketResolutionManagerAbci.BuildChallengesTxRound,
+    MechFinalStates.FinishedMechResponseRound: MarketResolutionManagerAbci.BuildAnswerTxRound,
 
     # MechInteract → Reset (skip/timeout — retry next cycle)
     MechFinalStates.FinishedMechRequestSkipRound: ResetAndPauseRound,
     MechFinalStates.FinishedMechResponseTimeoutRound: ResetAndPauseRound,
 
-    # Core skill → TxSettlement (challenge tx)
-    MarketResolutionManagerAbci.FinishedWithChallengeTxRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
+    # Core skill → TxSettlement (answer/challenge tx)
+    MarketResolutionManagerAbci.FinishedWithAnswerTxRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
 
-    # TxSettlement → ScanPendingMarkets (restart cycle after any tx)
-    # NOTE: TxSettlement can only map to ONE target. For Mech request txs this
-    # should go to MechResponseRound, but for recovery/challenge txs it should
-    # go to Scan. We route to Scan — Mech response will be picked up next cycle.
-    # TODO: add a PostTransactionRound to multiplex based on tx_submitter.
-    TransactionSettlementAbci.FinishedTransactionSubmissionRound: MechResponseStates.MechResponseRound,
+    # TxSettlement → PostTransaction (multiplex based on tx_submitter)
+    TransactionSettlementAbci.FinishedTransactionSubmissionRound: MarketResolutionManagerAbci.PostTransactionRound,
     TransactionSettlementAbci.FailedRound: ResetAndPauseRound,
+
+    # PostTransaction → MechResponseRound (poll for Mech delivery)
+    MarketResolutionManagerAbci.FinishedWithMechPollRound: MechResponseStates.MechResponseRound,
 
     # Core skill → Reset
     MarketResolutionManagerAbci.FinishedResolutionRound: ResetAndPauseRound,

@@ -61,5 +61,7 @@ logs/
 ethereum_private_key.txt
 keys.json
 fetched_service/
+testing/trader_keys.json
+testing/test_markets.json
 keys_json/
 .idea

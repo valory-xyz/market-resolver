@@ -10,28 +10,36 @@ fingerprint:
   README.md: bafybeicebua5cqf3pfr34hy5mmnr6i7m7wgxlkzbto6woi5dkuv4fqbymi
   __init__.py: bafybeiedhf4rirdachml54zzde7nl3nhuwz4c5xwskrc5udfphefbrdsfu
   behaviours/__init__.py: bafybeignnrbklzekhqurn6ptli5zhzsov2qtdzr5se4xe4hqdywt2vbtvu
-  behaviours/base.py: bafybeicw2m6b7hrxoiy7akna4jvpktnludud7ju4cpnztseqklefk6gvlq
-  behaviours/build_challenges.py: bafybeidqrgrpqvepcyhxyouvyxd3ehe2ec4ljsvo3yclplvruuu6jxq64a
-  behaviours/cleanup_tracked_markets.py: bafybeiafjgxzkzqyxckxb5graih5dpitkkiug56ao4mgz2d57rgc23ho4u
-  behaviours/evaluate_answers.py: bafybeiegawjfuohyakysecof7wtpcsmyykqybfypc26qcq6tufa34pfhtu
-  behaviours/round_behaviour.py: bafybeie3gjqocsmg6tkjo6zf6w7rqqq2mnp7cadwzsja76hsgl6kz3zlqi
-  behaviours/scan_pending_markets.py: bafybeifv46xpsjhjfi6wd6aq2bcyb2u27xmfoqqdrf3vt26lodw47dabb4
+  behaviours/base.py: bafybeieurfdeooyoktb5jezh5suebjx5juvtjf4fewubjjtahrd2jiu7ja
+  behaviours/build_answer_tx.py: bafybeibbruen55dhoq5uy53fhbnvxslpc5clhwu2gqaehs2sbxuvi45ji4
+  behaviours/cleanup_tracked_markets.py: bafybeifah7xcpqfiqg3sgl5tyej35ejr6mxkgog7ibx7tghwbcgbinwk3u
+  behaviours/evaluate_answers.py: bafybeihk4qxxm375iokjwdsihahxworu6vkbxg7lc62wjnr6c37vzflnd4
+  behaviours/post_transaction.py: bafybeifz47reox6hsco5ytvbbvpsjzgkaeqsctifultqlqewk5lmrhmuce
+  behaviours/round_behaviour.py: bafybeiblydgsriedhp2evzxmh3ocvlltiubbvha2fbnjvfxwl5obvza5cm
+  behaviours/scan_pending_markets.py: bafybeib4iun3qiruqh42mbexuodlq2kaeo5fxr6icyaievkyhqezxzj73i
   dialogues.py: bafybeict7mdksmjklx6wy2zplunpcfwhgxv5votxbsodidyum2phx3tv34
-  fsm_specification.yaml: bafybeiehpev3uqkqrfvktrrp5bnqbhmznrmk3eowcgleflf52pv77pcmqu
+  fsm_specification.yaml: bafybeif3g26fj54x3vepatxhsdftqtu42gkwn66akrk7hyoyvlwman2k2a
   handlers.py: bafybeigby2ymzvsoiwbgtdd4esk6xrkrafp2b22yqz5xi4ekrnqwqqoq4y
-  models.py: bafybeiecczrwvq4fj2yd2kizk6gw7rkgr5w4xc73vmzc2jzutd5uavkj3i
-  payloads.py: bafybeifnitniujjricav6vc57lbinqllmugmdt7ovjfaythrhjymap4nyi
-  rounds.py: bafybeicqmffluvetb6whixu5usawjfz2se6fp7ulq6ixl4dyjlqu4qi7pq
+  models.py: bafybeiczdeddndmodookdjb3tuvcnw5ekb5b7vaelv52kf2zng75g2vmiq
+  payloads.py: bafybeicl6x3nown5fbdgn6wovuf4ibff2vzxgdiklhwp7pupt537yfxzya
+  rounds.py: bafybeifcupil53jltrctzpubmd6upzp6axbxxtydca6flmrdmal5svnr4u
   states/__init__.py: bafybeiho5s4sehwxmgtp4ddgntnkxhjks5cflihdtag7zqy6btjrhzcyti
-  states/base.py: bafybeibq5yn737fj3xo2ng4thbaixtmtnvlzcjzimdyjbdoevdlb7mts2e
+  states/base.py: bafybeihab3kvtqklcdo35ckyjkvfd5g7qcsiznbytxrxviluvob3ktkbqy
   tests/__init__.py: bafybeidpf4le7kmwrvl6u3s4yl2mrlznnu7scha3hvcpd3s2omwo7bdwkq
   tests/behaviours/__init__.py: bafybeierpqlj4wjvfsa2acmkibioivviqudq4ulu5ifuqwcvdcfewzdgau
 fingerprint_ignore_patterns: []
 connections: []
-contracts: []
-protocols: []
+contracts:
+- valory/gnosis_safe:0.1.0:bafybeice337zvg3ol4cwpw2iikxcukmthwmw32ytwtdnkcju222qfc323y
+- valory/multisend:0.1.0:bafybeihx7c3xj6c5v4tgvu3ipnj7seyc4dkmovoyzu4isgbwdrhj2oo6uq
+- valory/realitio:0.1.0:bafybeibj7wequqhgxcke2bwsq5onp6amk35vdhzf5zcczhytiohz2tfqua
+protocols:
+- valory/ledger_api:1.0.0:bafybeiecq56phjfws36rgrefw6niyo4ezesloodsfis647mpm5ygqo4ysi
+- valory/contract_api:1.0.0:bafybeibld2xb5m7kyluiptkamp4nrt6oeomkohz7a3yppbv2oo7qw2e4la
 skills:
 - valory/abstract_round_abci:0.1.0:bafybeihygetmlgnhawrbyswvpvv3wpztr2hlhxkljmohp4r7qcmvglpwdq
+- valory/mech_interact_abci:0.1.0:bafybeibrmrdpys5xfivpmlyerbwlu2am2rmqb75bwub3cvcrvfwdbqxv54
+- valory/transaction_settlement_abci:0.1.0:bafybeiajyrszyyo6z4lxogutv4ougiaeoxak6xkq5gtrbey32gbgnirznq
 behaviours:
   main:
     args: {}
@@ -86,10 +94,9 @@ models:
       initial_answer_bond: 10000000000000000000
       challenge_cooldown_fraction: 0.25
       challenge_urgency_buffer: 3600
-      challenge_confidence_threshold: 0.85
       max_challenge_bond: 100000000000000000000
       max_escalation_rounds: 5
-      max_mech_retries: 3
+      max_mech_retries: 10
       cleanup_history_depth: 1
       cleanup_history_depth_current: null
       drand_public_key: 868f005eb8e6e4ca0a47c8a77ceaa5309a47978a7c71bc5cce96366b5d7a569937c529eeda66c7293784a9402801af31

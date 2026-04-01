@@ -62,7 +62,7 @@ class MarketResolutionManagerParams(BaseParams):
             "mech_tool", "resolve-market-jury-v1"
         )
         self.initial_answer_bond: int = kwargs.pop(
-            "initial_answer_bond", 10000000000000000000
+            "initial_answer_bond", 1000000000000000  # 0.001 xDAI
         )
         self.challenge_cooldown_fraction: float = kwargs.pop(
             "challenge_cooldown_fraction", 0.25
@@ -70,14 +70,11 @@ class MarketResolutionManagerParams(BaseParams):
         self.challenge_urgency_buffer: int = kwargs.pop(
             "challenge_urgency_buffer", 3600
         )
-        self.challenge_confidence_threshold: float = kwargs.pop(
-            "challenge_confidence_threshold", 0.85
-        )
         self.max_challenge_bond: int = kwargs.pop(
-            "max_challenge_bond", 100000000000000000000
+            "max_challenge_bond", 10000000000000000000  # 10 xDAI
         )
         self.max_escalation_rounds: int = kwargs.pop("max_escalation_rounds", 5)
-        self.max_mech_retries: int = kwargs.pop("max_mech_retries", 3)
+        self.max_mech_retries: int = kwargs.pop("max_mech_retries", 10)
         # Read without popping — MechParams also needs these
         self.mech_interact_round_timeout_seconds: int = kwargs.get(
             "mech_interact_round_timeout_seconds", 1200

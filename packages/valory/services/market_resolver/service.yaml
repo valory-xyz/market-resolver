@@ -7,7 +7,7 @@ license: Apache-2.0
 fingerprint:
   README.md: bafybeie6lb2mlmzmkycbcfma4onidhegfu4ipgpybg2av5mhfs5zx42b2m
 fingerprint_ignore_patterns: []
-agent: valory/market_resolver:0.1.0:bafybeid7o2bbtsmkh4lduev2ptkac6vnk6ouj54czr6qkqllyuoyqmjkme
+agent: valory/market_resolver:0.1.0:bafybeibpmnaqokwh6dk4yx3qtwqsoiwhsfgk5d375gn7xbbf7rcizwnrea
 number_of_agents: 1
 deployment:
   agent:
@@ -60,7 +60,7 @@ models:
       round_timeout_seconds: ${ROUND_TIMEOUT_SECONDS:float:60.0}
       validate_timeout: ${VALIDATE_TIMEOUT:int:1205}
       history_check_timeout: ${HISTORY_CHECK_TIMEOUT:int:1205}
-      reset_pause_duration: ${RESET_PAUSE_DURATION:int:1800}
+      reset_pause_duration: ${RESET_PAUSE_DURATION:int:600}
       max_healthcheck: ${MAX_HEALTHCHECK:int:43200}
       multisend_address: ${MULTISEND_ADDRESS:str:0xA238CBeb142c10Ef7Ad8442C6D1f9E89e07e7761}
       multisend_batch_size: ${MULTISEND_BATCH_SIZE:int:5}
@@ -83,8 +83,8 @@ models:
       serious_slash_unit_amount: ${SERIOUS_SLASH_UNIT_AMOUNT:int:8000000000000000}
       service_endpoint_base: ${SERVICE_ENDPOINT_BASE:str:https://dummy_service.autonolas.tech/}
       expected_service_owner_address: ${EXPECTED_SERVICE_OWNER_ADDRESS:str:0x0000000000000000000000000000000000000000}
-      funds_forwarder_token_config: ${FUNDS_FORWARDER_TOKEN_CONFIG:dict:{}}
-      xdai_threshold: ${XDAI_THRESHOLD:int:3000000000000000000}
+      funds_forwarder_token_config: ${FUNDS_FORWARDER_TOKEN_CONFIG:dict:{"0x0000000000000000000000000000000000000000":{"retain_balance":500000000000000000000,"max_transfer":1000000000000000000000,"min_transfer":100000000000000000000}}}
+      xdai_threshold: ${XDAI_THRESHOLD:int:1000000000000000000}
       redeem_winnings_batch_size: ${REDEEM_WINNINGS_BATCH_SIZE:int:5}
       realitio_contract: ${REALITIO_CONTRACT:str:0x79e32aE03fb27B07C89c0c568F80287C01ca2E57}
       realitio_oracle_proxy_contract: ${REALITIO_ORACLE_PROXY_CONTRACT:str:0xab16d643ba051c11962da645f74632d3130c81e2}
@@ -94,8 +94,27 @@ models:
       remove_liquidity_batch_size: ${REMOVE_LIQUIDITY_BATCH_SIZE:int:1}
       redeem_positions_batch_size: ${REDEEM_POSITIONS_BATCH_SIZE:int:5}
       claim_bonds_batch_size: ${CLAIM_BONDS_BATCH_SIZE:int:10}
-      min_balance_withdraw_realitio: ${MIN_BALANCE_WITHDRAW_REALITIO:int:10000000000000000000}
+      min_balance_withdraw_realitio: ${MIN_BALANCE_WITHDRAW_REALITIO:int:1000000000000000000}
       realitio_start_block: ${REALITIO_START_BLOCK:int:0}
+      watched_creator_addresses: ${WATCHED_CREATOR_ADDRESSES:list:[]}
+      trusted_addresses: ${TRUSTED_ADDRESSES:list:[]}
+      mech_tool: ${MECH_TOOL:str:resolve-market-jury-v1}
+      initial_answer_bond: ${INITIAL_ANSWER_BOND:int:1000000000000000}
+      challenge_cooldown_fraction: ${CHALLENGE_COOLDOWN_FRACTION:float:0.25}
+      challenge_urgency_buffer: ${CHALLENGE_URGENCY_BUFFER:int:3600}
+      max_challenge_bond: ${MAX_CHALLENGE_BOND:int:10000000000000000000}
+      max_escalation_rounds: ${MAX_ESCALATION_ROUNDS:int:5}
+      max_mech_retries: ${MAX_MECH_RETRIES:int:10}
+      mech_interact_round_timeout_seconds: ${MECH_INTERACT_ROUND_TIMEOUT_SECONDS:int:1200}
+      mech_interaction_sleep_time: ${MECH_INTERACTION_SLEEP_TIME:int:10}
+      use_mech_marketplace: ${USE_MECH_MARKETPLACE:bool:true}
+      mech_marketplace_config: ${MECH_MARKETPLACE_CONFIG:dict:{"mech_marketplace_address":"0x735FAAb1c4Ec41128c367AFb5c3baC73509f70bB","priority_mech_address":"0x601024E27f1C67B28209E24272CED8A31fc8151F","priority_mech_staking_instance_address":"0x998dEFafD094817EF329f6dc79c703f1CF18bC90","priority_mech_service_id":2198,"requester_staking_instance_address":"0xeF44Fb0842DDeF59D37f85D61A1eF492bbA6135d","use_dynamic_mech_selection":false,"response_timeout":300}}
+      mech_contract_address: ${MECH_CONTRACT_ADDRESS:str:0x601024E27f1C67B28209E24272CED8A31fc8151F}
+      mech_wrapped_native_token_address: ${MECH_WRAPPED_NATIVE_TOKEN_ADDRESS:str:0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d}
+      irrelevant_tools: ${IRRELEVANT_TOOLS:list:[]}
+      ignored_mechs: ${IGNORED_MECHS:list:[]}
+      penalize_mech_time_window: ${PENALIZE_MECH_TIME_WINDOW:int:1800}
+      deliveries_lookback_days: ${DELIVERIES_LOOKBACK_DAYS:int:30}
       setup:
         all_participants: ${ALL_PARTICIPANTS:list:["0x0000000000000000000000000000000000000000"]}
         safe_contract_address: ${SAFE_CONTRACT_ADDRESS:str:0x0000000000000000000000000000000000000000}
@@ -134,6 +153,36 @@ models:
       response_type: ${REALITIO_SUBGRAPH_RESPONSE_TYPE:str:list}
       retries: ${REALITIO_SUBGRAPH_RETRIES:int:5}
       url: ${REALITIO_SUBGRAPH_URL:str:https://gateway.thegraph.com/api/api-key/subgraphs/id/E7ymrCnNcQdAAgLbdFWzGE5mvr5Mb5T9VfT43FqA7bNh}
+  mech_response:
+    args:
+      headers:
+        Content-Type: ${MECH_RESPONSE_CONTENT_TYPE:str:application/json}
+      method: ${MECH_RESPONSE_METHOD:str:GET}
+      response_key: ${MECH_RESPONSE_KEY:str:result}
+      response_type: ${MECH_RESPONSE_TYPE:str:str}
+      retries: ${MECH_RESPONSE_RETRIES:int:5}
+      url: ${MECH_RESPONSE_URL:str:''}
+  mech_tools:
+    args:
+      headers:
+        Content-Type: ${MECH_TOOLS_CONTENT_TYPE:str:application/json}
+      method: ${MECH_TOOLS_METHOD:str:GET}
+      response_key: ${MECH_TOOLS_RESPONSE_KEY:str:tools}
+      response_type: ${MECH_TOOLS_RESPONSE_TYPE:str:list}
+      retries: ${MECH_TOOLS_RETRIES:int:5}
+      url: ${MECH_TOOLS_URL:str:''}
+  mechs_subgraph:
+    args:
+      headers:
+        Content-Type: ${MECHS_SUBGRAPH_CONTENT_TYPE:str:application/json}
+      method: ${MECHS_SUBGRAPH_METHOD:str:POST}
+      response_key: ${MECHS_SUBGRAPH_RESPONSE_KEY:str:data:meches}
+      response_type: ${MECHS_SUBGRAPH_RESPONSE_TYPE:str:list}
+      error_key: ${MECHS_SUBGRAPH_ERROR_KEY:str:errors}
+      error_index: ${MECHS_SUBGRAPH_ERROR_INDEX:int:0}
+      error_type: ${MECHS_SUBGRAPH_ERROR_TYPE:str:dict}
+      retries: ${MECHS_SUBGRAPH_RETRIES:int:5}
+      url: ${MECHS_SUBGRAPH_URL:str:https://api.subgraph.autonolas.tech/api/proxy/marketplace-gnosis}
 ---
 public_id: valory/ledger:0.19.0
 type: connection

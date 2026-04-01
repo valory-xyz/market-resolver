@@ -40,7 +40,7 @@ protocols:
 skills:
 - valory/abstract_abci:0.1.0:bafybeict6h3wfmddpvam5gmmanqzuokup6ppoev3t4j5uyl7xxahjaols4
 - valory/abstract_round_abci:0.1.0:bafybeihygetmlgnhawrbyswvpvv3wpztr2hlhxkljmohp4r7qcmvglpwdq
-- valory/market_resolver_abci:0.1.0:bafybeiespupdwsakhcxpppgzaqbsquhqyiomcfg7uzynrmdeokgntfmfx4
+- valory/market_resolver_abci:0.1.0:bafybeif57kbydifpiiz7ds5raahvjlsg6xzslao3kbtxk7p77rptdo5g5e
 - valory/registration_abci:0.1.0:bafybeif3gpewppz5wr5mmgyvaowsamjufyons3oif7cb4x5ubvvfb6rtda
 - valory/reset_pause_abci:0.1.0:bafybeidcnf77bc3o7pssa5zesilpbm4ley2k45taii5j5rrvvty7uhu3lq
 - valory/termination_abci:0.1.0:bafybeia33hlouukdpwaxctunauudv5gpfdxndimra7yqiof4a3skcwdqkq
@@ -49,7 +49,7 @@ skills:
 - valory/funds_forwarder_abci:0.1.0:bafybeig4kflknvmbpbsaeeim4kurgpjvpduu36xfcjm3ehrjhxamt6byaa
 - valory/omen_funds_recoverer_abci:0.1.0:bafybeicr7c5pbar6qk5c45qgbkvbl4aaz7nqwxsbtcw2n45dcotukjme7i
 - valory/mech_interact_abci:0.1.0:bafybeibrmrdpys5xfivpmlyerbwlu2am2rmqb75bwub3cvcrvfwdbqxv54
-- valory/market_resolution_manager_abci:0.1.0:bafybeidbhuozqe3ylto4s5zga43baqakcnih34yfdkews67b7wdua6nyny
+- valory/market_resolution_manager_abci:0.1.0:bafybeifh4vq7sol336f3flqhojklbilpkf43t545zjn4m3x3ugtfuhvrxu
 default_ledger: ethereum
 required_ledgers:
 - ethereum
@@ -203,8 +203,8 @@ models:
       serious_slash_unit_amount: ${int:8000000000000000}
       service_endpoint_base: ${str:https://dummy_service.autonolas.tech/}
       expected_service_owner_address: ${str:0x0000000000000000000000000000000000000000}
-      funds_forwarder_token_config: ${dict:{}}
-      xdai_threshold: ${int:3000000000000000000}
+      funds_forwarder_token_config: ${dict:{"0x0000000000000000000000000000000000000000":{"retain_balance":500000000000000000000,"max_transfer":1000000000000000000000,"min_transfer":100000000000000000000}}}
+      xdai_threshold: ${int:1000000000000000000}
       redeem_winnings_batch_size: ${int:5}
       realitio_contract: ${str:0x79e32aE03fb27B07C89c0c568F80287C01ca2E57}
       realitio_oracle_proxy_contract: ${str:0xab16d643ba051c11962da645f74632d3130c81e2}
@@ -214,23 +214,22 @@ models:
       remove_liquidity_batch_size: ${int:1}
       redeem_positions_batch_size: ${int:5}
       claim_bonds_batch_size: ${int:10}
-      min_balance_withdraw_realitio: ${int:10000000000000000000}
+      min_balance_withdraw_realitio: ${int:1000000000000000000}
       realitio_start_block: ${int:0}
       watched_creator_addresses: ${list:[]}
       trusted_addresses: ${list:[]}
       mech_tool: ${str:resolve-market-jury-v1}
-      initial_answer_bond: ${int:10000000000000000000}
+      initial_answer_bond: ${int:1000000000000000}
       challenge_cooldown_fraction: ${float:0.25}
       challenge_urgency_buffer: ${int:3600}
-      challenge_confidence_threshold: ${float:0.85}
-      max_challenge_bond: ${int:100000000000000000000}
+      max_challenge_bond: ${int:10000000000000000000}
       max_escalation_rounds: ${int:5}
-      max_mech_retries: ${int:3}
+      max_mech_retries: ${int:10}
       mech_interact_round_timeout_seconds: ${int:1200}
       mech_interaction_sleep_time: ${int:10}
-      use_mech_marketplace: ${bool:false}
-      mech_marketplace_config: ${dict:{"mech_marketplace_address":"0x0000000000000000000000000000000000000000","priority_mech_address":"0x0000000000000000000000000000000000000000","priority_mech_staking_instance_address":"0x0000000000000000000000000000000000000000","priority_mech_service_id":0,"requester_staking_instance_address":"0x0000000000000000000000000000000000000000","response_timeout":300,"use_dynamic_mech_selection":false}}
-      mech_contract_address: ${str:0x77af31de935740567cf4ff1986d04b2c964a786a}
+      use_mech_marketplace: ${bool:true}
+      mech_marketplace_config: ${dict:{"mech_marketplace_address":"0x735FAAb1c4Ec41128c367AFb5c3baC73509f70bB","priority_mech_address":"0x601024E27f1C67B28209E24272CED8A31fc8151F","priority_mech_staking_instance_address":"0x998dEFafD094817EF329f6dc79c703f1CF18bC90","priority_mech_service_id":2198,"requester_staking_instance_address":"0xeF44Fb0842DDeF59D37f85D61A1eF492bbA6135d","use_dynamic_mech_selection":false,"response_timeout":300}}
+      mech_contract_address: ${str:0x601024E27f1C67B28209E24272CED8A31fc8151F}
       mech_wrapped_native_token_address: ${str:0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d}
       irrelevant_tools: []
       ignored_mechs: []

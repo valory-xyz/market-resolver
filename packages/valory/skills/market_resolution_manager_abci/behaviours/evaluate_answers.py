@@ -22,6 +22,7 @@
 import json
 from dataclasses import asdict
 from typing import Generator, Optional
+from uuid import uuid4
 
 from packages.valory.skills.market_resolution_manager_abci.behaviours.base import (
     MarketResolutionManagerBaseBehaviour,
@@ -32,11 +33,10 @@ from packages.valory.skills.market_resolution_manager_abci.payloads import (
 from packages.valory.skills.market_resolution_manager_abci.rounds import (
     EvaluateAnswersRound,
 )
+from packages.valory.skills.market_resolution_manager_abci.states.base import (
+    AnswerStatus,
+)
 from packages.valory.skills.mech_interact_abci.states.base import MechMetadata
-
-# Status constants
-NEEDS_EVALUATION = "NEEDS_EVALUATION"
-CHALLENGE_PENDING = "CHALLENGE_PENDING"
 
 
 class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
@@ -44,7 +44,7 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
 
     Payload convention (custom end_block in EvaluateAnswersRound):
     - mech_requests=<json> → done_event → FinishedWithMechRequestRound → MechInteract
-    - evaluation_result=<status> → none_event → BuildChallengesTxRound (skip Mech)
+    - evaluation_result=<status> → none_event → BuildAnswerTxRound (skip Mech)
     """
 
     matching_round = EvaluateAnswersRound
@@ -67,12 +67,12 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
             return
 
         # Re-challenge scenario: already have Mech data, skip Mech
-        if action == CHALLENGE_PENDING and entry.get("evaluation") is not None:
+        if action == AnswerStatus.CHALLENGE_PENDING and entry.get("evaluation") is not None:
             self.context.logger.info(
                 f"Market {market_id}: reusing existing Mech evaluation "
                 f"for re-challenge (skipping Mech request)."
             )
-            yield from self._send_payload(None, CHALLENGE_PENDING)
+            yield from self._send_payload(None, AnswerStatus.CHALLENGE_PENDING)
             return
 
         # Check retry limit
@@ -84,12 +84,19 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
             yield from self._send_payload(None, None)
             return
 
-        # Build Mech request
-        question_id = entry.get("question_id", market_id)
-        prompt = entry.get("on_chain_answer") or f"Question {question_id}"
+        # Build Mech request — prompt is the market title (human-readable question)
+        title = entry.get("title", "")
+        if not title:
+            self.context.logger.error(
+                f"Market {market_id}: no title in DB entry. Cannot request Mech."
+            )
+            yield from self._send_payload(None, None)
+            return
+        prompt = title
 
+        nonce = str(uuid4())
         mech_request = MechMetadata(
-            nonce=market_id,
+            nonce=nonce,
             tool=self.params.mech_tool,
             prompt=prompt,
         )
@@ -97,7 +104,7 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
         self.context.logger.info(
             f"Market {market_id}: requesting Mech evaluation "
             f"with tool '{self.params.mech_tool}', "
-            f"nonce={market_id}, prompt={prompt[:60]}..."
+            f"nonce={nonce}, prompt={prompt[:60]}..."
         )
 
         mech_requests_json = json.dumps(
