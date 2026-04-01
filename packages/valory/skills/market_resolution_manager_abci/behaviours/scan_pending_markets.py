@@ -391,7 +391,6 @@ class ScanPendingMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         query1 = PENDING_MARKETS_QUERY.substitute(
             creators=creators_str,
             current_timestamp=now,
-            min_timestamp=min_timestamp,
         )
         result1 = yield from self.get_omen_subgraph_result(query1)
         pending = (

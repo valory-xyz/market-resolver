@@ -30,7 +30,7 @@ skills:
 - valory/funds_forwarder_abci:0.1.0:bafybeig4kflknvmbpbsaeeim4kurgpjvpduu36xfcjm3ehrjhxamt6byaa
 - valory/omen_funds_recoverer_abci:0.1.0:bafybeicr7c5pbar6qk5c45qgbkvbl4aaz7nqwxsbtcw2n45dcotukjme7i
 - valory/mech_interact_abci:0.1.0:bafybeibrmrdpys5xfivpmlyerbwlu2am2rmqb75bwub3cvcrvfwdbqxv54
-- valory/market_resolution_manager_abci:0.1.0:bafybeiautm2mviqovxyrm23scsvvsgdxgnup56tena3bommdllur7pfzaq
+- valory/market_resolution_manager_abci:0.1.0:bafybeiap6az4tfmud7wxbgpdqt4xmb2ct3gbo3enjly3xsu2kgmpm3kwwq
 behaviours:
   main:
     args: {}
