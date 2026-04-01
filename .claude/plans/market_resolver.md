@@ -723,11 +723,17 @@ The resolver uses `mech_interact_abci` the same way market-creator does. The cor
 - TxSettlement → `MechResponseRound` (poll for Mech delivery after Mech request tx)
 - `FinishedResolutionRound` → ResetAndPause
 
-**Debug artifacts to REMOVE before production:**
+**Debug artifacts — REMOVED (2026-04-01):**
 
-- Debug box in `build_answer_tx.py` — logs answer/challenge details (keep for now)
-- `_dump_db_to_file()` in `base.py` — dumps `answers_database_<timestamp>.json` on every DB write
-- `pprint` of DB in `scan_pending_markets.py` (if still present)
+To re-enable DB file dumps for debugging, add to `base.py` `questions_db` setter:
+```python
+import time, json
+from pathlib import Path
+hour = time.strftime("%Y%m%d_%H%M%S")
+path = Path.home() / "git" / "market-resolver" / f"answers_database_{hour}.json"
+with open(path, "w") as f:
+    json.dump(value, f, indent=2, default=str)
+```
 
 ### Phase 3c: Remaining Work
 

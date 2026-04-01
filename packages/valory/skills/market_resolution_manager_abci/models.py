@@ -58,8 +58,8 @@ class MarketResolutionManagerParams(BaseParams):
             "watched_creator_addresses", []
         )
         self.trusted_addresses: List[str] = kwargs.pop("trusted_addresses", [])
-        self.mech_tool: str = kwargs.pop(
-            "mech_tool", "resolve-market-jury-v1"
+        self.mech_tool_resolve_market: str = kwargs.pop(
+            "mech_tool_resolve_market", "resolve-market-jury-v1"
         )
         self.initial_answer_bond: int = kwargs.pop(
             "initial_answer_bond", 1000000000000000  # 0.001 xDAI

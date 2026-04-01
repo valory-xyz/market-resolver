@@ -20,9 +20,7 @@
 """This module contains the base behaviour for the market resolution manager."""
 
 import json
-import time
 from abc import ABC
-from pathlib import Path
 from typing import Any, Dict, Generator, Optional, cast
 
 from packages.valory.protocols.ledger_api import LedgerApiMessage
@@ -67,23 +65,6 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
     def questions_db(self, value: Dict[str, Any]) -> None:
         """Set the questions database on shared state."""
         self.context.state.questions_db = value
-        # --- DEBUG: dump DB to file — REMOVE IN PRODUCTION ---
-        self._dump_db_to_file(value)
-        # --- END DEBUG ---
-
-    def _dump_db_to_file(self, db: Dict[str, Any]) -> None:
-        """Dump the questions database to a JSON file for debugging.
-
-        TODO: REMOVE IN PRODUCTION — debug-only file dump.
-        """
-        try:
-            hour = time.strftime("%Y%m%d_%H%M%S")
-            path = Path.home() / "git" / "market-resolver" / f"answers_database_{hour}.json"
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(db, f, indent=2, default=str)
-            self.context.logger.info(f"DEBUG: DB dumped to {path}")
-        except Exception as exc:  # pylint: disable=broad-except
-            self.context.logger.warning(f"DEBUG: Failed to dump DB: {exc}")
 
     @property
     def last_synced_timestamp(self) -> int:

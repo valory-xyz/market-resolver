@@ -7,7 +7,7 @@ license: Apache-2.0
 fingerprint:
   README.md: bafybeie6lb2mlmzmkycbcfma4onidhegfu4ipgpybg2av5mhfs5zx42b2m
 fingerprint_ignore_patterns: []
-agent: valory/market_resolver:0.1.0:bafybeibpmnaqokwh6dk4yx3qtwqsoiwhsfgk5d375gn7xbbf7rcizwnrea
+agent: valory/market_resolver:0.1.0:bafybeieocasvuy22y2kf3jhhbw4k4mrjucjqtnhu5e63ovf7a2bnxngfgi
 number_of_agents: 1
 deployment:
   agent:
@@ -98,7 +98,7 @@ models:
       realitio_start_block: ${REALITIO_START_BLOCK:int:0}
       watched_creator_addresses: ${WATCHED_CREATOR_ADDRESSES:list:[]}
       trusted_addresses: ${TRUSTED_ADDRESSES:list:[]}
-      mech_tool: ${MECH_TOOL:str:resolve-market-jury-v1}
+      mech_tool_resolve_market: ${MECH_TOOL_RESOLVE_MARKET:str:resolve-market-jury-v1}
       initial_answer_bond: ${INITIAL_ANSWER_BOND:int:1000000000000000}
       challenge_cooldown_fraction: ${CHALLENGE_COOLDOWN_FRACTION:float:0.25}
       challenge_urgency_buffer: ${CHALLENGE_URGENCY_BUFFER:int:3600}

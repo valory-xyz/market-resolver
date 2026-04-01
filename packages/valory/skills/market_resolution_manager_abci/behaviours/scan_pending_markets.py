@@ -68,7 +68,7 @@ PENDING_MARKETS_QUERY = Template(
 }"""
 )
 
-# Finalizing markets (answered but finalization still in the future — can still be challenged)
+# Finalizing markets (answered but finalization still in the future -- can still be challenged)
 FINALIZING_MARKETS_QUERY = Template(
     """{
     fixedProductMarketMakers(
@@ -175,43 +175,56 @@ class ScanPendingMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             # Re-scan: update existing DB entries if answer changed
             if market_id in questions_db:
                 entry = questions_db[market_id]
+                old_status = entry.get("status")
                 stored_ts = entry.get("last_answer_timestamp")
 
                 if current_answer_ts and stored_ts != current_answer_ts:
                     # Answer changed on-chain
                     if latest_answerer in trusted:
+                        new_status = AnswerStatus.TRUSTED_ANSWER
                         questions_db[market_id] = self._update_entry(
-                            entry, market, latest_answerer, AnswerStatus.TRUSTED_ANSWER
+                            entry, market, latest_answerer, new_status
+                        )
+                        self.context.logger.info(
+                            f"  {market_id}: answer changed, "
+                            f"{old_status} -> {new_status} "
+                            f"(trusted answerer {latest_answerer})"
                         )
                         continue
                     elif entry.get("evaluation") is not None:
-                        # Have prior Mech data — go to AnswerStatus.CHALLENGE_PENDING
+                        new_status = AnswerStatus.CHALLENGE_PENDING
                         questions_db[market_id] = self._update_entry(
-                            entry, market, latest_answerer, AnswerStatus.CHALLENGE_PENDING
+                            entry, market, latest_answerer, new_status
+                        )
+                        self.context.logger.info(
+                            f"  {market_id}: answer changed, "
+                            f"{old_status} -> {new_status} "
+                            f"(untrusted {latest_answerer}, has evaluation)"
                         )
                     else:
-                        # Need fresh evaluation
+                        new_status = AnswerStatus.NEEDS_VERIFICATION
                         questions_db[market_id] = self._update_entry(
-                            entry, market, latest_answerer, AnswerStatus.NEEDS_VERIFICATION
+                            entry, market, latest_answerer, new_status
                         )
-                # else: answer unchanged, keep current status
+                        self.context.logger.info(
+                            f"  {market_id}: answer changed, "
+                            f"{old_status} -> {new_status} "
+                            f"(untrusted {latest_answerer})"
+                        )
 
                 entry = questions_db[market_id]
             else:
-                # New question — not in DB yet
+                # New market -- not in DB yet
                 if current_answer is None:
-                    # Unanswered — needs initial answer via Mech
                     entry = self._new_entry(market, "", AnswerStatus.NEEDS_ANSWER, now)
                     questions_db[market_id] = entry
                 elif latest_answerer in trusted:
-                    # Trusted answerer — track but no action
                     entry = self._new_entry(
                         market, latest_answerer, AnswerStatus.TRUSTED_ANSWER, now
                     )
                     questions_db[market_id] = entry
                     continue
                 else:
-                    # Non-trusted answerer — needs evaluation
                     entry = self._new_entry(
                         market, latest_answerer, AnswerStatus.NEEDS_VERIFICATION, now
                     )
@@ -230,7 +243,7 @@ class ScanPendingMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             # Skip if bond exceeds config limit
             if required_bond > self.params.max_challenge_bond:
                 self.context.logger.info(
-                    f"  Skipping [{status}] {market_id} — "
+                    f"  Skipping [{status}] {market_id} -- "
                     f"required bond {required_bond / 10**18:.4f} xDAI "
                     f"exceeds max {self.params.max_challenge_bond / 10**18:.4f} xDAI"
                 )
@@ -239,7 +252,7 @@ class ScanPendingMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             # Skip if safe can't afford the bond
             if required_bond > safe_balance:
                 self.context.logger.info(
-                    f"  Skipping [{status}] {market_id} — "
+                    f"  Skipping [{status}] {market_id} -- "
                     f"required bond {required_bond / 10**18:.4f} xDAI "
                     f"exceeds safe balance {safe_balance / 10**18:.4f} xDAI"
                 )
@@ -248,14 +261,22 @@ class ScanPendingMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             if status == AnswerStatus.NEEDS_ANSWER:
                 retry_after = entry.get("retry_after", 0)
                 if retry_after and now < retry_after:
-                    continue  # cooldown not elapsed yet
+                    self.context.logger.info(
+                        f"  Skipping [{status}] {market_id} -- "
+                        f"retry cooldown ({retry_after - now}s remaining)"
+                    )
+                    continue
                 actionable.append(
                     {"market_id": market_id, "action": AnswerStatus.NEEDS_ANSWER}
                 )
             elif status == AnswerStatus.NEEDS_VERIFICATION:
                 retry_after = entry.get("retry_after", 0)
                 if retry_after and now < retry_after:
-                    continue  # cooldown not elapsed yet
+                    self.context.logger.info(
+                        f"  Skipping [{status}] {market_id} -- "
+                        f"retry cooldown ({retry_after - now}s remaining)"
+                    )
+                    continue
                 actionable.append(
                     {"market_id": market_id, "action": AnswerStatus.NEEDS_VERIFICATION}
                 )
@@ -265,7 +286,10 @@ class ScanPendingMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
                 )
 
                 if now >= finalization_deadline:
-                    # Too late — answer already finalized
+                    self.context.logger.info(
+                        f"  Skipping [{status}] {market_id} -- "
+                        f"answer already finalized"
+                    )
                     continue
 
                 # First challenge: act immediately
@@ -277,6 +301,10 @@ class ScanPendingMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
                     urgency = now >= finalization_deadline - self.params.challenge_urgency_buffer
                     cooldown_elapsed = now >= last_challenge_ts + cooldown
                     if not (urgency or cooldown_elapsed):
+                        self.context.logger.info(
+                            f"  Skipping [{status}] {market_id} -- "
+                            f"re-challenge cooldown (escalation #{prior_challenge['escalation_count']})"
+                        )
                         continue
 
                 actionable.append(
@@ -313,7 +341,7 @@ class ScanPendingMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             1 for e in questions_db.values() if e["status"] == AnswerStatus.CHALLENGE_PENDING
         )
         self.context.logger.info(
-            f"Scan complete: {len(questions_db)} markets tracked — "
+            f"Scan complete: {len(questions_db)} markets tracked -- "
             f"{n_trusted} trusted, {n_verified} verified, "
             f"{n_answer} need answer, {n_eval} need evaluation, "
             f"{n_challenge} challenge pending"
@@ -363,6 +391,7 @@ class ScanPendingMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         query1 = PENDING_MARKETS_QUERY.substitute(
             creators=creators_str,
             current_timestamp=now,
+            min_timestamp=min_timestamp,
         )
         result1 = yield from self.get_omen_subgraph_result(query1)
         pending = (

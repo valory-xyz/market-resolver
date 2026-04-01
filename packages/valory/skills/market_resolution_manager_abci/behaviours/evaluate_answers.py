@@ -43,19 +43,19 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
     """Behaviour to decide: request Mech or reuse existing evaluation data.
 
     Payload convention (custom end_block in EvaluateAnswersRound):
-    - mech_requests=<json> → done_event → FinishedWithMechRequestRound → MechInteract
-    - evaluation_result=<status> → none_event → BuildAnswerTxRound (skip Mech)
+    - mech_requests=<json> -> done_event -> FinishedWithMechRequestRound -> MechInteract
+    - evaluation_result=<status> -> none_event -> BuildAnswerTxRound (skip Mech)
     """
 
     matching_round = EvaluateAnswersRound
 
     def async_act(self) -> Generator:
-        """Evaluate the selected market — request Mech or reuse existing data."""
+        """Evaluate the selected market -- request Mech or reuse existing data."""
         market_id = self.synchronized_data.selected_market_id
         action = self.synchronized_data.selected_market_action
 
         if market_id is None:
-            self.context.logger.info("No selected market — nothing to evaluate.")
+            self.context.logger.info("No selected market -- nothing to evaluate.")
             yield from self._send_payload(None, None)
             return
 
@@ -84,7 +84,7 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
             yield from self._send_payload(None, None)
             return
 
-        # Build Mech request — prompt is the market title (human-readable question)
+        # Build Mech request -- prompt is the market title (human-readable question)
         title = entry.get("title", "")
         if not title:
             self.context.logger.error(
@@ -97,13 +97,13 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
         nonce = str(uuid4())
         mech_request = MechMetadata(
             nonce=nonce,
-            tool=self.params.mech_tool,
+            tool=self.params.mech_tool_resolve_market,
             prompt=prompt,
         )
 
         self.context.logger.info(
             f"Market {market_id}: requesting Mech evaluation "
-            f"with tool '{self.params.mech_tool}', "
+            f"with tool '{self.params.mech_tool_resolve_market}', "
             f"nonce={nonce}, prompt={prompt[:60]}..."
         )
 
@@ -117,7 +117,7 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
         questions_db[market_id] = entry
         self.questions_db = questions_db
 
-        # Send mech_requests → done_event → MechInteract
+        # Send mech_requests -> done_event -> MechInteract
         yield from self._send_payload(mech_requests_json, None)
 
     def _send_payload(
