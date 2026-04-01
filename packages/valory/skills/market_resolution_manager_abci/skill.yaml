@@ -11,7 +11,7 @@ fingerprint:
   __init__.py: bafybeiedhf4rirdachml54zzde7nl3nhuwz4c5xwskrc5udfphefbrdsfu
   behaviours/__init__.py: bafybeignnrbklzekhqurn6ptli5zhzsov2qtdzr5se4xe4hqdywt2vbtvu
   behaviours/base.py: bafybeicing7xr3fhz6w7jeenvhmwatur747evvud5vzi4l4qbeh5tpm57e
-  behaviours/build_answer_tx.py: bafybeicoweox3yymxwtxy2qoh6lu7usfkkmx3olprmhoaqotzcocrwq7zy
+  behaviours/build_answer_tx.py: bafybeibpgqoo6w6gctqoxion73hngeu6qkn6qxwsvssqdol74pd7cmljbm
   behaviours/cleanup_tracked_markets.py: bafybeig6hlqe4h3rm5k7lu5ku2jvnkccxjssfnliwad5b7pvd6u4wpq2gu
   behaviours/evaluate_answers.py: bafybeifbymkqxape2rrrkp6v6s5spc46mimef7lb3j56iezwdull74z6jm
   behaviours/post_transaction.py: bafybeidczcjkwhaunsl6o6u4kapgwcme42aej7cnjuxgke3na34oo3arbu

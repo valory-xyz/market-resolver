@@ -735,18 +735,19 @@ with open(path, "w") as f:
     json.dump(value, f, indent=2, default=str)
 ```
 
-### Phase 3c: Remaining Work
+### Phase 3c: Production Hardening -- COMPLETE (2026-04-01)
 
-**Must do before production:**
+All items completed:
 
-1. **Rename `FinishedWithChallengeTxRound`** → `FinishedWithAnswerTxRound` (consistency)
-2. **PostTransactionRound** — currently TxSettlement routes ALL txs to MechResponseRound. For non-Mech txs (answer/challenge, recovery), MechResponse finds no pending request and eventually times out. Need a PostTransactionRound that checks `tx_submitter` to multiplex:
-   - Mech request tx → MechResponseRound (poll for delivery)
-   - Answer/challenge tx → CleanupTrackedMarketsRound
-   - Recovery tx → ScanPendingMarketsRound
-3. **Cleanup round** — currently a stub. Should query subgraph for finalized markets and remove them from DB
-4. **Remove debug artifacts** — dump file, debug box, pprint
-5. **Add `realitio_contract` param** to `.env` and config-mapping — currently uses default from skill.yaml
+1. **FinishedWithChallengeTxRound -> FinishedWithAnswerTxRound** -- renamed for consistency
+2. **PostTransactionRound** -- routes based on tx_submitter: Mech request -> MechResponse, answer tx -> Cleanup
+3. **Cleanup round** -- queries subgraph for finalized markets (answerFinalizedTimestamp_gt: 0 and _lt: now), removes from DB
+4. **Debug artifacts removed** -- DB dump, debug box removed. Production logging kept.
+5. **max_escalation_rounds removed** -- max_challenge_bond is sole risk control
+6. **AnswerStatus enum** -- clean status lifecycle
+7. **Bond/balance checks** -- only logged for actionable markets (not trusted/verified)
+8. **Production params set** -- initial_answer_bond=1 xDAI, max_challenge_bond=16 xDAI, reset_pause=5min
+9. **Propel deployment configured** -- all secrets and variables set
 6. **Verify economic params match `.env`** — many params in config-mapping are missing from `.env` ("Environment variable not found. Skipping..."). Add to `.env` or accept defaults.
 
 **Nice to have (deferred):**
