@@ -65,7 +65,7 @@ abci_app_transition_mapping: AbciAppTransitionMapping = {
 
     # Fund recovery → TxSettlement / Core skill
     OmenFundsRecovererAbci.FinishedWithRecoveryTxRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
-    OmenFundsRecovererAbci.FinishedWithoutRecoveryTxRound: MarketResolutionManagerAbci.ScanPendingMarketsRound,
+    OmenFundsRecovererAbci.FinishedWithoutRecoveryTxRound: MarketResolutionManagerAbci.ScanMarketsRound,
 
     # Core skill → MechInteract (needs Mech evaluation)
     MarketResolutionManagerAbci.FinishedWithMechRequestRound: MechVersionStates.MechVersionDetectionRound,

@@ -5,7 +5,7 @@ alphabet_in:
 - NONE
 - NO_MAJORITY
 - ROUND_TIMEOUT
-default_start_state: ScanPendingMarketsRound
+default_start_state: ScanMarketsRound
 final_states:
 - FinishedResolutionRound
 - FinishedWithAnswerTxRound
@@ -16,7 +16,7 @@ start_states:
 - BuildAnswerTxRound
 - CleanupTrackedMarketsRound
 - PostTransactionRound
-- ScanPendingMarketsRound
+- ScanMarketsRound
 states:
 - BuildAnswerTxRound
 - CleanupTrackedMarketsRound
@@ -26,7 +26,7 @@ states:
 - FinishedWithMechPollRound
 - FinishedWithMechRequestRound
 - PostTransactionRound
-- ScanPendingMarketsRound
+- ScanMarketsRound
 transition_func:
     (BuildAnswerTxRound, DONE): FinishedWithAnswerTxRound
     (BuildAnswerTxRound, NONE): CleanupTrackedMarketsRound
@@ -46,7 +46,7 @@ transition_func:
     (PostTransactionRound, NONE): CleanupTrackedMarketsRound
     (PostTransactionRound, NO_MAJORITY): CleanupTrackedMarketsRound
     (PostTransactionRound, ROUND_TIMEOUT): CleanupTrackedMarketsRound
-    (ScanPendingMarketsRound, DONE): EvaluateAnswersRound
-    (ScanPendingMarketsRound, NONE): CleanupTrackedMarketsRound
-    (ScanPendingMarketsRound, NO_MAJORITY): ScanPendingMarketsRound
-    (ScanPendingMarketsRound, ROUND_TIMEOUT): ScanPendingMarketsRound
+    (ScanMarketsRound, DONE): EvaluateAnswersRound
+    (ScanMarketsRound, NONE): CleanupTrackedMarketsRound
+    (ScanMarketsRound, NO_MAJORITY): ScanMarketsRound
+    (ScanMarketsRound, ROUND_TIMEOUT): ScanMarketsRound

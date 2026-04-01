@@ -37,7 +37,7 @@ from packages.valory.skills.market_resolution_manager_abci.payloads import (
     CleanupTrackedMarketsPayload,
     EvaluateAnswersPayload,
     PostTransactionPayload,
-    ScanPendingMarketsPayload,
+    ScanMarketsPayload,
 )
 from packages.valory.skills.market_resolution_manager_abci.states.base import (
     Event,
@@ -94,10 +94,10 @@ class SynchronizedData(BaseSynchronizedData):
         return [MechInteractionResponse(**item) for item in responses]
 
 
-class ScanPendingMarketsRound(CollectSameUntilThresholdRound):
+class ScanMarketsRound(CollectSameUntilThresholdRound):
     """Round to scan pending markets and classify questions."""
 
-    payload_class = ScanPendingMarketsPayload
+    payload_class = ScanMarketsPayload
     synchronized_data_class = SynchronizedData
     done_event = Event.DONE
     none_event = Event.NONE
@@ -244,12 +244,12 @@ class FinishedResolutionRound(DegenerateRound):
 class MarketResolutionManagerAbciApp(AbciApp[Event]):
     """MarketResolutionManagerAbciApp
 
-    Initial round: ScanPendingMarketsRound
+    Initial round: ScanMarketsRound
 
-    Initial states: {BuildAnswerTxRound, CleanupTrackedMarketsRound, ScanPendingMarketsRound}
+    Initial states: {BuildAnswerTxRound, CleanupTrackedMarketsRound, ScanMarketsRound}
 
     Transition states:
-        0. ScanPendingMarketsRound
+        0. ScanMarketsRound
             - done: 1.
             - none: 3.
             - no majority: 0.
@@ -279,19 +279,19 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
         round timeout: 180.0
     """
 
-    initial_round_cls: AppState = ScanPendingMarketsRound
+    initial_round_cls: AppState = ScanMarketsRound
     initial_states: Set[AppState] = {
-        ScanPendingMarketsRound,
+        ScanMarketsRound,
         BuildAnswerTxRound,
         CleanupTrackedMarketsRound,
         PostTransactionRound,
     }
     transition_function: AbciAppTransitionFunction = {
-        ScanPendingMarketsRound: {
+        ScanMarketsRound: {
             Event.DONE: EvaluateAnswersRound,
             Event.NONE: CleanupTrackedMarketsRound,
-            Event.NO_MAJORITY: ScanPendingMarketsRound,
-            Event.ROUND_TIMEOUT: ScanPendingMarketsRound,
+            Event.NO_MAJORITY: ScanMarketsRound,
+            Event.ROUND_TIMEOUT: ScanMarketsRound,
         },
         EvaluateAnswersRound: {
             Event.DONE: FinishedWithMechRequestRound,
@@ -335,7 +335,7 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
     }
     cross_period_persisted_keys: FrozenSet[str] = frozenset()
     db_pre_conditions: Dict[AppState, Set[str]] = {
-        ScanPendingMarketsRound: set(),
+        ScanMarketsRound: set(),
         BuildAnswerTxRound: set(),
         CleanupTrackedMarketsRound: set(),
         PostTransactionRound: set(),

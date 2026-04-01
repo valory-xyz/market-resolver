@@ -54,7 +54,7 @@ states:
 - RemoveLiquidityRound
 - ResetAndPauseRound
 - ResetRound
-- ScanPendingMarketsRound
+- ScanMarketsRound
 - SelectKeeperTransactionSubmissionARound
 - SelectKeeperTransactionSubmissionBAfterTimeoutRound
 - SelectKeeperTransactionSubmissionBRound
@@ -66,9 +66,9 @@ transition_func:
     (BuildAnswerTxRound, NO_MAJORITY): CleanupTrackedMarketsRound
     (BuildAnswerTxRound, ROUND_TIMEOUT): CleanupTrackedMarketsRound
     (BuildMultisendRound, DONE): RandomnessTransactionSubmissionRound
-    (BuildMultisendRound, NONE): ScanPendingMarketsRound
-    (BuildMultisendRound, NO_MAJORITY): ScanPendingMarketsRound
-    (BuildMultisendRound, ROUND_TIMEOUT): ScanPendingMarketsRound
+    (BuildMultisendRound, NONE): ScanMarketsRound
+    (BuildMultisendRound, NO_MAJORITY): ScanMarketsRound
+    (BuildMultisendRound, ROUND_TIMEOUT): ScanMarketsRound
     (CheckLateTxHashesRound, CHECK_LATE_ARRIVING_MESSAGE): SynchronizeLateMessagesRound
     (CheckLateTxHashesRound, CHECK_TIMEOUT): CheckLateTxHashesRound
     (CheckLateTxHashesRound, DONE): PostTransactionRound
@@ -158,10 +158,10 @@ transition_func:
     (ResetRound, DONE): RandomnessTransactionSubmissionRound
     (ResetRound, NO_MAJORITY): ResetAndPauseRound
     (ResetRound, RESET_TIMEOUT): ResetAndPauseRound
-    (ScanPendingMarketsRound, DONE): EvaluateAnswersRound
-    (ScanPendingMarketsRound, NONE): CleanupTrackedMarketsRound
-    (ScanPendingMarketsRound, NO_MAJORITY): ScanPendingMarketsRound
-    (ScanPendingMarketsRound, ROUND_TIMEOUT): ScanPendingMarketsRound
+    (ScanMarketsRound, DONE): EvaluateAnswersRound
+    (ScanMarketsRound, NONE): CleanupTrackedMarketsRound
+    (ScanMarketsRound, NO_MAJORITY): ScanMarketsRound
+    (ScanMarketsRound, ROUND_TIMEOUT): ScanMarketsRound
     (SelectKeeperTransactionSubmissionARound, DONE): CollectSignatureRound
     (SelectKeeperTransactionSubmissionARound, INCORRECT_SERIALIZATION): ResetAndPauseRound
     (SelectKeeperTransactionSubmissionARound, NO_MAJORITY): ResetRound

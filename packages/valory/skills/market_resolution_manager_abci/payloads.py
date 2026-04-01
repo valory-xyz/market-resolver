@@ -26,8 +26,8 @@ from packages.valory.skills.abstract_round_abci.base import BaseTxPayload
 
 
 @dataclass(frozen=True)
-class ScanPendingMarketsPayload(BaseTxPayload):
-    """Payload for the ScanPendingMarketsRound."""
+class ScanMarketsPayload(BaseTxPayload):
+    """Payload for the ScanMarketsRound."""
 
     n_markets: Optional[int] = None
     selected_market_id: Optional[str] = None

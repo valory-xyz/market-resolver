@@ -37,8 +37,8 @@ from packages.valory.skills.market_resolution_manager_abci.behaviours.evaluate_a
 from packages.valory.skills.market_resolution_manager_abci.behaviours.post_transaction import (
     PostTransactionBehaviour,
 )
-from packages.valory.skills.market_resolution_manager_abci.behaviours.scan_pending_markets import (
-    ScanPendingMarketsBehaviour,
+from packages.valory.skills.market_resolution_manager_abci.behaviours.scan_markets import (
+    ScanMarketsBehaviour,
 )
 from packages.valory.skills.market_resolution_manager_abci.rounds import (
     MarketResolutionManagerAbciApp,
@@ -48,10 +48,10 @@ from packages.valory.skills.market_resolution_manager_abci.rounds import (
 class MarketResolutionManagerRoundBehaviour(AbstractRoundBehaviour):
     """This behaviour manages the consensus stages for market resolution."""
 
-    initial_behaviour_cls = ScanPendingMarketsBehaviour
+    initial_behaviour_cls = ScanMarketsBehaviour
     abci_app_cls = MarketResolutionManagerAbciApp  # type: ignore
     behaviours: Set[Type[BaseBehaviour]] = {
-        ScanPendingMarketsBehaviour,
+        ScanMarketsBehaviour,
         EvaluateAnswersBehaviour,
         BuildAnswerTxBehaviour,
         PostTransactionBehaviour,

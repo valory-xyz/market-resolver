@@ -17,7 +17,7 @@
 #
 # ------------------------------------------------------------------------------
 
-"""This module contains the ScanPendingMarketsBehaviour."""
+"""This module contains the ScanMarketsBehaviour."""
 
 from string import Template
 from typing import Any, Dict, Generator, List, Optional
@@ -26,10 +26,10 @@ from packages.valory.skills.market_resolution_manager_abci.behaviours.base impor
     MarketResolutionManagerBaseBehaviour,
 )
 from packages.valory.skills.market_resolution_manager_abci.payloads import (
-    ScanPendingMarketsPayload,
+    ScanMarketsPayload,
 )
 from packages.valory.skills.market_resolution_manager_abci.rounds import (
-    ScanPendingMarketsRound,
+    ScanMarketsRound,
 )
 from packages.valory.skills.market_resolution_manager_abci.states.base import (
     AnswerStatus,
@@ -117,10 +117,10 @@ LATEST_ANSWERERS_QUERY = Template(
 SUBGRAPH_BATCH_SIZE = 1000
 
 
-class ScanPendingMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
+class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
     """Behaviour to scan pending markets and classify questions."""
 
-    matching_round = ScanPendingMarketsRound
+    matching_round = ScanMarketsRound
 
     def async_act(self) -> Generator:
         """Scan markets and classify questions."""
@@ -512,7 +512,7 @@ class ScanPendingMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         self.questions_db = questions_db
 
         sender = self.context.agent_address
-        payload = ScanPendingMarketsPayload(
+        payload = ScanMarketsPayload(
             sender=sender,
             n_markets=len(questions_db),
             selected_market_id=selected_id,
@@ -525,7 +525,7 @@ class ScanPendingMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
     def _send_none_payload(self) -> Generator:
         """Send a NONE payload (nothing to do)."""
         sender = self.context.agent_address
-        payload = ScanPendingMarketsPayload(sender=sender)
+        payload = ScanMarketsPayload(sender=sender)
         yield from self.send_a2a_transaction(payload)
         yield from self.wait_until_round_end()
         self.set_done()
