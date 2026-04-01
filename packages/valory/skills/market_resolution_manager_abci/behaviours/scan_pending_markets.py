@@ -232,15 +232,18 @@ class ScanPendingMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
 
             # Determine if actionable
             status = entry["status"]
-            # Check if the required bond exceeds our limit (skip before Mech)
+
+            # Trusted/verified markets are never actionable
+            if status in (AnswerStatus.TRUSTED_ANSWER, AnswerStatus.VERIFIED):
+                continue
+
+            # Check bond affordability (only for actionable statuses)
             on_chain_bond = int(entry.get("on_chain_bond") or 0)
-            # Compute required bond
             if on_chain_bond > 0:
                 required_bond = on_chain_bond * 2
             else:
                 required_bond = self.params.initial_answer_bond
 
-            # Skip if bond exceeds config limit
             if required_bond > self.params.max_challenge_bond:
                 self.context.logger.info(
                     f"  Skipping [{status}] {market_id} -- "
@@ -249,7 +252,6 @@ class ScanPendingMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
                 )
                 continue
 
-            # Skip if safe can't afford the bond
             if required_bond > safe_balance:
                 self.context.logger.info(
                     f"  Skipping [{status}] {market_id} -- "
