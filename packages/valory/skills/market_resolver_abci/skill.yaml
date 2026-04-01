@@ -30,7 +30,7 @@ skills:
 - valory/funds_forwarder_abci:0.1.0:bafybeig4kflknvmbpbsaeeim4kurgpjvpduu36xfcjm3ehrjhxamt6byaa
 - valory/omen_funds_recoverer_abci:0.1.0:bafybeicr7c5pbar6qk5c45qgbkvbl4aaz7nqwxsbtcw2n45dcotukjme7i
 - valory/mech_interact_abci:0.1.0:bafybeibrmrdpys5xfivpmlyerbwlu2am2rmqb75bwub3cvcrvfwdbqxv54
-- valory/market_resolution_manager_abci:0.1.0:bafybeiap6az4tfmud7wxbgpdqt4xmb2ct3gbo3enjly3xsu2kgmpm3kwwq
+- valory/market_resolution_manager_abci:0.1.0:bafybeidcmyzd7mqns74hpf53z6tlhblhrtmemlaudybtqhiuao6d3e6d2i
 behaviours:
   main:
     args: {}
@@ -161,11 +161,10 @@ models:
       watched_creator_addresses: []
       trusted_addresses: []
       mech_tool_resolve_market: resolve-market-jury-v1
-      initial_answer_bond: 1000000000000000
+      initial_answer_bond: 1000000000000000000
       challenge_cooldown_fraction: 0.25
       challenge_urgency_buffer: 3600
-      max_challenge_bond: 10000000000000000000
-      max_escalation_rounds: 5
+      max_challenge_bond: 16000000000000000000
       max_mech_retries: 10
       mech_interact_round_timeout_seconds: 1200
       mech_interaction_sleep_time: 10

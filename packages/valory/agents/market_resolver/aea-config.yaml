@@ -40,7 +40,7 @@ protocols:
 skills:
 - valory/abstract_abci:0.1.0:bafybeict6h3wfmddpvam5gmmanqzuokup6ppoev3t4j5uyl7xxahjaols4
 - valory/abstract_round_abci:0.1.0:bafybeihygetmlgnhawrbyswvpvv3wpztr2hlhxkljmohp4r7qcmvglpwdq
-- valory/market_resolver_abci:0.1.0:bafybeidooihqvjck774dudtgd5wsomraz3cqs4jp46mqn6qzpcckjq3gh4
+- valory/market_resolver_abci:0.1.0:bafybeiavbsei4uzblbldm76o3w37eanoamdloeganfc4wuxr7545miafpi
 - valory/registration_abci:0.1.0:bafybeif3gpewppz5wr5mmgyvaowsamjufyons3oif7cb4x5ubvvfb6rtda
 - valory/reset_pause_abci:0.1.0:bafybeidcnf77bc3o7pssa5zesilpbm4ley2k45taii5j5rrvvty7uhu3lq
 - valory/termination_abci:0.1.0:bafybeia33hlouukdpwaxctunauudv5gpfdxndimra7yqiof4a3skcwdqkq
@@ -49,7 +49,7 @@ skills:
 - valory/funds_forwarder_abci:0.1.0:bafybeig4kflknvmbpbsaeeim4kurgpjvpduu36xfcjm3ehrjhxamt6byaa
 - valory/omen_funds_recoverer_abci:0.1.0:bafybeicr7c5pbar6qk5c45qgbkvbl4aaz7nqwxsbtcw2n45dcotukjme7i
 - valory/mech_interact_abci:0.1.0:bafybeibrmrdpys5xfivpmlyerbwlu2am2rmqb75bwub3cvcrvfwdbqxv54
-- valory/market_resolution_manager_abci:0.1.0:bafybeiap6az4tfmud7wxbgpdqt4xmb2ct3gbo3enjly3xsu2kgmpm3kwwq
+- valory/market_resolution_manager_abci:0.1.0:bafybeidcmyzd7mqns74hpf53z6tlhblhrtmemlaudybtqhiuao6d3e6d2i
 default_ledger: ethereum
 required_ledgers:
 - ethereum
@@ -180,7 +180,7 @@ models:
       round_timeout_seconds: ${float:60.0}
       validate_timeout: ${int:1205}
       history_check_timeout: ${int:1205}
-      reset_pause_duration: ${int:1800}
+      reset_pause_duration: ${int:300}
       max_healthcheck: ${int:43200}
       multisend_address: ${str:0xA238CBeb142c10Ef7Ad8442C6D1f9E89e07e7761}
       multisend_batch_size: ${int:5}
@@ -216,14 +216,13 @@ models:
       claim_bonds_batch_size: ${int:10}
       min_balance_withdraw_realitio: ${int:1000000000000000000}
       realitio_start_block: ${int:0}
-      watched_creator_addresses: ${list:[]}
-      trusted_addresses: ${list:[]}
+      watched_creator_addresses: ${list:["0x89c5cc945dd550BcFfb72Fe42BfF002429F46Fec","0xffc8029154ecd55abed15bd428ba596e7d23f557"]}
+      trusted_addresses: ${list:["0x89c5cc945dd550BcFfb72Fe42BfF002429F46Fec","0xffc8029154ecd55abed15bd428ba596e7d23f557"]}
       mech_tool_resolve_market: ${str:resolve-market-jury-v1}
-      initial_answer_bond: ${int:1000000000000000}
+      initial_answer_bond: ${int:1000000000000000000}
       challenge_cooldown_fraction: ${float:0.25}
       challenge_urgency_buffer: ${int:3600}
-      max_challenge_bond: ${int:10000000000000000000}
-      max_escalation_rounds: ${int:5}
+      max_challenge_bond: ${int:16000000000000000000}
       max_mech_retries: ${int:10}
       mech_interact_round_timeout_seconds: ${int:1200}
       mech_interaction_sleep_time: ${int:10}

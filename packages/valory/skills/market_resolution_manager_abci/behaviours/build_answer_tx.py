@@ -204,13 +204,6 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
 
         challenge = entry.get("challenge") or {}
         escalation_count = challenge.get("escalation_count", 0)
-        if escalation_count >= self.params.max_escalation_rounds:
-            self.context.logger.warning(
-                f"Market {market_id}: max escalation rounds "
-                f"({escalation_count}) reached."
-            )
-            yield from self._send_payload(None)
-            return
 
         on_chain_bond = int(entry.get("on_chain_bond") or 0)
         if on_chain_bond == 0:

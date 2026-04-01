@@ -11,7 +11,7 @@ fingerprint:
   __init__.py: bafybeiedhf4rirdachml54zzde7nl3nhuwz4c5xwskrc5udfphefbrdsfu
   behaviours/__init__.py: bafybeignnrbklzekhqurn6ptli5zhzsov2qtdzr5se4xe4hqdywt2vbtvu
   behaviours/base.py: bafybeicing7xr3fhz6w7jeenvhmwatur747evvud5vzi4l4qbeh5tpm57e
-  behaviours/build_answer_tx.py: bafybeifs4yrgz2crpzmz5mtgnazbo6gjaetarnyseykdu6lyb4hkwvaojy
+  behaviours/build_answer_tx.py: bafybeicoweox3yymxwtxy2qoh6lu7usfkkmx3olprmhoaqotzcocrwq7zy
   behaviours/cleanup_tracked_markets.py: bafybeig6hlqe4h3rm5k7lu5ku2jvnkccxjssfnliwad5b7pvd6u4wpq2gu
   behaviours/evaluate_answers.py: bafybeifbymkqxape2rrrkp6v6s5spc46mimef7lb3j56iezwdull74z6jm
   behaviours/post_transaction.py: bafybeidczcjkwhaunsl6o6u4kapgwcme42aej7cnjuxgke3na34oo3arbu
@@ -20,7 +20,7 @@ fingerprint:
   dialogues.py: bafybeict7mdksmjklx6wy2zplunpcfwhgxv5votxbsodidyum2phx3tv34
   fsm_specification.yaml: bafybeif3g26fj54x3vepatxhsdftqtu42gkwn66akrk7hyoyvlwman2k2a
   handlers.py: bafybeigby2ymzvsoiwbgtdd4esk6xrkrafp2b22yqz5xi4ekrnqwqqoq4y
-  models.py: bafybeigypscfyhz7sgaooi37htndgl3iij6gpg45pgr36obxyqn3rv76bu
+  models.py: bafybeiggd4mkdqjdz5q3jttvtet2yno366h657kfyjaxg3hjy5fnwzmsbe
   payloads.py: bafybeicl6x3nown5fbdgn6wovuf4ibff2vzxgdiklhwp7pupt537yfxzya
   rounds.py: bafybeifcupil53jltrctzpubmd6upzp6axbxxtydca6flmrdmal5svnr4u
   states/__init__.py: bafybeiho5s4sehwxmgtp4ddgntnkxhjks5cflihdtag7zqy6btjrhzcyti
