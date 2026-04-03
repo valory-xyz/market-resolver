@@ -28,7 +28,7 @@ skills:
 - valory/transaction_settlement_abci:0.1.0:bafybeiajyrszyyo6z4lxogutv4ougiaeoxak6xkq5gtrbey32gbgnirznq
 - valory/identify_service_owner_abci:0.1.0:bafybeid3uz3zy2feigoyw47jknqg3m5nwettuazprefzmz57jgktdsumne
 - valory/funds_forwarder_abci:0.1.0:bafybeig4kflknvmbpbsaeeim4kurgpjvpduu36xfcjm3ehrjhxamt6byaa
-- valory/omen_funds_recoverer_abci:0.1.0:bafybeicr7c5pbar6qk5c45qgbkvbl4aaz7nqwxsbtcw2n45dcotukjme7i
+- valory/omen_funds_recoverer_abci:0.1.0:bafybeiaoh5w6pai6fi7wvidtp3nowgghj66zpn3frzk7vuoa2ulfrouysq
 - valory/mech_interact_abci:0.1.0:bafybeibrmrdpys5xfivpmlyerbwlu2am2rmqb75bwub3cvcrvfwdbqxv54
 - valory/market_resolution_manager_abci:0.1.0:bafybeigccgg2j6u7krd5dsjoohvw2n6bldqnclz2fviwr62snjmjy3sqwu
 behaviours:
