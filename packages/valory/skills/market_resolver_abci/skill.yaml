@@ -13,13 +13,15 @@ fingerprint:
   composition.py: bafybeicod65gbyb2v4uqoydiifnususo5cp5kswifr4kwtjp6y6xpjhjna
   dialogues.py: bafybeidhc2scoo5hrmpovzoem5s36b3yas6vggkkajoijautv7g3bqaeb4
   fsm_specification.yaml: bafybeibusbtbhmxjkkukitrwwgvohteqkwsaxb3rurcew3zpzmtsl4tpiu
-  handlers.py: bafybeibl7txv6psjg3bl6tr5y5yigpl4bgqe5aoao62v5v7gwh26soz2au
+  handlers.py: bafybeifbf7rdzewdy2y3ewgs26wztasljfe4jwfrhnzncb4bjwt3jtmfru
   models.py: bafybeihwqf72psxcewszs2poh7yjukntvmminez5qbmftgtxvaximzfzou
   tests/__init__.py: bafybeibb6rglfusig6k56wjqe6pofhyjt2hbknwk6culahlooxo73bx2lu
 fingerprint_ignore_patterns: []
-connections: []
+connections:
+- valory/http_server:0.22.0:bafybeid4oqsfkqo36lryoecymjnq4whme3tgupqfq6m4l7lbr5r4yxtswu
 contracts: []
-protocols: []
+protocols:
+- valory/http:1.0.0:bafybeidxkp3vga7t6x2pbt2tpkgyaxa5bgpdgryao54py7w3yxyzr7neoy
 skills:
 - valory/abstract_round_abci:0.1.0:bafybeihygetmlgnhawrbyswvpvv3wpztr2hlhxkljmohp4r7qcmvglpwdq
 - valory/registration_abci:0.1.0:bafybeif3gpewppz5wr5mmgyvaowsamjufyons3oif7cb4x5ubvvfb6rtda
@@ -28,7 +30,7 @@ skills:
 - valory/transaction_settlement_abci:0.1.0:bafybeiajyrszyyo6z4lxogutv4ougiaeoxak6xkq5gtrbey32gbgnirznq
 - valory/identify_service_owner_abci:0.1.0:bafybeid3uz3zy2feigoyw47jknqg3m5nwettuazprefzmz57jgktdsumne
 - valory/funds_forwarder_abci:0.1.0:bafybeig4kflknvmbpbsaeeim4kurgpjvpduu36xfcjm3ehrjhxamt6byaa
-- valory/omen_funds_recoverer_abci:0.1.0:bafybeiaoh5w6pai6fi7wvidtp3nowgghj66zpn3frzk7vuoa2ulfrouysq
+- valory/omen_funds_recoverer_abci:0.1.0:bafybeibrqzdh4dmelma3dl4qye4dh77yauf7nezyrmte6f5z4veetg632m
 - valory/mech_interact_abci:0.1.0:bafybeibrmrdpys5xfivpmlyerbwlu2am2rmqb75bwub3cvcrvfwdbqxv54
 - valory/market_resolution_manager_abci:0.1.0:bafybeigccgg2j6u7krd5dsjoohvw2n6bldqnclz2fviwr62snjmjy3sqwu
 behaviours:
@@ -157,7 +159,6 @@ models:
       redeem_positions_batch_size: 5
       claim_bonds_batch_size: 10
       min_balance_withdraw_realitio: 1000000000000000000
-      realitio_start_block: 0
       watched_creator_addresses: []
       trusted_addresses: []
       mech_tool_resolve_market: resolve-market-jury-v1

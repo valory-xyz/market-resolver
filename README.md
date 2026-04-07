@@ -16,7 +16,7 @@ This is a sibling service to [market-creator](https://github.com/valory-xyz/mark
 
 ## Architecture
 
-The service is composed of 7 chained ABCI apps:
+The service is composed of 8 chained ABCI apps:
 
 ```
 Registration
@@ -47,7 +47,7 @@ ResetAndPause -- wait 5 min, then restart cycle
 The core FSM manages the market lifecycle:
 
 ```
-ScanPendingMarkets -- query Omen subgraph for pending + finalizing markets
+ScanMarkets -- query Omen subgraph for pending + finalizing markets
     |
     |--- DONE (actionable market found) --> EvaluateAnswers
     |--- NONE (nothing to do) --> Cleanup
@@ -75,17 +75,17 @@ CleanupTrackedMarkets -- remove finalized markets from DB
 ### Market Status Lifecycle (AnswerStatus enum)
 
 ```
-New unanswered market          --> NEEDS_ANSWER
-New market with untrusted answer --> NEEDS_VERIFICATION
-Mech agrees with on-chain      --> VERIFIED
-Mech disagrees / tx built      --> CHALLENGE_PENDING
-Our safe is the answerer       --> TRUSTED_ANSWER
+New unanswered market              --> NEEDS_ANSWER
+New market with untrusted answer   --> NEEDS_VERIFICATION
+Mech agrees with untrusted answer  --> VERIFIED (no action needed)
+Mech disagrees / answer tx built   --> CHALLENGE_PENDING
+Answered by our safe or trusted addr --> TRUSTED_ANSWER
 ```
 
 ### Key Design Decisions
 
 - **DB on SharedState, not SynchronizedData** -- the questions database is too heavy for Tendermint consensus. Each agent computes it deterministically from subgraph data.
-- **One market per cycle** -- processes the highest-priority market each cycle (challenges first, then unanswered). ~2 min per cycle.
+- **One market per cycle** -- processes the highest-priority market each cycle (challenges first, then unanswered). ~3-5 min per cycle including Mech response time.
 - **Bond-based risk control** -- `max_challenge_bond` caps the maximum xDAI the agent will put up. No `max_escalation_rounds` needed.
 - **Mech reuse** -- when someone counter-challenges a market we already evaluated, the agent reuses the existing evaluation instead of making a new Mech request.
 
