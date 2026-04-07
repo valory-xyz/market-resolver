@@ -54,7 +54,7 @@ data/
 __pycache__
 temp/
 agent/
-market_resolver/
+/market_resolver/
 logs/
 .env
 

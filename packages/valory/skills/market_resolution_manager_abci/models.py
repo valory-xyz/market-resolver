@@ -54,6 +54,9 @@ class MarketResolutionManagerParams(BaseParams):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize the parameters object."""
+        self.service_endpoint_base: str = self._ensure(
+            "service_endpoint_base", kwargs, str
+        )
         self.watched_creator_addresses: List[str] = kwargs.pop(
             "watched_creator_addresses", []
         )
