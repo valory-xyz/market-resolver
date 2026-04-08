@@ -41,8 +41,8 @@ skills:
 - valory/mech_interact_abci:0.1.0:bafybeibrmrdpys5xfivpmlyerbwlu2am2rmqb75bwub3cvcrvfwdbqxv54
 - valory/transaction_settlement_abci:0.1.0:bafybeiajyrszyyo6z4lxogutv4ougiaeoxak6xkq5gtrbey32gbgnirznq
 - valory/funds_forwarder_abci:0.1.0:bafybeig4kflknvmbpbsaeeim4kurgpjvpduu36xfcjm3ehrjhxamt6byaa
-- valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeic5jhft74l4kg7exceogxv2c3pfaj35bzijzsnrzwisxsa2zrbth4
-- valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeiadt36bvknkoglmg7jr32auycclu4voouibhfv64juguynginhnge
+- valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeia65oeligujwn7fisaada6oklmpqqn254shmed42r4s5eca62d32y
+- valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeieskw2xej53d2wuhjstdjikovxvcnruff2wfhync5djutwo5ar4me
 - valory/omen_realitio_withdraw_bond_abci:0.1.0:bafybeigesdt5xqjxlcv454fuguflrmy727lwpdbcgmqaqrjiaqgsqogmxa
 behaviours:
   main:

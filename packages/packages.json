@@ -1,9 +1,9 @@
 {
     "dev": {
-        "skill/valory/market_resolution_manager_abci/0.1.0": "bafybeifvw76d22br6xx2k2fyhj473ykpmsaivnxelkmgifwan32y3yfely",
-        "skill/valory/market_resolver_abci/0.1.0": "bafybeifrhziqmexdxfi2dr7pwrhrtjcfd4qzkmt2e7fprljlkx3z7w75su",
-        "agent/valory/market_resolver/0.1.0": "bafybeibqt4z6r6tjz6vd5dgjsehoshn67qltwa3j7khff4qzgi66orpipu",
-        "service/valory/market_resolver/0.1.0": "bafybeia7wek2k7uzujxr5i5z5se6y35ih64xly5i4yvzlddmhlwojkom3e"
+        "skill/valory/market_resolution_manager_abci/0.1.0": "bafybeifjrwjlrfo4bl7vdv6zhcovnlllxib6b4ou5x2xorqon5jwrvabxu",
+        "skill/valory/market_resolver_abci/0.1.0": "bafybeia5qfuph4gm2hbadq7tlrv3uyhnmrrq6zfhe6js7bdsmpur2qdksi",
+        "agent/valory/market_resolver/0.1.0": "bafybeibcbkjxvdf6xac3pbmdudc4e7umyxy62wah5pt347mw4rql4frlsi",
+        "service/valory/market_resolver/0.1.0": "bafybeibdziuir6fmb26egq3owkhme54t2adt77fyelxcsrwi3llant3ykq"
     },
     "third_party": {
         "protocol/valory/contract_api/1.0.0": "bafybeibld2xb5m7kyluiptkamp4nrt6oeomkohz7a3yppbv2oo7qw2e4la",
@@ -57,8 +57,8 @@
         "skill/valory/termination_abci/0.1.0": "bafybeia33hlouukdpwaxctunauudv5gpfdxndimra7yqiof4a3skcwdqkq",
         "skill/valory/identify_service_owner_abci/0.1.0": "bafybeid3uz3zy2feigoyw47jknqg3m5nwettuazprefzmz57jgktdsumne",
         "skill/valory/funds_forwarder_abci/0.1.0": "bafybeig4kflknvmbpbsaeeim4kurgpjvpduu36xfcjm3ehrjhxamt6byaa",
-        "skill/valory/omen_ct_redeem_tokens_abci/0.1.0": "bafybeic5jhft74l4kg7exceogxv2c3pfaj35bzijzsnrzwisxsa2zrbth4",
-        "skill/valory/omen_fpmm_remove_liquidity_abci/0.1.0": "bafybeiadt36bvknkoglmg7jr32auycclu4voouibhfv64juguynginhnge",
+        "skill/valory/omen_ct_redeem_tokens_abci/0.1.0": "bafybeia65oeligujwn7fisaada6oklmpqqn254shmed42r4s5eca62d32y",
+        "skill/valory/omen_fpmm_remove_liquidity_abci/0.1.0": "bafybeieskw2xej53d2wuhjstdjikovxvcnruff2wfhync5djutwo5ar4me",
         "skill/valory/omen_realitio_withdraw_bond_abci/0.1.0": "bafybeigesdt5xqjxlcv454fuguflrmy727lwpdbcgmqaqrjiaqgsqogmxa"
     }
 }
