@@ -57,8 +57,8 @@
         "skill/valory/termination_abci/0.1.0": "bafybeia33hlouukdpwaxctunauudv5gpfdxndimra7yqiof4a3skcwdqkq",
         "skill/valory/identify_service_owner_abci/0.1.0": "bafybeid3uz3zy2feigoyw47jknqg3m5nwettuazprefzmz57jgktdsumne",
         "skill/valory/funds_forwarder_abci/0.1.0": "bafybeig4kflknvmbpbsaeeim4kurgpjvpduu36xfcjm3ehrjhxamt6byaa",
-        "skill/valory/omen_ct_redeem_tokens_abci/0.1.0": "bafybeia65oeligujwn7fisaada6oklmpqqn254shmed42r4s5eca62d32y",
-        "skill/valory/omen_fpmm_remove_liquidity_abci/0.1.0": "bafybeieskw2xej53d2wuhjstdjikovxvcnruff2wfhync5djutwo5ar4me",
-        "skill/valory/omen_realitio_withdraw_bond_abci/0.1.0": "bafybeigesdt5xqjxlcv454fuguflrmy727lwpdbcgmqaqrjiaqgsqogmxa"
+        "skill/valory/omen_ct_redeem_tokens_abci/0.1.0": "bafybeif5rxndrf7e4wpcfgyntcwhtowhzfxntuuvwqpwfgmbppiztfygbi",
+        "skill/valory/omen_fpmm_remove_liquidity_abci/0.1.0": "bafybeiefyiq7e3wdi73jlgcyoszwofdiisprywrm5wzwwjsijcqfzy5hay",
+        "skill/valory/omen_realitio_withdraw_bonds_abci/0.1.0": "bafybeicme52ijrxogbrrm3e3frclowpgeoko6po6nxmu2wi4kqjvqoysgm"
     }
 }
