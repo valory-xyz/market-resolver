@@ -67,7 +67,10 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
             return
 
         # Re-challenge scenario: already have Mech data, skip Mech
-        if action == AnswerStatus.CHALLENGE_PENDING and entry.get("evaluation") is not None:
+        if (
+            action == AnswerStatus.CHALLENGE_PENDING
+            and entry.get("evaluation") is not None
+        ):
             self.context.logger.info(
                 f"Market {market_id}: reusing existing Mech evaluation "
                 f"for re-challenge (skipping Mech request)."
@@ -107,9 +110,7 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
             f"nonce={nonce}, prompt={prompt[:60]}..."
         )
 
-        mech_requests_json = json.dumps(
-            [asdict(mech_request)], sort_keys=True
-        )
+        mech_requests_json = json.dumps([asdict(mech_request)], sort_keys=True)
 
         # Increment retry counter
         entry["mech_retries"] = retries + 1

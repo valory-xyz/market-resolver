@@ -77,7 +77,9 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
 
     matching_round = BuildAnswerTxRound
 
-    def async_act(self) -> Generator:
+    def async_act(  # pylint: disable=too-many-locals,too-many-return-statements,too-many-statements,too-many-branches
+        self,
+    ) -> Generator:
         """Build challenge transaction or mark as verified."""
         market_id = self.synchronized_data.selected_market_id
         if market_id is None:
@@ -158,7 +160,10 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
 
             entry["retry_after"] = retry_after
             # Keep original status (NEEDS_ANSWER or NEEDS_VERIFICATION)
-            if entry["status"] not in (AnswerStatus.NEEDS_ANSWER, AnswerStatus.NEEDS_VERIFICATION):
+            if entry["status"] not in (
+                AnswerStatus.NEEDS_ANSWER,
+                AnswerStatus.NEEDS_VERIFICATION,
+            ):
                 entry["status"] = AnswerStatus.NEEDS_VERIFICATION
             questions_db[market_id] = entry
             self.questions_db = questions_db
@@ -281,7 +286,7 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
         """
         # Step 1: Get the Realitio submitAnswer calldata
         response = yield from self.get_contract_api_response(
-            performative=ContractApiMessage.Performative.GET_STATE,
+            performative=ContractApiMessage.Performative.GET_STATE,  # type: ignore
             contract_address=self.params.realitio_contract,
             contract_id=str(RealitioContract.contract_id),
             contract_callable="get_submit_answer_tx",
@@ -295,8 +300,7 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
             or response.performative != ContractApiMessage.Performative.STATE
         ):
             self.context.logger.error(
-                f"Could not get submitAnswer calldata. "
-                f"Response: {response}"
+                f"Could not get submitAnswer calldata. " f"Response: {response}"
             )
             return None
 
@@ -313,7 +317,7 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
         ]
 
         response = yield from self.get_contract_api_response(
-            performative=ContractApiMessage.Performative.GET_RAW_TRANSACTION,
+            performative=ContractApiMessage.Performative.GET_RAW_TRANSACTION,  # type: ignore
             contract_address=self.params.multisend_address,
             contract_id=str(MultiSendContract.contract_id),
             contract_callable="get_tx_data",
@@ -322,8 +326,7 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
 
         if response.performative != ContractApiMessage.Performative.RAW_TRANSACTION:
             self.context.logger.error(
-                f"Could not compile multisend tx. "
-                f"Response: {response}"
+                f"Could not compile multisend tx. " f"Response: {response}"
             )
             return None
 
@@ -366,7 +369,7 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
     ) -> Generator[None, None, Optional[str]]:
         """Get Safe transaction hash via GnosisSafe contract."""
         response = yield from self.get_contract_api_response(
-            performative=ContractApiMessage.Performative.GET_STATE,
+            performative=ContractApiMessage.Performative.GET_STATE,  # type: ignore
             contract_address=self.synchronized_data.safe_contract_address,
             contract_id=str(GnosisSafeContract.contract_id),
             contract_callable="get_raw_safe_transaction_hash",

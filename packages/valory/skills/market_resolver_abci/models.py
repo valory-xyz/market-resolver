@@ -62,10 +62,10 @@ from packages.valory.skills.omen_funds_recoverer_abci.models import (
     ConditionalTokensSubgraph as BaseConditionalTokensSubgraph,
 )
 from packages.valory.skills.omen_funds_recoverer_abci.models import (
-    OmenSubgraph as BaseOmenSubgraph,
+    OmenFundsRecovererParams,
 )
 from packages.valory.skills.omen_funds_recoverer_abci.models import (
-    OmenFundsRecovererParams,
+    OmenSubgraph as BaseOmenSubgraph,
 )
 from packages.valory.skills.omen_funds_recoverer_abci.models import (
     RealitioSubgraph as BaseRealitioSubgraph,
@@ -120,7 +120,9 @@ class SharedState(BaseSharedState):
         )
         MarketResolverAbciApp.event_to_timeout[
             ResetPauseEvent.RESET_AND_PAUSE_TIMEOUT
-        ] = (self.context.params.reset_pause_duration + MARGIN)
+        ] = (
+            self.context.params.reset_pause_duration + MARGIN
+        )
         MarketResolverAbciApp.event_to_timeout[
             IdentifyServiceOwnerEvent.ROUND_TIMEOUT
         ] = self.context.params.round_timeout_seconds

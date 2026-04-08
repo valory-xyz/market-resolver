@@ -33,7 +33,6 @@ from packages.valory.skills.market_resolution_manager_abci.rounds import (
     MarketResolutionManagerAbciApp,
 )
 
-
 Requests = BaseRequests
 BenchmarkTool = BaseBenchmarkTool
 
@@ -49,7 +48,9 @@ class SharedState(BaseSharedState):
         self.questions_db: Dict[str, Any] = {}
 
 
-class MarketResolutionManagerParams(BaseParams):
+class MarketResolutionManagerParams(  # pylint: disable=too-many-instance-attributes
+    BaseParams,
+):
     """Parameters for the market_resolution_manager_abci skill."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:

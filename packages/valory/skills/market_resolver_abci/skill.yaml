@@ -10,11 +10,11 @@ fingerprint:
   README.md: bafybeiahbbj3x5pfg3tqbnrrnw2mhc2jguaqrwg7pjzk2ycxoqmlm6scje
   __init__.py: bafybeig5dyyxibrg3ouf4ax53l5mpytzttebdvqmjewltawxtswk4op364
   behaviours.py: bafybeifzfyykbrqdsqqrhmmghesn3ztjx7jvrkztars5fdj6kw4r6tdyny
-  composition.py: bafybeicod65gbyb2v4uqoydiifnususo5cp5kswifr4kwtjp6y6xpjhjna
+  composition.py: bafybeiek2squfjeinx7lwosnurcbu7hgrp3j4h2mykyvt3xxzkwo7aovfy
   dialogues.py: bafybeidhc2scoo5hrmpovzoem5s36b3yas6vggkkajoijautv7g3bqaeb4
   fsm_specification.yaml: bafybeibusbtbhmxjkkukitrwwgvohteqkwsaxb3rurcew3zpzmtsl4tpiu
-  handlers.py: bafybeifbf7rdzewdy2y3ewgs26wztasljfe4jwfrhnzncb4bjwt3jtmfru
-  models.py: bafybeihwqf72psxcewszs2poh7yjukntvmminez5qbmftgtxvaximzfzou
+  handlers.py: bafybeicpi4lz6jowj3yjlp4cdhstlxl4ryql7joqiowmq4oknpnfyrd4oq
+  models.py: bafybeifzmfk2x77qzw5fcwls3jatyjbsi3odf2cx3ovjuhu4gqhta3juje
   tests/__init__.py: bafybeibb6rglfusig6k56wjqe6pofhyjt2hbknwk6culahlooxo73bx2lu
 fingerprint_ignore_patterns: []
 connections:
@@ -32,7 +32,7 @@ skills:
 - valory/funds_forwarder_abci:0.1.0:bafybeig4kflknvmbpbsaeeim4kurgpjvpduu36xfcjm3ehrjhxamt6byaa
 - valory/omen_funds_recoverer_abci:0.1.0:bafybeibjqwvn2qy62axkbaklea4flr2ln4ceely3pj3cac6vardqgtapum
 - valory/mech_interact_abci:0.1.0:bafybeibrmrdpys5xfivpmlyerbwlu2am2rmqb75bwub3cvcrvfwdbqxv54
-- valory/market_resolution_manager_abci:0.1.0:bafybeibrwgj22qn7g4q5e6abtfhqaoqfefnqyf3aehreeuwuvt3vjpdfhy
+- valory/market_resolution_manager_abci:0.1.0:bafybeidfrc55mpzrjsavkoztzjveqor6rxwgqa4igynbnha3bskegbpfmi
 behaviours:
   main:
     args: {}

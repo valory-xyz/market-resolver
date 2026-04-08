@@ -31,13 +31,9 @@ from packages.valory.skills.market_resolution_manager_abci.payloads import (
 from packages.valory.skills.market_resolution_manager_abci.rounds import (
     CleanupTrackedMarketsRound,
 )
-from packages.valory.skills.market_resolution_manager_abci.states.base import (
-    AnswerStatus,
-)
 
 # Query finalized markets by FPMM id
-FINALIZED_MARKETS_QUERY = Template(
-    """{
+FINALIZED_MARKETS_QUERY = Template("""{
     fixedProductMarketMakers(
         where: {
             id_in: [${market_ids}]
@@ -49,8 +45,7 @@ FINALIZED_MARKETS_QUERY = Template(
         id
         answerFinalizedTimestamp
     }
-}"""
-)
+}""")
 
 SUBGRAPH_BATCH_SIZE = 100
 
@@ -80,7 +75,7 @@ class CleanupTrackedMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         tracked_ids = list(questions_db.keys())
         if tracked_ids:
             for i in range(0, len(tracked_ids), SUBGRAPH_BATCH_SIZE):
-                batch = tracked_ids[i: i + SUBGRAPH_BATCH_SIZE]
+                batch = tracked_ids[i : i + SUBGRAPH_BATCH_SIZE]
                 ids_str = ", ".join(f'"{mid}"' for mid in batch)
                 query = FINALIZED_MARKETS_QUERY.substitute(
                     market_ids=ids_str,
@@ -94,16 +89,13 @@ class CleanupTrackedMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
                     )
                     break
 
-                markets = result.get("data", {}).get(
-                    "fixedProductMarketMakers", []
-                )
+                markets = result.get("data", {}).get("fixedProductMarketMakers", [])
                 for market in markets:
                     mid = market.get("id")
                     if mid and mid in questions_db:
                         old_status = questions_db[mid].get("status", "?")
                         self.context.logger.info(
-                            f"  Removing finalized market {mid} "
-                            f"(was {old_status})"
+                            f"  Removing finalized market {mid} " f"(was {old_status})"
                         )
                         removed.add(mid)
                         del questions_db[mid]

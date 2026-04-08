@@ -39,9 +39,7 @@ from packages.valory.skills.market_resolution_manager_abci.payloads import (
     PostTransactionPayload,
     ScanMarketsPayload,
 )
-from packages.valory.skills.market_resolution_manager_abci.states.base import (
-    Event,
-)
+from packages.valory.skills.market_resolution_manager_abci.states.base import Event
 from packages.valory.skills.mech_interact_abci.states.base import (
     MechInteractionResponse,
     MechMetadata,
@@ -138,9 +136,7 @@ class EvaluateAnswersRound(CollectSameUntilThresholdRound):
         - evaluation_result → NONE → BuildAnswerTxRound
         """
         if self.threshold_reached:
-            values = dict(
-                zip(self.selection_key, self.most_voted_payload_values)
-            )
+            values = dict(zip(self.selection_key, self.most_voted_payload_values))
             values[self.collection_key] = self.serialized_collection
             synchronized_data = self.synchronized_data.update(
                 synchronized_data_class=self.synchronized_data_class,
@@ -246,34 +242,42 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
 
     Initial round: ScanMarketsRound
 
-    Initial states: {BuildAnswerTxRound, CleanupTrackedMarketsRound, ScanMarketsRound}
+    Initial states: {BuildAnswerTxRound, CleanupTrackedMarketsRound, PostTransactionRound, ScanMarketsRound}
 
     Transition states:
         0. ScanMarketsRound
             - done: 1.
-            - none: 3.
+            - none: 4.
             - no majority: 0.
             - round timeout: 0.
         1. EvaluateAnswersRound
-            - done: 4.
-            - none: 2.
-            - no majority: 3.
-            - round timeout: 3.
-        2. BuildAnswerTxRound
             - done: 5.
-            - none: 3.
-            - no majority: 3.
-            - round timeout: 3.
-        3. CleanupTrackedMarketsRound
-            - done: 6.
-            - none: 6.
-            - no majority: 6.
-            - round timeout: 6.
-        4. FinishedWithMechRequestRound
-        5. FinishedWithAnswerTxRound
-        6. FinishedResolutionRound
+            - none: 2.
+            - no majority: 4.
+            - round timeout: 4.
+        2. BuildAnswerTxRound
+            - done: 7.
+            - none: 4.
+            - no majority: 4.
+            - round timeout: 4.
+        3. PostTransactionRound
+            - mech request done: 6.
+            - answer tx done: 4.
+            - done: 4.
+            - none: 4.
+            - no majority: 4.
+            - round timeout: 4.
+        4. CleanupTrackedMarketsRound
+            - done: 8.
+            - none: 8.
+            - no majority: 8.
+            - round timeout: 8.
+        5. FinishedWithMechRequestRound
+        6. FinishedWithMechPollRound
+        7. FinishedWithAnswerTxRound
+        8. FinishedResolutionRound
 
-    Final states: {FinishedResolutionRound, FinishedWithAnswerTxRound, FinishedWithMechRequestRound}
+    Final states: {FinishedResolutionRound, FinishedWithAnswerTxRound, FinishedWithMechPollRound, FinishedWithMechRequestRound}
 
     Timeouts:
         round timeout: 180.0
@@ -341,9 +345,7 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
         PostTransactionRound: set(),
     }
     db_post_conditions: Dict[AppState, Set[str]] = {
-        FinishedWithMechRequestRound: {
-            get_name(SynchronizedData.mech_requests)
-        },
+        FinishedWithMechRequestRound: {get_name(SynchronizedData.mech_requests)},
         FinishedWithMechPollRound: set(),
         FinishedWithAnswerTxRound: {"most_voted_tx_hash"},
         FinishedResolutionRound: set(),

@@ -39,8 +39,7 @@ from packages.valory.skills.market_resolution_manager_abci.states.base import (
 # answerFinalizedTimestamp: null = not yet finalized
 # openingTimestamp_lt: now = market is past opening time
 # Pending markets (no answer yet)
-PENDING_MARKETS_QUERY = Template(
-    """{
+PENDING_MARKETS_QUERY = Template("""{
     fixedProductMarketMakers(
         where: {
             creator_in: [${creators}]
@@ -65,12 +64,10 @@ PENDING_MARKETS_QUERY = Template(
         }
         title
     }
-}"""
-)
+}""")
 
 # Finalizing markets (answered but finalization still in the future -- can still be challenged)
-FINALIZING_MARKETS_QUERY = Template(
-    """{
+FINALIZING_MARKETS_QUERY = Template("""{
     fixedProductMarketMakers(
         where: {
             creator_in: [${creators}]
@@ -95,12 +92,10 @@ FINALIZING_MARKETS_QUERY = Template(
         }
         title
     }
-}"""
-)
+}""")
 
 # Realitio subgraph query: get latest answerer for each question
-LATEST_ANSWERERS_QUERY = Template(
-    """{
+LATEST_ANSWERERS_QUERY = Template("""{
     questions(
         where: {questionId_in: [${question_ids}]}
         first: 1000
@@ -111,8 +106,7 @@ LATEST_ANSWERERS_QUERY = Template(
             timestamp
         }
     }
-}"""
-)
+}""")
 
 SUBGRAPH_BATCH_SIZE = 1000
 
@@ -122,7 +116,9 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
 
     matching_round = ScanMarketsRound
 
-    def async_act(self) -> Generator:
+    def async_act(  # pylint: disable=too-many-locals,too-many-statements,too-many-branches
+        self,
+    ) -> Generator:
         """Scan markets and classify questions."""
         watched = self.params.watched_creator_addresses
         if not watched:
@@ -145,9 +141,7 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
 
         # Step 3: Classify questions and update DB
         questions_db = dict(self.questions_db)
-        trusted = set(
-            addr.lower() for addr in self.params.trusted_addresses
-        )
+        trusted = set(addr.lower() for addr in self.params.trusted_addresses)
         trusted.add(self.synchronized_data.safe_contract_address.lower())
 
         # Get safe balance once for bond affordability check
@@ -156,8 +150,7 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         if safe_balance is None:
             safe_balance = 0
         self.context.logger.info(
-            f"Safe {safe_address} balance: "
-            f"{safe_balance / 10 ** 18:.4f} xDAI"
+            f"Safe {safe_address} balance: " f"{safe_balance / 10 ** 18:.4f} xDAI"
         )
 
         actionable: List[Dict[str, Any]] = []
@@ -167,7 +160,6 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             market_id = market["id"]
             question_id = market["question"]["id"]
             current_answer = market.get("currentAnswer")
-            current_bond = market.get("currentAnswerBond")
             current_answer_ts = market.get("currentAnswerTimestamp")
             timeout = int(market.get("timeout", 86400))
             latest_answerer = answerers.get(question_id, "").lower()
@@ -191,7 +183,7 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
                             f"(trusted answerer {latest_answerer})"
                         )
                         continue
-                    elif entry.get("evaluation") is not None:
+                    if entry.get("evaluation") is not None:
                         new_status = AnswerStatus.CHALLENGE_PENDING
                         questions_db[market_id] = self._update_entry(
                             entry, market, latest_answerer, new_status
@@ -300,7 +292,10 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
                 if prior_challenge.get("escalation_count", 0) > 0:
                     cooldown = timeout * self.params.challenge_cooldown_fraction
                     last_challenge_ts = prior_challenge.get("timestamp", 0)
-                    urgency = now >= finalization_deadline - self.params.challenge_urgency_buffer
+                    urgency = (
+                        now
+                        >= finalization_deadline - self.params.challenge_urgency_buffer
+                    )
                     cooldown_elapsed = now >= last_challenge_ts + cooldown
                     if not (urgency or cooldown_elapsed):
                         self.context.logger.info(
@@ -328,7 +323,9 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
 
         # Log summary
         n_trusted = sum(
-            1 for e in questions_db.values() if e["status"] == AnswerStatus.TRUSTED_ANSWER
+            1
+            for e in questions_db.values()
+            if e["status"] == AnswerStatus.TRUSTED_ANSWER
         )
         n_verified = sum(
             1 for e in questions_db.values() if e["status"] == AnswerStatus.VERIFIED
@@ -337,10 +334,14 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             1 for e in questions_db.values() if e["status"] == AnswerStatus.NEEDS_ANSWER
         )
         n_eval = sum(
-            1 for e in questions_db.values() if e["status"] == AnswerStatus.NEEDS_VERIFICATION
+            1
+            for e in questions_db.values()
+            if e["status"] == AnswerStatus.NEEDS_VERIFICATION
         )
         n_challenge = sum(
-            1 for e in questions_db.values() if e["status"] == AnswerStatus.CHALLENGE_PENDING
+            1
+            for e in questions_db.values()
+            if e["status"] == AnswerStatus.CHALLENGE_PENDING
         )
         self.context.logger.info(
             f"Scan complete: {len(questions_db)} markets tracked -- "
@@ -397,7 +398,8 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         result1 = yield from self.get_omen_subgraph_result(query1)
         pending = (
             result1.get("data", {}).get("fixedProductMarketMakers", [])
-            if result1 else []
+            if result1
+            else []
         )
 
         # Query 2: finalizing (answered, finalization in the future)
@@ -408,7 +410,8 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         result2 = yield from self.get_omen_subgraph_result(query2)
         finalizing = (
             result2.get("data", {}).get("fixedProductMarketMakers", [])
-            if result2 else []
+            if result2
+            else []
         )
 
         # Merge and deduplicate by market id
@@ -436,7 +439,7 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             return answerers
 
         for i in range(0, len(question_ids), SUBGRAPH_BATCH_SIZE):
-            batch = question_ids[i: i + SUBGRAPH_BATCH_SIZE]
+            batch = question_ids[i : i + SUBGRAPH_BATCH_SIZE]
             ids_str = ", ".join(f'"{qid}"' for qid in batch)
             query = LATEST_ANSWERERS_QUERY.substitute(question_ids=ids_str)
             result = yield from self.get_realitio_subgraph_result(query)
@@ -493,7 +496,10 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         updated["realitio_timeout"] = int(market.get("timeout", 86400))
 
         # Clear Mech data if re-evaluating (new non-trusted answer)
-        if new_status == AnswerStatus.NEEDS_VERIFICATION and entry.get("evaluation") is not None:
+        if (
+            new_status == AnswerStatus.NEEDS_VERIFICATION
+            and entry.get("evaluation") is not None
+        ):
             updated["mech_request"] = None
             updated["mech_response"] = None
             updated["evaluation"] = None

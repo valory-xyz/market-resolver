@@ -85,6 +85,7 @@ class HttpMethod(Enum):
     POST = "post"
 
 
+# pylint: disable=protected-access,attribute-defined-outside-init
 class HttpHandler(BaseHttpHandler):
     """This implements the HTTP handler for the market resolver service."""
 
@@ -128,9 +129,7 @@ class HttpHandler(BaseHttpHandler):
             db=self.context.state.round_sequence.latest_synchronized_data.db
         )
 
-    def _get_handler(
-        self, url: str, method: str
-    ) -> Tuple[Optional[Callable], Dict]:
+    def _get_handler(self, url: str, method: str) -> Tuple[Optional[Callable], Dict]:
         """Check if a url is meant to be handled in this handler.
 
         We expect url to match the pattern {hostname}/.*,
@@ -289,8 +288,7 @@ class HttpHandler(BaseHttpHandler):
         if round_sequence._abci_app:
             current_round = round_sequence._abci_app.current_round.round_id
             rounds = [
-                r.round_id
-                for r in round_sequence._abci_app._previous_rounds[-25:]
+                r.round_id for r in round_sequence._abci_app._previous_rounds[-25:]
             ]
             rounds.append(current_round)
 

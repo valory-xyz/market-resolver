@@ -75,12 +75,10 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
         )
         return int(last_timestamp)
 
-    def get_native_balance(
-        self, address: str
-    ) -> Generator[None, None, Optional[int]]:
+    def get_native_balance(self, address: str) -> Generator[None, None, Optional[int]]:
         """Get the native xDAI balance of the provided address."""
         ledger_api_response = yield from self.get_ledger_api_response(
-            performative=LedgerApiMessage.Performative.GET_STATE,
+            performative=LedgerApiMessage.Performative.GET_STATE,  # type: ignore
             ledger_callable="get_balance",
             account=address,
         )
@@ -90,9 +88,7 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
                 f"Expected STATE, got {ledger_api_response.performative.value}."
             )
             return None
-        balance = cast(
-            int, ledger_api_response.state.body.get("get_balance_result")
-        )
+        balance = cast(int, ledger_api_response.state.body.get("get_balance_result"))
         return balance
 
     def get_omen_subgraph_result(

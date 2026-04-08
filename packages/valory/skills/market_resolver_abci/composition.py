@@ -54,52 +54,39 @@ from packages.valory.skills.termination_abci.rounds import (
 abci_app_transition_mapping: AbciAppTransitionMapping = {
     # Registration → IdentifyServiceOwner
     FinishedRegistrationRound: IdentifyServiceOwnerAbci.IdentifyServiceOwnerRound,
-
     # IdentifyServiceOwner → FundsForwarder / Recovery
     IdentifyServiceOwnerAbci.FinishedIdentifyServiceOwnerRound: FundsForwarderAbci.FundsForwarderRound,
     IdentifyServiceOwnerAbci.FinishedIdentifyServiceOwnerErrorRound: OmenFundsRecovererAbci.RemoveLiquidityRound,
-
     # FundsForwarder → Recovery / TxSettlement
     FundsForwarderAbci.FinishedFundsForwarderNoTxRound: OmenFundsRecovererAbci.RemoveLiquidityRound,
     FundsForwarderAbci.FinishedFundsForwarderWithTxRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
-
     # Fund recovery → TxSettlement / Core skill
     OmenFundsRecovererAbci.FinishedWithRecoveryTxRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
     OmenFundsRecovererAbci.FinishedWithoutRecoveryTxRound: MarketResolutionManagerAbci.ScanMarketsRound,
-
     # Core skill → MechInteract (needs Mech evaluation)
     MarketResolutionManagerAbci.FinishedWithMechRequestRound: MechVersionStates.MechVersionDetectionRound,
-
     # MechInteract internal routing
     MechFinalStates.FinishedMarketplaceLegacyDetectedRound: MechRequestStates.MechRequestRound,
     MechFinalStates.FinishedMechLegacyDetectedRound: MechRequestStates.MechRequestRound,
     MechFinalStates.FinishedMechInformationRound: MechRequestStates.MechRequestRound,
     MechFinalStates.FailedMechInformationRound: MechVersionStates.MechVersionDetectionRound,
-
     # MechInteract → TxSettlement (for on-chain Mech request)
     MechFinalStates.FinishedMechRequestRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
     MechFinalStates.FinishedMechPurchaseSubscriptionRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
-
     # MechInteract → Core skill (response received)
     MechFinalStates.FinishedMechResponseRound: MarketResolutionManagerAbci.BuildAnswerTxRound,
-
     # MechInteract → Reset (skip/timeout — retry next cycle)
     MechFinalStates.FinishedMechRequestSkipRound: ResetAndPauseRound,
     MechFinalStates.FinishedMechResponseTimeoutRound: ResetAndPauseRound,
-
     # Core skill → TxSettlement (answer/challenge tx)
     MarketResolutionManagerAbci.FinishedWithAnswerTxRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
-
     # TxSettlement → PostTransaction (multiplex based on tx_submitter)
     TransactionSettlementAbci.FinishedTransactionSubmissionRound: MarketResolutionManagerAbci.PostTransactionRound,
     TransactionSettlementAbci.FailedRound: ResetAndPauseRound,
-
     # PostTransaction → MechResponseRound (poll for Mech delivery)
     MarketResolutionManagerAbci.FinishedWithMechPollRound: MechResponseStates.MechResponseRound,
-
     # Core skill → Reset
     MarketResolutionManagerAbci.FinishedResolutionRound: ResetAndPauseRound,
-
     # Reset → next cycle
     FinishedResetAndPauseRound: IdentifyServiceOwnerAbci.IdentifyServiceOwnerRound,
     FinishedResetAndPauseErrorRound: RegistrationRound,
