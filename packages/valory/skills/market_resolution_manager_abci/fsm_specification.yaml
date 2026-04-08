@@ -1,16 +1,24 @@
 alphabet_in:
 - ANSWER_TX_DONE
+- CT_REDEEM_TOKENS_TX_DONE
 - DONE
+- FPMM_REMOVE_LIQUIDITY_TX_DONE
+- FUNDS_FORWARDER_TX_DONE
 - MECH_REQUEST_DONE
 - NONE
 - NO_MAJORITY
+- REALITIO_WITHDRAW_BOND_TX_DONE
 - ROUND_TIMEOUT
 default_start_state: ScanMarketsRound
 final_states:
 - FinishedResolutionRound
 - FinishedWithAnswerTxRound
+- FinishedWithCtRedeemTokensPostTxRound
+- FinishedWithFpmmRemoveLiquidityPostTxRound
+- FinishedWithFundsForwarderPostTxRound
 - FinishedWithMechPollRound
 - FinishedWithMechRequestRound
+- FinishedWithRealitioWithdrawBondPostTxRound
 label: MarketResolutionManagerAbciApp
 start_states:
 - BuildAnswerTxRound
@@ -23,8 +31,12 @@ states:
 - EvaluateAnswersRound
 - FinishedResolutionRound
 - FinishedWithAnswerTxRound
+- FinishedWithCtRedeemTokensPostTxRound
+- FinishedWithFpmmRemoveLiquidityPostTxRound
+- FinishedWithFundsForwarderPostTxRound
 - FinishedWithMechPollRound
 - FinishedWithMechRequestRound
+- FinishedWithRealitioWithdrawBondPostTxRound
 - PostTransactionRound
 - ScanMarketsRound
 transition_func:
@@ -41,10 +53,14 @@ transition_func:
     (EvaluateAnswersRound, NO_MAJORITY): CleanupTrackedMarketsRound
     (EvaluateAnswersRound, ROUND_TIMEOUT): CleanupTrackedMarketsRound
     (PostTransactionRound, ANSWER_TX_DONE): CleanupTrackedMarketsRound
+    (PostTransactionRound, CT_REDEEM_TOKENS_TX_DONE): FinishedWithCtRedeemTokensPostTxRound
     (PostTransactionRound, DONE): CleanupTrackedMarketsRound
+    (PostTransactionRound, FPMM_REMOVE_LIQUIDITY_TX_DONE): FinishedWithFpmmRemoveLiquidityPostTxRound
+    (PostTransactionRound, FUNDS_FORWARDER_TX_DONE): FinishedWithFundsForwarderPostTxRound
     (PostTransactionRound, MECH_REQUEST_DONE): FinishedWithMechPollRound
     (PostTransactionRound, NONE): CleanupTrackedMarketsRound
     (PostTransactionRound, NO_MAJORITY): CleanupTrackedMarketsRound
+    (PostTransactionRound, REALITIO_WITHDRAW_BOND_TX_DONE): FinishedWithRealitioWithdrawBondPostTxRound
     (PostTransactionRound, ROUND_TIMEOUT): CleanupTrackedMarketsRound
     (ScanMarketsRound, DONE): EvaluateAnswersRound
     (ScanMarketsRound, NONE): CleanupTrackedMarketsRound

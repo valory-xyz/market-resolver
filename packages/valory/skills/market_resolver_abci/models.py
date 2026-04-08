@@ -19,6 +19,8 @@
 
 """This module contains the shared state for the market resolver ABCI application."""
 
+# pylint: disable=superfluous-parens,too-many-ancestors
+
 from typing import Any, Dict
 
 from packages.valory.skills.abstract_round_abci.models import ApiSpecs
@@ -58,20 +60,32 @@ from packages.valory.skills.mech_interact_abci.models import (
     Params as MechInteractAbciParams,
 )
 from packages.valory.skills.mech_interact_abci.rounds import Event as MechInteractEvent
-from packages.valory.skills.omen_funds_recoverer_abci.models import (
+from packages.valory.skills.omen_ct_redeem_tokens_abci.models import (
     ConditionalTokensSubgraph as BaseConditionalTokensSubgraph,
 )
-from packages.valory.skills.omen_funds_recoverer_abci.models import (
-    OmenFundsRecovererParams,
+from packages.valory.skills.omen_ct_redeem_tokens_abci.models import (
+    CtRedeemTokensParams,
 )
-from packages.valory.skills.omen_funds_recoverer_abci.models import (
+from packages.valory.skills.omen_ct_redeem_tokens_abci.models import (
     OmenSubgraph as BaseOmenSubgraph,
 )
-from packages.valory.skills.omen_funds_recoverer_abci.models import (
+from packages.valory.skills.omen_ct_redeem_tokens_abci.rounds import (
+    Event as OmenCtRedeemTokensEvent,
+)
+from packages.valory.skills.omen_fpmm_remove_liquidity_abci.models import (
+    FpmmRemoveLiquidityParams,
+)
+from packages.valory.skills.omen_fpmm_remove_liquidity_abci.rounds import (
+    Event as OmenFpmmRemoveLiquidityEvent,
+)
+from packages.valory.skills.omen_realitio_withdraw_bond_abci.models import (
     RealitioSubgraph as BaseRealitioSubgraph,
 )
-from packages.valory.skills.omen_funds_recoverer_abci.rounds import (
-    Event as OmenFundsRecovererEvent,
+from packages.valory.skills.omen_realitio_withdraw_bond_abci.models import (
+    RealitioWithdrawBondParams,
+)
+from packages.valory.skills.omen_realitio_withdraw_bond_abci.rounds import (
+    Event as OmenRealitioWithdrawBondEvent,
 )
 from packages.valory.skills.reset_pause_abci.rounds import Event as ResetPauseEvent
 from packages.valory.skills.termination_abci.models import TerminationParams
@@ -120,9 +134,7 @@ class SharedState(BaseSharedState):
         )
         MarketResolverAbciApp.event_to_timeout[
             ResetPauseEvent.RESET_AND_PAUSE_TIMEOUT
-        ] = (
-            self.context.params.reset_pause_duration + MARGIN
-        )
+        ] = (self.context.params.reset_pause_duration + MARGIN)
         MarketResolverAbciApp.event_to_timeout[
             IdentifyServiceOwnerEvent.ROUND_TIMEOUT
         ] = self.context.params.round_timeout_seconds
@@ -130,7 +142,13 @@ class SharedState(BaseSharedState):
             self.context.params.round_timeout_seconds
         )
         MarketResolverAbciApp.event_to_timeout[
-            OmenFundsRecovererEvent.ROUND_TIMEOUT
+            OmenFpmmRemoveLiquidityEvent.ROUND_TIMEOUT
+        ] = self.context.params.round_timeout_seconds
+        MarketResolverAbciApp.event_to_timeout[
+            OmenCtRedeemTokensEvent.ROUND_TIMEOUT
+        ] = self.context.params.round_timeout_seconds
+        MarketResolverAbciApp.event_to_timeout[
+            OmenRealitioWithdrawBondEvent.ROUND_TIMEOUT
         ] = self.context.params.round_timeout_seconds
         MarketResolverAbciApp.event_to_timeout[
             MarketResolutionManagerEvent.ROUND_TIMEOUT
@@ -142,7 +160,9 @@ class SharedState(BaseSharedState):
 
 class Params(
     MarketResolutionManagerParams,
-    OmenFundsRecovererParams,
+    FpmmRemoveLiquidityParams,
+    CtRedeemTokensParams,
+    RealitioWithdrawBondParams,
     FundsForwarderParams,
     MechInteractAbciParams,
     TerminationParams,

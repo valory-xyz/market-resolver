@@ -22,6 +22,7 @@
 from typing import Generator
 
 import packages.valory.skills.mech_interact_abci.states.request as MechRequestStates
+from packages.valory.skills.funds_forwarder_abci.rounds import FundsForwarderRound
 from packages.valory.skills.market_resolution_manager_abci.behaviours.base import (
     MarketResolutionManagerBaseBehaviour,
 )
@@ -31,6 +32,13 @@ from packages.valory.skills.market_resolution_manager_abci.payloads import (
 from packages.valory.skills.market_resolution_manager_abci.rounds import (
     BuildAnswerTxRound,
     PostTransactionRound,
+)
+from packages.valory.skills.omen_ct_redeem_tokens_abci.rounds import CtRedeemTokensRound
+from packages.valory.skills.omen_fpmm_remove_liquidity_abci.rounds import (
+    FpmmRemoveLiquidityRound,
+)
+from packages.valory.skills.omen_realitio_withdraw_bond_abci.rounds import (
+    RealitioWithdrawBondRound,
 )
 
 
@@ -53,8 +61,16 @@ class PostTransactionBehaviour(MarketResolutionManagerBaseBehaviour):
             content = PostTransactionRound.MECH_REQUEST_DONE_PAYLOAD
         elif tx_submitter == BuildAnswerTxRound.auto_round_id():
             content = PostTransactionRound.ANSWER_TX_DONE_PAYLOAD
+        elif tx_submitter == FundsForwarderRound.auto_round_id():
+            content = PostTransactionRound.FUNDS_FORWARDER_TX_DONE_PAYLOAD
+        elif tx_submitter == FpmmRemoveLiquidityRound.auto_round_id():
+            content = PostTransactionRound.FPMM_REMOVE_LIQUIDITY_TX_DONE_PAYLOAD
+        elif tx_submitter == CtRedeemTokensRound.auto_round_id():
+            content = PostTransactionRound.CT_REDEEM_TOKENS_TX_DONE_PAYLOAD
+        elif tx_submitter == RealitioWithdrawBondRound.auto_round_id():
+            content = PostTransactionRound.REALITIO_WITHDRAW_BOND_TX_DONE_PAYLOAD
         else:
-            # Recovery tx, funds forwarder, or unknown -- just proceed
+            # Unknown tx submitter — fall through to cleanup to avoid a stuck FSM.
             content = PostTransactionRound.ANSWER_TX_DONE_PAYLOAD
 
         sender = self.context.agent_address

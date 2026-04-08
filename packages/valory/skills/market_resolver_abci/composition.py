@@ -27,7 +27,9 @@ import packages.valory.skills.mech_interact_abci.states.final_states as MechFina
 import packages.valory.skills.mech_interact_abci.states.mech_version as MechVersionStates
 import packages.valory.skills.mech_interact_abci.states.request as MechRequestStates
 import packages.valory.skills.mech_interact_abci.states.response as MechResponseStates
-import packages.valory.skills.omen_funds_recoverer_abci.rounds as OmenFundsRecovererAbci
+import packages.valory.skills.omen_ct_redeem_tokens_abci.rounds as OmenCtRedeemTokensAbci
+import packages.valory.skills.omen_fpmm_remove_liquidity_abci.rounds as OmenFpmmRemoveLiquidityAbci
+import packages.valory.skills.omen_realitio_withdraw_bond_abci.rounds as OmenRealitioWithdrawBondAbci
 import packages.valory.skills.transaction_settlement_abci.rounds as TransactionSettlementAbci
 from packages.valory.skills.abstract_round_abci.abci_app_chain import (
     AbciAppTransitionMapping,
@@ -54,40 +56,49 @@ from packages.valory.skills.termination_abci.rounds import (
 abci_app_transition_mapping: AbciAppTransitionMapping = {
     # Registration → IdentifyServiceOwner
     FinishedRegistrationRound: IdentifyServiceOwnerAbci.IdentifyServiceOwnerRound,
-    # IdentifyServiceOwner → FundsForwarder / Recovery
+    # IdentifyServiceOwner → FundsForwarder (ok) / FpmmRemoveLiquidity (error — skip FundsForwarder)
     IdentifyServiceOwnerAbci.FinishedIdentifyServiceOwnerRound: FundsForwarderAbci.FundsForwarderRound,
-    IdentifyServiceOwnerAbci.FinishedIdentifyServiceOwnerErrorRound: OmenFundsRecovererAbci.RemoveLiquidityRound,
-    # FundsForwarder → Recovery / TxSettlement
-    FundsForwarderAbci.FinishedFundsForwarderNoTxRound: OmenFundsRecovererAbci.RemoveLiquidityRound,
+    IdentifyServiceOwnerAbci.FinishedIdentifyServiceOwnerErrorRound: OmenFpmmRemoveLiquidityAbci.FpmmRemoveLiquidityRound,
+    # FundsForwarder: tx → TxSettlement (returns via PostTx → FpmmRemoveLiquidity).
+    # No tx → FpmmRemoveLiquidity directly.
+    FundsForwarderAbci.FinishedFundsForwarderNoTxRound: OmenFpmmRemoveLiquidityAbci.FpmmRemoveLiquidityRound,
     FundsForwarderAbci.FinishedFundsForwarderWithTxRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
-    # Fund recovery → TxSettlement / Core skill
-    OmenFundsRecovererAbci.FinishedWithRecoveryTxRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
-    OmenFundsRecovererAbci.FinishedWithoutRecoveryTxRound: MarketResolutionManagerAbci.ScanMarketsRound,
-    # Core skill → MechInteract (needs Mech evaluation)
+    # Linear recovery chain: each skill either builds a multisend (→ TxSettlement →
+    # PostTx → next skill) or produces no tx (→ next skill directly). Every cycle walks
+    # through all three skills in order before reaching the core resolution flow.
+    #
+    # Step 1: FpmmRemoveLiquidity
+    OmenFpmmRemoveLiquidityAbci.FinishedWithFpmmRemoveLiquidityTxRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
+    OmenFpmmRemoveLiquidityAbci.FinishedWithoutFpmmRemoveLiquidityTxRound: OmenCtRedeemTokensAbci.CtRedeemTokensRound,
+    # Step 2: CtRedeemTokens
+    OmenCtRedeemTokensAbci.FinishedWithCtRedeemTokensTxRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
+    OmenCtRedeemTokensAbci.FinishedWithoutCtRedeemTokensTxRound: OmenRealitioWithdrawBondAbci.RealitioWithdrawBondRound,
+    # Step 3: RealitioWithdrawBond
+    OmenRealitioWithdrawBondAbci.FinishedWithRealitioWithdrawBondTxRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
+    OmenRealitioWithdrawBondAbci.FinishedWithoutRealitioWithdrawBondTxRound: MarketResolutionManagerAbci.ScanMarketsRound,
+    # PostTx fan-out: each recovery tx returns to the NEXT step of the chain.
+    MarketResolutionManagerAbci.FinishedWithFundsForwarderPostTxRound: OmenFpmmRemoveLiquidityAbci.FpmmRemoveLiquidityRound,
+    MarketResolutionManagerAbci.FinishedWithFpmmRemoveLiquidityPostTxRound: OmenCtRedeemTokensAbci.CtRedeemTokensRound,
+    MarketResolutionManagerAbci.FinishedWithCtRedeemTokensPostTxRound: OmenRealitioWithdrawBondAbci.RealitioWithdrawBondRound,
+    MarketResolutionManagerAbci.FinishedWithRealitioWithdrawBondPostTxRound: MarketResolutionManagerAbci.ScanMarketsRound,
+    # Core resolution flow (unchanged) ------------------------------------------
     MarketResolutionManagerAbci.FinishedWithMechRequestRound: MechVersionStates.MechVersionDetectionRound,
-    # MechInteract internal routing
     MechFinalStates.FinishedMarketplaceLegacyDetectedRound: MechRequestStates.MechRequestRound,
     MechFinalStates.FinishedMechLegacyDetectedRound: MechRequestStates.MechRequestRound,
     MechFinalStates.FinishedMechInformationRound: MechRequestStates.MechRequestRound,
     MechFinalStates.FailedMechInformationRound: MechVersionStates.MechVersionDetectionRound,
-    # MechInteract → TxSettlement (for on-chain Mech request)
     MechFinalStates.FinishedMechRequestRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
     MechFinalStates.FinishedMechPurchaseSubscriptionRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
-    # MechInteract → Core skill (response received)
     MechFinalStates.FinishedMechResponseRound: MarketResolutionManagerAbci.BuildAnswerTxRound,
-    # MechInteract → Reset (skip/timeout — retry next cycle)
     MechFinalStates.FinishedMechRequestSkipRound: ResetAndPauseRound,
     MechFinalStates.FinishedMechResponseTimeoutRound: ResetAndPauseRound,
-    # Core skill → TxSettlement (answer/challenge tx)
     MarketResolutionManagerAbci.FinishedWithAnswerTxRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
-    # TxSettlement → PostTransaction (multiplex based on tx_submitter)
+    # TxSettlement → PostTransactionRound (multiplexes by tx_submitter)
     TransactionSettlementAbci.FinishedTransactionSubmissionRound: MarketResolutionManagerAbci.PostTransactionRound,
     TransactionSettlementAbci.FailedRound: ResetAndPauseRound,
-    # PostTransaction → MechResponseRound (poll for Mech delivery)
     MarketResolutionManagerAbci.FinishedWithMechPollRound: MechResponseStates.MechResponseRound,
-    # Core skill → Reset
     MarketResolutionManagerAbci.FinishedResolutionRound: ResetAndPauseRound,
-    # Reset → next cycle
+    # Reset → next period
     FinishedResetAndPauseRound: IdentifyServiceOwnerAbci.IdentifyServiceOwnerRound,
     FinishedResetAndPauseErrorRound: RegistrationRound,
 }
@@ -103,7 +114,9 @@ MarketResolverAbciApp = chain(
         AgentRegistrationAbciApp,
         IdentifyServiceOwnerAbci.IdentifyServiceOwnerAbciApp,
         FundsForwarderAbci.FundsForwarderAbciApp,
-        OmenFundsRecovererAbci.OmenFundsRecovererAbciApp,
+        OmenFpmmRemoveLiquidityAbci.OmenFpmmRemoveLiquidityAbciApp,
+        OmenCtRedeemTokensAbci.OmenCtRedeemTokensAbciApp,
+        OmenRealitioWithdrawBondAbci.OmenRealitioWithdrawBondAbciApp,
         MarketResolutionManagerAbci.MarketResolutionManagerAbciApp,
         TransactionSettlementAbci.TransactionSubmissionAbciApp,
         MechInteractAbci.MechInteractAbciApp,

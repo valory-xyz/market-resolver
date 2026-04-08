@@ -40,16 +40,18 @@ protocols:
 skills:
 - valory/abstract_abci:0.1.0:bafybeict6h3wfmddpvam5gmmanqzuokup6ppoev3t4j5uyl7xxahjaols4
 - valory/abstract_round_abci:0.1.0:bafybeihygetmlgnhawrbyswvpvv3wpztr2hlhxkljmohp4r7qcmvglpwdq
-- valory/market_resolver_abci:0.1.0:bafybeids75qcbg2s2piyu2dxary2px5fyh7qfuflzxhuubxotg7lex6hfu
+- valory/market_resolver_abci:0.1.0:bafybeifrhziqmexdxfi2dr7pwrhrtjcfd4qzkmt2e7fprljlkx3z7w75su
 - valory/registration_abci:0.1.0:bafybeif3gpewppz5wr5mmgyvaowsamjufyons3oif7cb4x5ubvvfb6rtda
 - valory/reset_pause_abci:0.1.0:bafybeidcnf77bc3o7pssa5zesilpbm4ley2k45taii5j5rrvvty7uhu3lq
 - valory/termination_abci:0.1.0:bafybeia33hlouukdpwaxctunauudv5gpfdxndimra7yqiof4a3skcwdqkq
 - valory/transaction_settlement_abci:0.1.0:bafybeiajyrszyyo6z4lxogutv4ougiaeoxak6xkq5gtrbey32gbgnirznq
 - valory/identify_service_owner_abci:0.1.0:bafybeid3uz3zy2feigoyw47jknqg3m5nwettuazprefzmz57jgktdsumne
 - valory/funds_forwarder_abci:0.1.0:bafybeig4kflknvmbpbsaeeim4kurgpjvpduu36xfcjm3ehrjhxamt6byaa
-- valory/omen_funds_recoverer_abci:0.1.0:bafybeibjqwvn2qy62axkbaklea4flr2ln4ceely3pj3cac6vardqgtapum
+- valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeic5jhft74l4kg7exceogxv2c3pfaj35bzijzsnrzwisxsa2zrbth4
+- valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeiadt36bvknkoglmg7jr32auycclu4voouibhfv64juguynginhnge
+- valory/omen_realitio_withdraw_bond_abci:0.1.0:bafybeigesdt5xqjxlcv454fuguflrmy727lwpdbcgmqaqrjiaqgsqogmxa
 - valory/mech_interact_abci:0.1.0:bafybeibrmrdpys5xfivpmlyerbwlu2am2rmqb75bwub3cvcrvfwdbqxv54
-- valory/market_resolution_manager_abci:0.1.0:bafybeidfrc55mpzrjsavkoztzjveqor6rxwgqa4igynbnha3bskegbpfmi
+- valory/market_resolution_manager_abci:0.1.0:bafybeifvw76d22br6xx2k2fyhj473ykpmsaivnxelkmgifwan32y3yfely
 default_ledger: ethereum
 required_ledgers:
 - ethereum
@@ -211,10 +213,10 @@ models:
       conditional_tokens_contract: ${str:0xCeAfDD6bc0bEF976fdCd1112955828E00543c0Ce}
       collateral_tokens_contract: ${str:0xe91d153e0b41518a2ce8dd3d7944fa863463a97d}
       liquidity_removal_lead_time: ${int:86400}
-      remove_liquidity_batch_size: ${int:1}
-      redeem_positions_batch_size: ${int:5}
-      claim_bonds_batch_size: ${int:10}
-      min_balance_withdraw_realitio: ${int:1000000000000000000}
+      fpmm_remove_liquidity_batch_size: ${int:1}
+      ct_redeem_tokens_batch_size: ${int:5}
+      realitio_withdraw_bond_batch_size: ${int:10}
+      min_realitio_withdraw_balance: ${int:1000000000000000000}
       watched_creator_addresses: ${list:["0x89c5cc945dd550BcFfb72Fe42BfF002429F46Fec","0xffc8029154ecd55abed15bd428ba596e7d23f557"]}
       trusted_addresses: ${list:["0x89c5cc945dd550BcFfb72Fe42BfF002429F46Fec","0xffc8029154ecd55abed15bd428ba596e7d23f557"]}
       mech_tool_resolve_market: ${str:resolve-market-jury-v1}

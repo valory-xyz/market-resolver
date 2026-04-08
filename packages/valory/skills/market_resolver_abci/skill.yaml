@@ -9,12 +9,12 @@ aea_version: '>=2.0.0, <3.0.0'
 fingerprint:
   README.md: bafybeiahbbj3x5pfg3tqbnrrnw2mhc2jguaqrwg7pjzk2ycxoqmlm6scje
   __init__.py: bafybeig5dyyxibrg3ouf4ax53l5mpytzttebdvqmjewltawxtswk4op364
-  behaviours.py: bafybeifzfyykbrqdsqqrhmmghesn3ztjx7jvrkztars5fdj6kw4r6tdyny
-  composition.py: bafybeiek2squfjeinx7lwosnurcbu7hgrp3j4h2mykyvt3xxzkwo7aovfy
+  behaviours.py: bafybeigxjli3waxr34kx5tglelx6tmc624xmel3z6a7kot5fllc6qe3lqu
+  composition.py: bafybeidq4t3xndraidilkshzqugwmkwkm3cnzovkpjm5a3wzrrda5strse
   dialogues.py: bafybeidhc2scoo5hrmpovzoem5s36b3yas6vggkkajoijautv7g3bqaeb4
-  fsm_specification.yaml: bafybeibusbtbhmxjkkukitrwwgvohteqkwsaxb3rurcew3zpzmtsl4tpiu
+  fsm_specification.yaml: bafybeicmwumzy7spvcon6bgxumkiytz7hm6h5l6ivqlzapo6sjhqileshi
   handlers.py: bafybeicpi4lz6jowj3yjlp4cdhstlxl4ryql7joqiowmq4oknpnfyrd4oq
-  models.py: bafybeifzmfk2x77qzw5fcwls3jatyjbsi3odf2cx3ovjuhu4gqhta3juje
+  models.py: bafybeidkpht6ybm6friptsg5zocs4vqg2xhriflzn3xttbfl7ucqu3a36a
   tests/__init__.py: bafybeibb6rglfusig6k56wjqe6pofhyjt2hbknwk6culahlooxo73bx2lu
 fingerprint_ignore_patterns: []
 connections:
@@ -30,9 +30,11 @@ skills:
 - valory/transaction_settlement_abci:0.1.0:bafybeiajyrszyyo6z4lxogutv4ougiaeoxak6xkq5gtrbey32gbgnirznq
 - valory/identify_service_owner_abci:0.1.0:bafybeid3uz3zy2feigoyw47jknqg3m5nwettuazprefzmz57jgktdsumne
 - valory/funds_forwarder_abci:0.1.0:bafybeig4kflknvmbpbsaeeim4kurgpjvpduu36xfcjm3ehrjhxamt6byaa
-- valory/omen_funds_recoverer_abci:0.1.0:bafybeibjqwvn2qy62axkbaklea4flr2ln4ceely3pj3cac6vardqgtapum
+- valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeic5jhft74l4kg7exceogxv2c3pfaj35bzijzsnrzwisxsa2zrbth4
+- valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeiadt36bvknkoglmg7jr32auycclu4voouibhfv64juguynginhnge
+- valory/omen_realitio_withdraw_bond_abci:0.1.0:bafybeigesdt5xqjxlcv454fuguflrmy727lwpdbcgmqaqrjiaqgsqogmxa
 - valory/mech_interact_abci:0.1.0:bafybeibrmrdpys5xfivpmlyerbwlu2am2rmqb75bwub3cvcrvfwdbqxv54
-- valory/market_resolution_manager_abci:0.1.0:bafybeidfrc55mpzrjsavkoztzjveqor6rxwgqa4igynbnha3bskegbpfmi
+- valory/market_resolution_manager_abci:0.1.0:bafybeifvw76d22br6xx2k2fyhj473ykpmsaivnxelkmgifwan32y3yfely
 behaviours:
   main:
     args: {}
@@ -155,10 +157,10 @@ models:
       conditional_tokens_contract: '0x0000000000000000000000000000000000000000'
       collateral_tokens_contract: '0x0000000000000000000000000000000000000000'
       liquidity_removal_lead_time: 86400
-      remove_liquidity_batch_size: 1
-      redeem_positions_batch_size: 5
-      claim_bonds_batch_size: 10
-      min_balance_withdraw_realitio: 1000000000000000000
+      fpmm_remove_liquidity_batch_size: 1
+      ct_redeem_tokens_batch_size: 5
+      realitio_withdraw_bond_batch_size: 10
+      min_realitio_withdraw_balance: 1000000000000000000
       watched_creator_addresses: []
       trusted_addresses: []
       mech_tool_resolve_market: resolve-market-jury-v1

@@ -10,21 +10,21 @@ fingerprint:
   README.md: bafybeicebua5cqf3pfr34hy5mmnr6i7m7wgxlkzbto6woi5dkuv4fqbymi
   __init__.py: bafybeiedhf4rirdachml54zzde7nl3nhuwz4c5xwskrc5udfphefbrdsfu
   behaviours/__init__.py: bafybeignnrbklzekhqurn6ptli5zhzsov2qtdzr5se4xe4hqdywt2vbtvu
-  behaviours/base.py: bafybeidnx6y6klxo3pip45xhsuj2obvgglzi4gnyi732hgtzf3jt6s27za
-  behaviours/build_answer_tx.py: bafybeif6lpa2woqu6iuaj47ziclczpeen63sgajnzr7wok7y63zbbm57eu
-  behaviours/cleanup_tracked_markets.py: bafybeie4ih2igfz2xajwx4yzrzsnfkriplyqxelykzqnwmczb4ykhamz2a
-  behaviours/evaluate_answers.py: bafybeiew37ipcn3w2bscu2wvte5cg33nftjeyylnsbdqlxc2irmawls2iu
-  behaviours/post_transaction.py: bafybeihaw4t35zie7vbiu7bzawktwbwxecs2xyld6skywl4qjk7bui2dke
+  behaviours/base.py: bafybeicnuxp7gn2mtkwez4cas3f5xkfcjvqkozqbw7vmqut7vddaowgqsy
+  behaviours/build_answer_tx.py: bafybeiga6zuijp5qpbaltodk3u46sbg4utindfsubnbzsluiykwki7mfzi
+  behaviours/cleanup_tracked_markets.py: bafybeiewsi3rrwgg6vksirm7bpu6qm7m455vzmzis37oizrz3qpfzmax3a
+  behaviours/evaluate_answers.py: bafybeiabqaxph6m55b5cf4gklk5v752vwyuzuwpqioxpbxjnbqf4f2gpjm
+  behaviours/post_transaction.py: bafybeihdeouh4gjofmhb2ijffecnjs66kc4tgorrmlgtqnzw7wx5lm4v3m
   behaviours/round_behaviour.py: bafybeiauzj5hs6t5hzq6ksyxeafak7of5f3mfrl2kgizjw55pq435ymak4
-  behaviours/scan_markets.py: bafybeicy2bathrfiibco4btkcox2v3gxfrsh6orgik7gyhtjravikzwmze
+  behaviours/scan_markets.py: bafybeig6ozjgs72gcdby5vucj33wrvu43t4l5py7s47fmapdjr7gho23eu
   dialogues.py: bafybeict7mdksmjklx6wy2zplunpcfwhgxv5votxbsodidyum2phx3tv34
-  fsm_specification.yaml: bafybeibzefzefurqcrgvtk2ca3beprc6mtb7hhs5f6dirmgqtrohcfnzz4
+  fsm_specification.yaml: bafybeicedsz7i3nyity4rzufa3z6mrrfgrphruad2jgsuanthbkvle4bwy
   handlers.py: bafybeigby2ymzvsoiwbgtdd4esk6xrkrafp2b22yqz5xi4ekrnqwqqoq4y
   models.py: bafybeif7ny6szebqmiviar76iudqcoj5pk3n6mnwlucfddpu4d63xm76ge
   payloads.py: bafybeibv6zzvzgbkfzxql775rytb5okuk2tfij25hdstyuezs7umrniuve
-  rounds.py: bafybeie4kw5ywoz3yj6wvrdchvrczjh3nxvemtzuvizueuzb4ter27xhcy
+  rounds.py: bafybeih26iizoqri4cvr4fghmp4leaecfbfs2wivwfvhwbt7igu3ypvzbu
   states/__init__.py: bafybeiho5s4sehwxmgtp4ddgntnkxhjks5cflihdtag7zqy6btjrhzcyti
-  states/base.py: bafybeihab3kvtqklcdo35ckyjkvfd5g7qcsiznbytxrxviluvob3ktkbqy
+  states/base.py: bafybeiayupm5gdugkuight5ndiboe4wp26bmxsihjnjrdj4yykirdw26ru
   tests/__init__.py: bafybeidpf4le7kmwrvl6u3s4yl2mrlznnu7scha3hvcpd3s2omwo7bdwkq
   tests/behaviours/__init__.py: bafybeierpqlj4wjvfsa2acmkibioivviqudq4ulu5ifuqwcvdcfewzdgau
 fingerprint_ignore_patterns: []
@@ -40,6 +40,10 @@ skills:
 - valory/abstract_round_abci:0.1.0:bafybeihygetmlgnhawrbyswvpvv3wpztr2hlhxkljmohp4r7qcmvglpwdq
 - valory/mech_interact_abci:0.1.0:bafybeibrmrdpys5xfivpmlyerbwlu2am2rmqb75bwub3cvcrvfwdbqxv54
 - valory/transaction_settlement_abci:0.1.0:bafybeiajyrszyyo6z4lxogutv4ougiaeoxak6xkq5gtrbey32gbgnirznq
+- valory/funds_forwarder_abci:0.1.0:bafybeig4kflknvmbpbsaeeim4kurgpjvpduu36xfcjm3ehrjhxamt6byaa
+- valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeic5jhft74l4kg7exceogxv2c3pfaj35bzijzsnrzwisxsa2zrbth4
+- valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeiadt36bvknkoglmg7jr32auycclu4voouibhfv64juguynginhnge
+- valory/omen_realitio_withdraw_bond_abci:0.1.0:bafybeigesdt5xqjxlcv454fuguflrmy727lwpdbcgmqaqrjiaqgsqogmxa
 behaviours:
   main:
     args: {}

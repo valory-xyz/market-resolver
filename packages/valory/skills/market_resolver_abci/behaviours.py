@@ -40,8 +40,14 @@ from packages.valory.skills.market_resolver_abci.composition import (
 from packages.valory.skills.mech_interact_abci.behaviours.round_behaviour import (
     MechInteractRoundBehaviour,
 )
-from packages.valory.skills.omen_funds_recoverer_abci.behaviours.round_behaviour import (
-    OmenFundsRecovererRoundBehaviour,
+from packages.valory.skills.omen_ct_redeem_tokens_abci.behaviours.round_behaviour import (
+    CtRedeemTokensRoundBehaviour,
+)
+from packages.valory.skills.omen_fpmm_remove_liquidity_abci.behaviours.round_behaviour import (
+    OmenFpmmRemoveLiquidityRoundBehaviour,
+)
+from packages.valory.skills.omen_realitio_withdraw_bond_abci.behaviours.round_behaviour import (
+    OmenRealitioWithdrawBondRoundBehaviour,
 )
 from packages.valory.skills.registration_abci.behaviours import (
     AgentRegistrationRoundBehaviour,
@@ -68,7 +74,9 @@ class MarketResolverRoundBehaviour(AbstractRoundBehaviour):
         *AgentRegistrationRoundBehaviour.behaviours,
         *IdentifyServiceOwnerRoundBehaviour.behaviours,
         *FundsForwarderRoundBehaviour.behaviours,
-        *OmenFundsRecovererRoundBehaviour.behaviours,
+        *OmenFpmmRemoveLiquidityRoundBehaviour.behaviours,
+        *CtRedeemTokensRoundBehaviour.behaviours,
+        *OmenRealitioWithdrawBondRoundBehaviour.behaviours,
         *MarketResolutionManagerRoundBehaviour.behaviours,
         *TransactionSettlementRoundBehaviour.behaviours,
         *ResetPauseABCIConsensusBehaviour.behaviours,

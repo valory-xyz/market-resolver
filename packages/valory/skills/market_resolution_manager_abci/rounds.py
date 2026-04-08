@@ -191,11 +191,19 @@ class PostTransactionRound(CollectSameUntilThresholdRound):
     Custom end_block checks the payload content to emit the right event:
     - MECH_REQUEST_DONE → MechResponseRound (poll for Mech delivery)
     - ANSWER_TX_DONE → CleanupTrackedMarketsRound
+    - FUNDS_FORWARDER_TX_DONE → FpmmRemoveLiquidityRound (enter recovery chain)
+    - FPMM_REMOVE_LIQUIDITY_TX_DONE → CtRedeemTokensRound (next chain step)
+    - CT_REDEEM_TOKENS_TX_DONE → RealitioWithdrawBondRound (next chain step)
+    - REALITIO_WITHDRAW_BOND_TX_DONE → ScanMarketsRound (chain complete)
     - ERROR / anything else → CleanupTrackedMarketsRound
     """
 
     MECH_REQUEST_DONE_PAYLOAD = "MECH_REQUEST_DONE"
     ANSWER_TX_DONE_PAYLOAD = "ANSWER_TX_DONE"
+    FUNDS_FORWARDER_TX_DONE_PAYLOAD = "FUNDS_FORWARDER_TX_DONE"
+    FPMM_REMOVE_LIQUIDITY_TX_DONE_PAYLOAD = "FPMM_REMOVE_LIQUIDITY_TX_DONE"
+    CT_REDEEM_TOKENS_TX_DONE_PAYLOAD = "CT_REDEEM_TOKENS_TX_DONE"
+    REALITIO_WITHDRAW_BOND_TX_DONE_PAYLOAD = "REALITIO_WITHDRAW_BOND_TX_DONE"
     ERROR_PAYLOAD = "ERROR"
 
     payload_class = PostTransactionPayload
@@ -206,13 +214,23 @@ class PostTransactionRound(CollectSameUntilThresholdRound):
     collection_key = "participant_to_post_tx"
     selection_key: Tuple[str, ...] = ("ignored",)
 
-    def end_block(self) -> Optional[Tuple[BaseSynchronizedData, Enum]]:
+    def end_block(  # pylint: disable=too-many-return-statements
+        self,
+    ) -> Optional[Tuple[BaseSynchronizedData, Enum]]:
         """Route based on which tx was settled."""
         if self.threshold_reached:
             if self.most_voted_payload == self.MECH_REQUEST_DONE_PAYLOAD:
                 return self.synchronized_data, Event.MECH_REQUEST_DONE
             if self.most_voted_payload == self.ANSWER_TX_DONE_PAYLOAD:
                 return self.synchronized_data, Event.ANSWER_TX_DONE
+            if self.most_voted_payload == self.FUNDS_FORWARDER_TX_DONE_PAYLOAD:
+                return self.synchronized_data, Event.FUNDS_FORWARDER_TX_DONE
+            if self.most_voted_payload == self.FPMM_REMOVE_LIQUIDITY_TX_DONE_PAYLOAD:
+                return self.synchronized_data, Event.FPMM_REMOVE_LIQUIDITY_TX_DONE
+            if self.most_voted_payload == self.CT_REDEEM_TOKENS_TX_DONE_PAYLOAD:
+                return self.synchronized_data, Event.CT_REDEEM_TOKENS_TX_DONE
+            if self.most_voted_payload == self.REALITIO_WITHDRAW_BOND_TX_DONE_PAYLOAD:
+                return self.synchronized_data, Event.REALITIO_WITHDRAW_BOND_TX_DONE
             return self.synchronized_data, Event.DONE
         if not self.is_majority_possible(
             self.collection, self.synchronized_data.nb_participants
@@ -235,6 +253,22 @@ class FinishedWithAnswerTxRound(DegenerateRound):
 
 class FinishedResolutionRound(DegenerateRound):
     """Degenerate round: transition to ResetPause."""
+
+
+class FinishedWithFundsForwarderPostTxRound(DegenerateRound):
+    """Degenerate round: FundsForwarder tx settled; resume recovery chain."""
+
+
+class FinishedWithFpmmRemoveLiquidityPostTxRound(DegenerateRound):
+    """Degenerate round: FpmmRemoveLiquidity tx settled; advance to CtRedeemTokens."""
+
+
+class FinishedWithCtRedeemTokensPostTxRound(DegenerateRound):
+    """Degenerate round: CtRedeemTokens tx settled; advance to RealitioWithdrawBond."""
+
+
+class FinishedWithRealitioWithdrawBondPostTxRound(DegenerateRound):
+    """Degenerate round: RealitioWithdrawBond tx settled; chain complete, enter core."""
 
 
 class MarketResolutionManagerAbciApp(AbciApp[Event]):
@@ -263,6 +297,10 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
         3. PostTransactionRound
             - mech request done: 6.
             - answer tx done: 4.
+            - funds forwarder tx done: 9.
+            - fpmm remove liquidity tx done: 10.
+            - ct redeem tokens tx done: 11.
+            - realitio withdraw bond tx done: 12.
             - done: 4.
             - none: 4.
             - no majority: 4.
@@ -276,8 +314,12 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
         6. FinishedWithMechPollRound
         7. FinishedWithAnswerTxRound
         8. FinishedResolutionRound
+        9. FinishedWithFundsForwarderPostTxRound
+        10. FinishedWithFpmmRemoveLiquidityPostTxRound
+        11. FinishedWithCtRedeemTokensPostTxRound
+        12. FinishedWithRealitioWithdrawBondPostTxRound
 
-    Final states: {FinishedResolutionRound, FinishedWithAnswerTxRound, FinishedWithMechPollRound, FinishedWithMechRequestRound}
+    Final states: {FinishedResolutionRound, FinishedWithAnswerTxRound, FinishedWithCtRedeemTokensPostTxRound, FinishedWithFpmmRemoveLiquidityPostTxRound, FinishedWithFundsForwarderPostTxRound, FinishedWithMechPollRound, FinishedWithMechRequestRound, FinishedWithRealitioWithdrawBondPostTxRound}
 
     Timeouts:
         round timeout: 180.0
@@ -312,6 +354,10 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
         PostTransactionRound: {
             Event.MECH_REQUEST_DONE: FinishedWithMechPollRound,
             Event.ANSWER_TX_DONE: CleanupTrackedMarketsRound,
+            Event.FUNDS_FORWARDER_TX_DONE: FinishedWithFundsForwarderPostTxRound,
+            Event.FPMM_REMOVE_LIQUIDITY_TX_DONE: FinishedWithFpmmRemoveLiquidityPostTxRound,
+            Event.CT_REDEEM_TOKENS_TX_DONE: FinishedWithCtRedeemTokensPostTxRound,
+            Event.REALITIO_WITHDRAW_BOND_TX_DONE: FinishedWithRealitioWithdrawBondPostTxRound,
             Event.DONE: CleanupTrackedMarketsRound,
             Event.NONE: CleanupTrackedMarketsRound,
             Event.NO_MAJORITY: CleanupTrackedMarketsRound,
@@ -327,12 +373,20 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
         FinishedWithMechPollRound: {},
         FinishedWithAnswerTxRound: {},
         FinishedResolutionRound: {},
+        FinishedWithFundsForwarderPostTxRound: {},
+        FinishedWithFpmmRemoveLiquidityPostTxRound: {},
+        FinishedWithCtRedeemTokensPostTxRound: {},
+        FinishedWithRealitioWithdrawBondPostTxRound: {},
     }
     final_states: Set[AppState] = {
         FinishedWithMechRequestRound,
         FinishedWithMechPollRound,
         FinishedWithAnswerTxRound,
         FinishedResolutionRound,
+        FinishedWithFundsForwarderPostTxRound,
+        FinishedWithFpmmRemoveLiquidityPostTxRound,
+        FinishedWithCtRedeemTokensPostTxRound,
+        FinishedWithRealitioWithdrawBondPostTxRound,
     }
     event_to_timeout: Dict[Event, float] = {
         Event.ROUND_TIMEOUT: 180.0,
@@ -349,4 +403,8 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
         FinishedWithMechPollRound: set(),
         FinishedWithAnswerTxRound: {"most_voted_tx_hash"},
         FinishedResolutionRound: set(),
+        FinishedWithFundsForwarderPostTxRound: set(),
+        FinishedWithFpmmRemoveLiquidityPostTxRound: set(),
+        FinishedWithCtRedeemTokensPostTxRound: set(),
+        FinishedWithRealitioWithdrawBondPostTxRound: set(),
     }
