@@ -46,8 +46,8 @@ from packages.valory.skills.omen_ct_redeem_tokens_abci.behaviours.round_behaviou
 from packages.valory.skills.omen_fpmm_remove_liquidity_abci.behaviours.round_behaviour import (
     OmenFpmmRemoveLiquidityRoundBehaviour,
 )
-from packages.valory.skills.omen_realitio_withdraw_bond_abci.behaviours.round_behaviour import (
-    OmenRealitioWithdrawBondRoundBehaviour,
+from packages.valory.skills.omen_realitio_withdraw_bonds_abci.behaviours.round_behaviour import (
+    OmenRealitioWithdrawBondsRoundBehaviour,
 )
 from packages.valory.skills.registration_abci.behaviours import (
     AgentRegistrationRoundBehaviour,
@@ -76,7 +76,7 @@ class MarketResolverRoundBehaviour(AbstractRoundBehaviour):
         *FundsForwarderRoundBehaviour.behaviours,
         *OmenFpmmRemoveLiquidityRoundBehaviour.behaviours,
         *CtRedeemTokensRoundBehaviour.behaviours,
-        *OmenRealitioWithdrawBondRoundBehaviour.behaviours,
+        *OmenRealitioWithdrawBondsRoundBehaviour.behaviours,
         *MarketResolutionManagerRoundBehaviour.behaviours,
         *TransactionSettlementRoundBehaviour.behaviours,
         *ResetPauseABCIConsensusBehaviour.behaviours,

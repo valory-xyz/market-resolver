@@ -37,8 +37,8 @@ from packages.valory.skills.omen_ct_redeem_tokens_abci.rounds import CtRedeemTok
 from packages.valory.skills.omen_fpmm_remove_liquidity_abci.rounds import (
     FpmmRemoveLiquidityRound,
 )
-from packages.valory.skills.omen_realitio_withdraw_bond_abci.rounds import (
-    RealitioWithdrawBondRound,
+from packages.valory.skills.omen_realitio_withdraw_bonds_abci.rounds import (
+    RealitioWithdrawBondsRound,
 )
 
 
@@ -67,8 +67,8 @@ class PostTransactionBehaviour(MarketResolutionManagerBaseBehaviour):
             content = PostTransactionRound.FPMM_REMOVE_LIQUIDITY_TX_DONE_PAYLOAD
         elif tx_submitter == CtRedeemTokensRound.auto_round_id():
             content = PostTransactionRound.CT_REDEEM_TOKENS_TX_DONE_PAYLOAD
-        elif tx_submitter == RealitioWithdrawBondRound.auto_round_id():
-            content = PostTransactionRound.REALITIO_WITHDRAW_BOND_TX_DONE_PAYLOAD
+        elif tx_submitter == RealitioWithdrawBondsRound.auto_round_id():
+            content = PostTransactionRound.REALITIO_WITHDRAW_BONDS_TX_DONE_PAYLOAD
         else:
             # Unknown tx submitter — fall through to cleanup to avoid a stuck FSM.
             content = PostTransactionRound.ANSWER_TX_DONE_PAYLOAD

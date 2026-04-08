@@ -40,18 +40,18 @@ protocols:
 skills:
 - valory/abstract_abci:0.1.0:bafybeict6h3wfmddpvam5gmmanqzuokup6ppoev3t4j5uyl7xxahjaols4
 - valory/abstract_round_abci:0.1.0:bafybeihygetmlgnhawrbyswvpvv3wpztr2hlhxkljmohp4r7qcmvglpwdq
-- valory/market_resolver_abci:0.1.0:bafybeia5qfuph4gm2hbadq7tlrv3uyhnmrrq6zfhe6js7bdsmpur2qdksi
+- valory/market_resolver_abci:0.1.0:bafybeigh7n54i3774ylnreaq25zdijw2d2jxekq2x5yevlrqi3v2vkxvbi
 - valory/registration_abci:0.1.0:bafybeif3gpewppz5wr5mmgyvaowsamjufyons3oif7cb4x5ubvvfb6rtda
 - valory/reset_pause_abci:0.1.0:bafybeidcnf77bc3o7pssa5zesilpbm4ley2k45taii5j5rrvvty7uhu3lq
 - valory/termination_abci:0.1.0:bafybeia33hlouukdpwaxctunauudv5gpfdxndimra7yqiof4a3skcwdqkq
 - valory/transaction_settlement_abci:0.1.0:bafybeiajyrszyyo6z4lxogutv4ougiaeoxak6xkq5gtrbey32gbgnirznq
 - valory/identify_service_owner_abci:0.1.0:bafybeid3uz3zy2feigoyw47jknqg3m5nwettuazprefzmz57jgktdsumne
 - valory/funds_forwarder_abci:0.1.0:bafybeig4kflknvmbpbsaeeim4kurgpjvpduu36xfcjm3ehrjhxamt6byaa
-- valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeia65oeligujwn7fisaada6oklmpqqn254shmed42r4s5eca62d32y
-- valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeieskw2xej53d2wuhjstdjikovxvcnruff2wfhync5djutwo5ar4me
-- valory/omen_realitio_withdraw_bond_abci:0.1.0:bafybeigesdt5xqjxlcv454fuguflrmy727lwpdbcgmqaqrjiaqgsqogmxa
+- valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeif5rxndrf7e4wpcfgyntcwhtowhzfxntuuvwqpwfgmbppiztfygbi
+- valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeiefyiq7e3wdi73jlgcyoszwofdiisprywrm5wzwwjsijcqfzy5hay
+- valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeicme52ijrxogbrrm3e3frclowpgeoko6po6nxmu2wi4kqjvqoysgm
 - valory/mech_interact_abci:0.1.0:bafybeibrmrdpys5xfivpmlyerbwlu2am2rmqb75bwub3cvcrvfwdbqxv54
-- valory/market_resolution_manager_abci:0.1.0:bafybeifjrwjlrfo4bl7vdv6zhcovnlllxib6b4ou5x2xorqon5jwrvabxu
+- valory/market_resolution_manager_abci:0.1.0:bafybeihl5e5qofqrkudl4hwg2ct7353opemvbcwg6mt5evnd7soiyvdqi4
 default_ledger: ethereum
 required_ledgers:
 - ethereum
@@ -215,7 +215,7 @@ models:
       liquidity_removal_lead_time: ${int:86400}
       fpmm_remove_liquidity_batch_size: ${int:1}
       ct_redeem_tokens_batch_size: ${int:5}
-      realitio_withdraw_bond_batch_size: ${int:10}
+      realitio_withdraw_bonds_batch_size: ${int:10}
       min_realitio_withdraw_balance: ${int:1000000000000000000}
       watched_creator_addresses: ${list:["0x89c5cc945dd550BcFfb72Fe42BfF002429F46Fec","0xffc8029154ecd55abed15bd428ba596e7d23f557"]}
       trusted_addresses: ${list:["0x89c5cc945dd550BcFfb72Fe42BfF002429F46Fec","0xffc8029154ecd55abed15bd428ba596e7d23f557"]}

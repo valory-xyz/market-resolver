@@ -193,8 +193,8 @@ class PostTransactionRound(CollectSameUntilThresholdRound):
     - ANSWER_TX_DONE → CleanupTrackedMarketsRound
     - FUNDS_FORWARDER_TX_DONE → FpmmRemoveLiquidityRound (enter recovery chain)
     - FPMM_REMOVE_LIQUIDITY_TX_DONE → CtRedeemTokensRound (next chain step)
-    - CT_REDEEM_TOKENS_TX_DONE → RealitioWithdrawBondRound (next chain step)
-    - REALITIO_WITHDRAW_BOND_TX_DONE → ScanMarketsRound (chain complete)
+    - CT_REDEEM_TOKENS_TX_DONE → RealitioWithdrawBondsRound (next chain step)
+    - REALITIO_WITHDRAW_BONDS_TX_DONE → ScanMarketsRound (chain complete)
     - ERROR / anything else → CleanupTrackedMarketsRound
     """
 
@@ -203,7 +203,7 @@ class PostTransactionRound(CollectSameUntilThresholdRound):
     FUNDS_FORWARDER_TX_DONE_PAYLOAD = "FUNDS_FORWARDER_TX_DONE"
     FPMM_REMOVE_LIQUIDITY_TX_DONE_PAYLOAD = "FPMM_REMOVE_LIQUIDITY_TX_DONE"
     CT_REDEEM_TOKENS_TX_DONE_PAYLOAD = "CT_REDEEM_TOKENS_TX_DONE"
-    REALITIO_WITHDRAW_BOND_TX_DONE_PAYLOAD = "REALITIO_WITHDRAW_BOND_TX_DONE"
+    REALITIO_WITHDRAW_BONDS_TX_DONE_PAYLOAD = "REALITIO_WITHDRAW_BONDS_TX_DONE"
     ERROR_PAYLOAD = "ERROR"
 
     payload_class = PostTransactionPayload
@@ -229,8 +229,8 @@ class PostTransactionRound(CollectSameUntilThresholdRound):
                 return self.synchronized_data, Event.FPMM_REMOVE_LIQUIDITY_TX_DONE
             if self.most_voted_payload == self.CT_REDEEM_TOKENS_TX_DONE_PAYLOAD:
                 return self.synchronized_data, Event.CT_REDEEM_TOKENS_TX_DONE
-            if self.most_voted_payload == self.REALITIO_WITHDRAW_BOND_TX_DONE_PAYLOAD:
-                return self.synchronized_data, Event.REALITIO_WITHDRAW_BOND_TX_DONE
+            if self.most_voted_payload == self.REALITIO_WITHDRAW_BONDS_TX_DONE_PAYLOAD:
+                return self.synchronized_data, Event.REALITIO_WITHDRAW_BONDS_TX_DONE
             return self.synchronized_data, Event.DONE
         if not self.is_majority_possible(
             self.collection, self.synchronized_data.nb_participants
@@ -267,7 +267,7 @@ class FinishedWithCtRedeemTokensPostTxRound(DegenerateRound):
     """Degenerate round: CtRedeemTokens tx settled; advance to RealitioWithdrawBond."""
 
 
-class FinishedWithRealitioWithdrawBondPostTxRound(DegenerateRound):
+class FinishedWithRealitioWithdrawBondsPostTxRound(DegenerateRound):
     """Degenerate round: RealitioWithdrawBond tx settled; chain complete, enter core."""
 
 
@@ -300,7 +300,7 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
             - funds forwarder tx done: 9.
             - fpmm remove liquidity tx done: 10.
             - ct redeem tokens tx done: 11.
-            - realitio withdraw bond tx done: 12.
+            - realitio withdraw bonds tx done: 12.
             - done: 4.
             - none: 4.
             - no majority: 4.
@@ -317,9 +317,9 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
         9. FinishedWithFundsForwarderPostTxRound
         10. FinishedWithFpmmRemoveLiquidityPostTxRound
         11. FinishedWithCtRedeemTokensPostTxRound
-        12. FinishedWithRealitioWithdrawBondPostTxRound
+        12. FinishedWithRealitioWithdrawBondsPostTxRound
 
-    Final states: {FinishedResolutionRound, FinishedWithAnswerTxRound, FinishedWithCtRedeemTokensPostTxRound, FinishedWithFpmmRemoveLiquidityPostTxRound, FinishedWithFundsForwarderPostTxRound, FinishedWithMechPollRound, FinishedWithMechRequestRound, FinishedWithRealitioWithdrawBondPostTxRound}
+    Final states: {FinishedResolutionRound, FinishedWithAnswerTxRound, FinishedWithCtRedeemTokensPostTxRound, FinishedWithFpmmRemoveLiquidityPostTxRound, FinishedWithFundsForwarderPostTxRound, FinishedWithMechPollRound, FinishedWithMechRequestRound, FinishedWithRealitioWithdrawBondsPostTxRound}
 
     Timeouts:
         round timeout: 180.0
@@ -357,7 +357,7 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
             Event.FUNDS_FORWARDER_TX_DONE: FinishedWithFundsForwarderPostTxRound,
             Event.FPMM_REMOVE_LIQUIDITY_TX_DONE: FinishedWithFpmmRemoveLiquidityPostTxRound,
             Event.CT_REDEEM_TOKENS_TX_DONE: FinishedWithCtRedeemTokensPostTxRound,
-            Event.REALITIO_WITHDRAW_BOND_TX_DONE: FinishedWithRealitioWithdrawBondPostTxRound,
+            Event.REALITIO_WITHDRAW_BONDS_TX_DONE: FinishedWithRealitioWithdrawBondsPostTxRound,
             Event.DONE: CleanupTrackedMarketsRound,
             Event.NONE: CleanupTrackedMarketsRound,
             Event.NO_MAJORITY: CleanupTrackedMarketsRound,
@@ -376,7 +376,7 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
         FinishedWithFundsForwarderPostTxRound: {},
         FinishedWithFpmmRemoveLiquidityPostTxRound: {},
         FinishedWithCtRedeemTokensPostTxRound: {},
-        FinishedWithRealitioWithdrawBondPostTxRound: {},
+        FinishedWithRealitioWithdrawBondsPostTxRound: {},
     }
     final_states: Set[AppState] = {
         FinishedWithMechRequestRound,
@@ -386,7 +386,7 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
         FinishedWithFundsForwarderPostTxRound,
         FinishedWithFpmmRemoveLiquidityPostTxRound,
         FinishedWithCtRedeemTokensPostTxRound,
-        FinishedWithRealitioWithdrawBondPostTxRound,
+        FinishedWithRealitioWithdrawBondsPostTxRound,
     }
     event_to_timeout: Dict[Event, float] = {
         Event.ROUND_TIMEOUT: 180.0,
@@ -406,5 +406,5 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
         FinishedWithFundsForwarderPostTxRound: set(),
         FinishedWithFpmmRemoveLiquidityPostTxRound: set(),
         FinishedWithCtRedeemTokensPostTxRound: set(),
-        FinishedWithRealitioWithdrawBondPostTxRound: set(),
+        FinishedWithRealitioWithdrawBondsPostTxRound: set(),
     }

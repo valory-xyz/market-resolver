@@ -78,13 +78,13 @@ from packages.valory.skills.omen_fpmm_remove_liquidity_abci.models import (
 from packages.valory.skills.omen_fpmm_remove_liquidity_abci.rounds import (
     Event as OmenFpmmRemoveLiquidityEvent,
 )
-from packages.valory.skills.omen_realitio_withdraw_bond_abci.models import (
+from packages.valory.skills.omen_realitio_withdraw_bonds_abci.models import (
     RealitioSubgraph as BaseRealitioSubgraph,
 )
-from packages.valory.skills.omen_realitio_withdraw_bond_abci.models import (
-    RealitioWithdrawBondParams,
+from packages.valory.skills.omen_realitio_withdraw_bonds_abci.models import (
+    RealitioWithdrawBondsParams,
 )
-from packages.valory.skills.omen_realitio_withdraw_bond_abci.rounds import (
+from packages.valory.skills.omen_realitio_withdraw_bonds_abci.rounds import (
     Event as OmenRealitioWithdrawBondEvent,
 )
 from packages.valory.skills.reset_pause_abci.rounds import Event as ResetPauseEvent
@@ -162,7 +162,7 @@ class Params(
     MarketResolutionManagerParams,
     FpmmRemoveLiquidityParams,
     CtRedeemTokensParams,
-    RealitioWithdrawBondParams,
+    RealitioWithdrawBondsParams,
     FundsForwarderParams,
     MechInteractAbciParams,
     TerminationParams,

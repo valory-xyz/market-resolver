@@ -29,7 +29,7 @@ import packages.valory.skills.mech_interact_abci.states.request as MechRequestSt
 import packages.valory.skills.mech_interact_abci.states.response as MechResponseStates
 import packages.valory.skills.omen_ct_redeem_tokens_abci.rounds as OmenCtRedeemTokensAbci
 import packages.valory.skills.omen_fpmm_remove_liquidity_abci.rounds as OmenFpmmRemoveLiquidityAbci
-import packages.valory.skills.omen_realitio_withdraw_bond_abci.rounds as OmenRealitioWithdrawBondAbci
+import packages.valory.skills.omen_realitio_withdraw_bonds_abci.rounds as OmenRealitioWithdrawBondAbci
 import packages.valory.skills.transaction_settlement_abci.rounds as TransactionSettlementAbci
 from packages.valory.skills.abstract_round_abci.abci_app_chain import (
     AbciAppTransitionMapping,
@@ -72,15 +72,15 @@ abci_app_transition_mapping: AbciAppTransitionMapping = {
     OmenFpmmRemoveLiquidityAbci.FinishedWithoutFpmmRemoveLiquidityTxRound: OmenCtRedeemTokensAbci.CtRedeemTokensRound,
     # Step 2: CtRedeemTokens
     OmenCtRedeemTokensAbci.FinishedWithCtRedeemTokensTxRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
-    OmenCtRedeemTokensAbci.FinishedWithoutCtRedeemTokensTxRound: OmenRealitioWithdrawBondAbci.RealitioWithdrawBondRound,
+    OmenCtRedeemTokensAbci.FinishedWithoutCtRedeemTokensTxRound: OmenRealitioWithdrawBondAbci.RealitioWithdrawBondsRound,
     # Step 3: RealitioWithdrawBond
-    OmenRealitioWithdrawBondAbci.FinishedWithRealitioWithdrawBondTxRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
-    OmenRealitioWithdrawBondAbci.FinishedWithoutRealitioWithdrawBondTxRound: MarketResolutionManagerAbci.ScanMarketsRound,
+    OmenRealitioWithdrawBondAbci.FinishedWithRealitioWithdrawBondsTxRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
+    OmenRealitioWithdrawBondAbci.FinishedWithoutRealitioWithdrawBondsTxRound: MarketResolutionManagerAbci.ScanMarketsRound,
     # PostTx fan-out: each recovery tx returns to the NEXT step of the chain.
     MarketResolutionManagerAbci.FinishedWithFundsForwarderPostTxRound: OmenFpmmRemoveLiquidityAbci.FpmmRemoveLiquidityRound,
     MarketResolutionManagerAbci.FinishedWithFpmmRemoveLiquidityPostTxRound: OmenCtRedeemTokensAbci.CtRedeemTokensRound,
-    MarketResolutionManagerAbci.FinishedWithCtRedeemTokensPostTxRound: OmenRealitioWithdrawBondAbci.RealitioWithdrawBondRound,
-    MarketResolutionManagerAbci.FinishedWithRealitioWithdrawBondPostTxRound: MarketResolutionManagerAbci.ScanMarketsRound,
+    MarketResolutionManagerAbci.FinishedWithCtRedeemTokensPostTxRound: OmenRealitioWithdrawBondAbci.RealitioWithdrawBondsRound,
+    MarketResolutionManagerAbci.FinishedWithRealitioWithdrawBondsPostTxRound: MarketResolutionManagerAbci.ScanMarketsRound,
     # Core resolution flow (unchanged) ------------------------------------------
     MarketResolutionManagerAbci.FinishedWithMechRequestRound: MechVersionStates.MechVersionDetectionRound,
     MechFinalStates.FinishedMarketplaceLegacyDetectedRound: MechRequestStates.MechRequestRound,
@@ -116,7 +116,7 @@ MarketResolverAbciApp = chain(
         FundsForwarderAbci.FundsForwarderAbciApp,
         OmenFpmmRemoveLiquidityAbci.OmenFpmmRemoveLiquidityAbciApp,
         OmenCtRedeemTokensAbci.OmenCtRedeemTokensAbciApp,
-        OmenRealitioWithdrawBondAbci.OmenRealitioWithdrawBondAbciApp,
+        OmenRealitioWithdrawBondAbci.OmenRealitioWithdrawBondsAbciApp,
         MarketResolutionManagerAbci.MarketResolutionManagerAbciApp,
         TransactionSettlementAbci.TransactionSubmissionAbciApp,
         MechInteractAbci.MechInteractAbciApp,

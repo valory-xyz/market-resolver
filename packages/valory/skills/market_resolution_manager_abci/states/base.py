@@ -34,7 +34,7 @@ class Event(Enum):
     FUNDS_FORWARDER_TX_DONE = "funds_forwarder_tx_done"
     FPMM_REMOVE_LIQUIDITY_TX_DONE = "fpmm_remove_liquidity_tx_done"
     CT_REDEEM_TOKENS_TX_DONE = "ct_redeem_tokens_tx_done"
-    REALITIO_WITHDRAW_BOND_TX_DONE = "realitio_withdraw_bond_tx_done"
+    REALITIO_WITHDRAW_BONDS_TX_DONE = "realitio_withdraw_bonds_tx_done"
 
 
 class AnswerStatus(str, Enum):

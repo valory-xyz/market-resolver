@@ -18,7 +18,7 @@ alphabet_in:
 - NONE
 - NO_MAJORITY
 - NO_MARKETPLACE
-- REALITIO_WITHDRAW_BOND_TX_DONE
+- REALITIO_WITHDRAW_BONDS_TX_DONE
 - RESET_AND_PAUSE_TIMEOUT
 - RESET_TIMEOUT
 - ROUND_TIMEOUT
@@ -52,7 +52,7 @@ states:
 - MechVersionDetectionRound
 - PostTransactionRound
 - RandomnessTransactionSubmissionRound
-- RealitioWithdrawBondRound
+- RealitioWithdrawBondsRound
 - RegistrationRound
 - RegistrationStartupRound
 - ResetAndPauseRound
@@ -88,9 +88,9 @@ transition_func:
     (CollectSignatureRound, NO_MAJORITY): ResetRound
     (CollectSignatureRound, ROUND_TIMEOUT): CollectSignatureRound
     (CtRedeemTokensRound, DONE): RandomnessTransactionSubmissionRound
-    (CtRedeemTokensRound, NONE): RealitioWithdrawBondRound
-    (CtRedeemTokensRound, NO_MAJORITY): RealitioWithdrawBondRound
-    (CtRedeemTokensRound, ROUND_TIMEOUT): RealitioWithdrawBondRound
+    (CtRedeemTokensRound, NONE): RealitioWithdrawBondsRound
+    (CtRedeemTokensRound, NO_MAJORITY): RealitioWithdrawBondsRound
+    (CtRedeemTokensRound, ROUND_TIMEOUT): RealitioWithdrawBondsRound
     (EvaluateAnswersRound, DONE): MechVersionDetectionRound
     (EvaluateAnswersRound, NONE): BuildAnswerTxRound
     (EvaluateAnswersRound, NO_MAJORITY): CleanupTrackedMarketsRound
@@ -135,23 +135,23 @@ transition_func:
     (MechVersionDetectionRound, V1): MechRequestRound
     (MechVersionDetectionRound, V2): MechInformationRound
     (PostTransactionRound, ANSWER_TX_DONE): CleanupTrackedMarketsRound
-    (PostTransactionRound, CT_REDEEM_TOKENS_TX_DONE): RealitioWithdrawBondRound
+    (PostTransactionRound, CT_REDEEM_TOKENS_TX_DONE): RealitioWithdrawBondsRound
     (PostTransactionRound, DONE): CleanupTrackedMarketsRound
     (PostTransactionRound, FPMM_REMOVE_LIQUIDITY_TX_DONE): CtRedeemTokensRound
     (PostTransactionRound, FUNDS_FORWARDER_TX_DONE): FpmmRemoveLiquidityRound
     (PostTransactionRound, MECH_REQUEST_DONE): MechResponseRound
     (PostTransactionRound, NONE): CleanupTrackedMarketsRound
     (PostTransactionRound, NO_MAJORITY): CleanupTrackedMarketsRound
-    (PostTransactionRound, REALITIO_WITHDRAW_BOND_TX_DONE): ScanMarketsRound
+    (PostTransactionRound, REALITIO_WITHDRAW_BONDS_TX_DONE): ScanMarketsRound
     (PostTransactionRound, ROUND_TIMEOUT): CleanupTrackedMarketsRound
     (RandomnessTransactionSubmissionRound, DONE): SelectKeeperTransactionSubmissionARound
     (RandomnessTransactionSubmissionRound, NONE): RandomnessTransactionSubmissionRound
     (RandomnessTransactionSubmissionRound, NO_MAJORITY): RandomnessTransactionSubmissionRound
     (RandomnessTransactionSubmissionRound, ROUND_TIMEOUT): RandomnessTransactionSubmissionRound
-    (RealitioWithdrawBondRound, DONE): RandomnessTransactionSubmissionRound
-    (RealitioWithdrawBondRound, NONE): ScanMarketsRound
-    (RealitioWithdrawBondRound, NO_MAJORITY): ScanMarketsRound
-    (RealitioWithdrawBondRound, ROUND_TIMEOUT): ScanMarketsRound
+    (RealitioWithdrawBondsRound, DONE): RandomnessTransactionSubmissionRound
+    (RealitioWithdrawBondsRound, NONE): ScanMarketsRound
+    (RealitioWithdrawBondsRound, NO_MAJORITY): ScanMarketsRound
+    (RealitioWithdrawBondsRound, ROUND_TIMEOUT): ScanMarketsRound
     (RegistrationRound, DONE): IdentifyServiceOwnerRound
     (RegistrationRound, NO_MAJORITY): RegistrationRound
     (RegistrationStartupRound, DONE): IdentifyServiceOwnerRound

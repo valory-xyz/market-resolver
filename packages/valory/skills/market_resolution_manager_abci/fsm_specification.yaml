@@ -7,7 +7,7 @@ alphabet_in:
 - MECH_REQUEST_DONE
 - NONE
 - NO_MAJORITY
-- REALITIO_WITHDRAW_BOND_TX_DONE
+- REALITIO_WITHDRAW_BONDS_TX_DONE
 - ROUND_TIMEOUT
 default_start_state: ScanMarketsRound
 final_states:
@@ -18,7 +18,7 @@ final_states:
 - FinishedWithFundsForwarderPostTxRound
 - FinishedWithMechPollRound
 - FinishedWithMechRequestRound
-- FinishedWithRealitioWithdrawBondPostTxRound
+- FinishedWithRealitioWithdrawBondsPostTxRound
 label: MarketResolutionManagerAbciApp
 start_states:
 - BuildAnswerTxRound
@@ -36,7 +36,7 @@ states:
 - FinishedWithFundsForwarderPostTxRound
 - FinishedWithMechPollRound
 - FinishedWithMechRequestRound
-- FinishedWithRealitioWithdrawBondPostTxRound
+- FinishedWithRealitioWithdrawBondsPostTxRound
 - PostTransactionRound
 - ScanMarketsRound
 transition_func:
@@ -60,7 +60,7 @@ transition_func:
     (PostTransactionRound, MECH_REQUEST_DONE): FinishedWithMechPollRound
     (PostTransactionRound, NONE): CleanupTrackedMarketsRound
     (PostTransactionRound, NO_MAJORITY): CleanupTrackedMarketsRound
-    (PostTransactionRound, REALITIO_WITHDRAW_BOND_TX_DONE): FinishedWithRealitioWithdrawBondPostTxRound
+    (PostTransactionRound, REALITIO_WITHDRAW_BONDS_TX_DONE): FinishedWithRealitioWithdrawBondsPostTxRound
     (PostTransactionRound, ROUND_TIMEOUT): CleanupTrackedMarketsRound
     (ScanMarketsRound, DONE): EvaluateAnswersRound
     (ScanMarketsRound, NONE): CleanupTrackedMarketsRound
