@@ -1,6 +1,6 @@
 # Market Resolver
 
-An autonomous service built on the [Open Autonomy](https://docs.autonolas.network/) framework that resolves prediction markets on Gnosis Chain.
+An autonomous service built on the [Open Autonomy](https://stack.olas.network/open-autonomy/) framework that resolves prediction markets on Gnosis Chain.
 
 ## What it does
 
