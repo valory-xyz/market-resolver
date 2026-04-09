@@ -19,7 +19,6 @@
 
 """This module contains the BuildAnswerTxBehaviour."""
 
-import json
 from typing import Generator, Optional, cast
 
 from packages.valory.contracts.gnosis_safe.contract import GnosisSafeContract
@@ -31,6 +30,7 @@ from packages.valory.contracts.realitio.contract import RealitioContract
 from packages.valory.protocols.contract_api import ContractApiMessage
 from packages.valory.skills.market_resolution_manager_abci.behaviours.base import (
     MarketResolutionManagerBaseBehaviour,
+    parse_mech_response,
 )
 from packages.valory.skills.market_resolution_manager_abci.payloads import (
     BuildAnswerTxPayload,
@@ -106,10 +106,16 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
                         f"result={resp.result}, error={resp.error}"
                     )
                     # Parse the Mech result
-                    evaluation = self._parse_mech_response(resp.result)
-                    if evaluation is not None:
+                    evaluation = parse_mech_response(resp.result)
+                    if evaluation is None:
+                        self.context.logger.warning(
+                            f"Could not parse Mech result as JSON: "
+                            f"{(resp.result or '')[:200]}"
+                        )
+                    else:
                         entry["evaluation"] = evaluation
                         entry["mech_response"] = {
+                            "source": "mech_interact",
                             "nonce": resp.nonce,
                             "result": resp.result,
                             "error": resp.error,
@@ -391,66 +397,6 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
         tx_hash = cast(str, response.state.body["tx_hash"])
         tx_hash = tx_hash[2:] if tx_hash.startswith("0x") else tx_hash
         return tx_hash
-
-    def _parse_mech_response(self, result: Optional[str]) -> Optional[dict]:
-        """Parse resolve-market-jury-v1 result into evaluation dict.
-
-        Expected result JSON schema:
-        {
-            "is_valid": true/false,
-            "is_determinable": true/false,
-            "has_occurred": true/false/null,
-            "votes": [...],
-            "judge_reasoning": "...",
-            "agreement_ratio": 0.0-1.0,
-            "n_voters": 3,
-            "n_successful": 3
-        }
-        """
-        if result is None:
-            return None
-        try:
-            data = json.loads(result)
-        except (json.JSONDecodeError, TypeError):
-            self.context.logger.warning(
-                f"Could not parse Mech result as JSON: {result[:200]}"
-            )
-            return None
-
-        is_valid = data.get("is_valid", False)
-        is_determinable = data.get("is_determinable", False)
-        has_occurred = data.get("has_occurred")
-        agreement_ratio = float(data.get("agreement_ratio", 0.0))
-        reasoning = data.get("judge_reasoning", "")
-
-        if not is_valid or not is_determinable or has_occurred is None:
-            self.context.logger.info(
-                f"Mech result: not determinable or invalid "
-                f"(is_valid={is_valid}, is_determinable={is_determinable}, "
-                f"has_occurred={has_occurred})"
-            )
-            return {
-                "answer": None,
-                "has_occurred": has_occurred,
-                "is_valid": is_valid,
-                "is_determinable": is_determinable,
-                "agreement_ratio": agreement_ratio,
-                "agrees_with_on_chain": None,
-                "reasoning": reasoning,
-            }
-
-        # Map has_occurred to Realitio answer encoding
-        mech_answer = ANSWER_YES if has_occurred else ANSWER_NO
-
-        return {
-            "answer": mech_answer,
-            "has_occurred": has_occurred,
-            "is_valid": is_valid,
-            "is_determinable": is_determinable,
-            "agreement_ratio": agreement_ratio,
-            "agrees_with_on_chain": None,
-            "reasoning": reasoning,
-        }
 
     def _send_payload(self, tx_hash: Optional[str]) -> Generator:
         """Send the build challenges payload.

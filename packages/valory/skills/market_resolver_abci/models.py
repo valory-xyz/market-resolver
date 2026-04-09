@@ -41,6 +41,9 @@ from packages.valory.skills.identify_service_owner_abci.rounds import (
 from packages.valory.skills.market_resolution_manager_abci.models import (
     MarketResolutionManagerParams,
 )
+from packages.valory.skills.market_resolution_manager_abci.models import (
+    MechGnosisSubgraph as BaseMechGnosisSubgraph,
+)
 from packages.valory.skills.market_resolution_manager_abci.rounds import (
     Event as MarketResolutionManagerEvent,
 )
@@ -103,6 +106,7 @@ RealitioSubgraph = BaseRealitioSubgraph
 MechResponseSpecs = BaseMechResponseSpecs
 MechToolsSpecs = BaseMechToolsSpecs
 MechsSubgraph = BaseMechsSubgraph
+MechGnosisSubgraph = BaseMechGnosisSubgraph
 
 
 class SharedState(BaseSharedState):

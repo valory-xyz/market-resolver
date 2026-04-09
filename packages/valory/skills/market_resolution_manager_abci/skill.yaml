@@ -10,17 +10,17 @@ fingerprint:
   README.md: bafybeicebua5cqf3pfr34hy5mmnr6i7m7wgxlkzbto6woi5dkuv4fqbymi
   __init__.py: bafybeiedhf4rirdachml54zzde7nl3nhuwz4c5xwskrc5udfphefbrdsfu
   behaviours/__init__.py: bafybeignnrbklzekhqurn6ptli5zhzsov2qtdzr5se4xe4hqdywt2vbtvu
-  behaviours/base.py: bafybeicnuxp7gn2mtkwez4cas3f5xkfcjvqkozqbw7vmqut7vddaowgqsy
-  behaviours/build_answer_tx.py: bafybeiga6zuijp5qpbaltodk3u46sbg4utindfsubnbzsluiykwki7mfzi
+  behaviours/base.py: bafybeiewppb3bbb3m6da4mmtbkokk5yyldszew4j6bph2wwwf44gzwv5qe
+  behaviours/build_answer_tx.py: bafybeihm42u2u7keiqygt36dq6zcbp5qkgvrviwegzt4sl5dmkawep3j5a
   behaviours/cleanup_tracked_markets.py: bafybeiewsi3rrwgg6vksirm7bpu6qm7m455vzmzis37oizrz3qpfzmax3a
-  behaviours/evaluate_answers.py: bafybeiabqaxph6m55b5cf4gklk5v752vwyuzuwpqioxpbxjnbqf4f2gpjm
+  behaviours/evaluate_answers.py: bafybeiglzhdfmb4m6lwtytpqlqbmzavzkpzthmljtizaxrjn6b5yowbn5a
   behaviours/post_transaction.py: bafybeihuqutrw22m2bcawnhsbsuymrbv475aetud4rtqs7hlqr6yahytxu
   behaviours/round_behaviour.py: bafybeiauzj5hs6t5hzq6ksyxeafak7of5f3mfrl2kgizjw55pq435ymak4
   behaviours/scan_markets.py: bafybeig6ozjgs72gcdby5vucj33wrvu43t4l5py7s47fmapdjr7gho23eu
   dialogues.py: bafybeict7mdksmjklx6wy2zplunpcfwhgxv5votxbsodidyum2phx3tv34
   fsm_specification.yaml: bafybeifozim4bp32peud7vyptzq6l4zpt3ubovc5xetbats6kagma3omdq
   handlers.py: bafybeigby2ymzvsoiwbgtdd4esk6xrkrafp2b22yqz5xi4ekrnqwqqoq4y
-  models.py: bafybeif7ny6szebqmiviar76iudqcoj5pk3n6mnwlucfddpu4d63xm76ge
+  models.py: bafybeigqgkpwj5gp2exd7ypbn23tprr2m6xzx4jsw6ryccu5qrox7ve36i
   payloads.py: bafybeibv6zzvzgbkfzxql775rytb5okuk2tfij25hdstyuezs7umrniuve
   rounds.py: bafybeifhnkaxnkcv34dohbbquymv2ejx5wpamrfd5bpob7msvphhcrztfy
   states/__init__.py: bafybeiho5s4sehwxmgtp4ddgntnkxhjks5cflihdtag7zqy6btjrhzcyti
@@ -90,6 +90,18 @@ models:
   ledger_api_dialogues:
     args: {}
     class_name: LedgerApiDialogues
+  mech_gnosis_subgraph:
+    args:
+      api_id: mech_gnosis
+      headers:
+        Content-Type: application/json
+      method: POST
+      parameters: {}
+      response_key: data:sender
+      response_type: dict
+      retries: 5
+      url: https://api.subgraph.autonolas.tech/api/proxy/marketplace-gnosis
+    class_name: MechGnosisSubgraph
   params:
     args:
       watched_creator_addresses: []

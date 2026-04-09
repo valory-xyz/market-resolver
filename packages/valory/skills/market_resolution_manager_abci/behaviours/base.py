@@ -35,6 +35,84 @@ from packages.valory.skills.market_resolution_manager_abci.rounds import (
 
 HTTP_OK = 200
 
+# Realitio answer encoding (outcome index for binary Yes/No markets).
+ANSWER_YES = "0x0000000000000000000000000000000000000000000000000000000000000000"
+ANSWER_NO = "0x0000000000000000000000000000000000000000000000000000000000000001"
+
+
+def parse_mech_response(result: Optional[str]) -> Optional[dict]:
+    """Parse a resolve-market-jury-v1 Mech result into an evaluation dict.
+
+    Expected result JSON schema::
+
+        {
+            "is_valid": true/false,
+            "is_determinable": true/false,
+            "has_occurred": true/false/null,
+            "votes": [...],
+            "judge_reasoning": "...",
+            "agreement_ratio": 0.0-1.0
+        }
+
+    :param result: raw string (JSON) returned by the Mech tool, or None.
+    :return: evaluation dict (with "answer" set to the Realitio-encoded hex
+        for determinable results, or None for undeterminable/invalid), or
+        None if the payload is absent or unparseable.
+    """
+    if result is None:
+        return None
+    try:
+        data = json.loads(result)
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+    is_valid = data.get("is_valid", False)
+    is_determinable = data.get("is_determinable", False)
+    has_occurred = data.get("has_occurred")
+    agreement_ratio = float(data.get("agreement_ratio", 0.0))
+    reasoning = data.get("judge_reasoning", "")
+
+    if not is_valid or not is_determinable or has_occurred is None:
+        return {
+            "answer": None,
+            "has_occurred": has_occurred,
+            "is_valid": is_valid,
+            "is_determinable": is_determinable,
+            "agreement_ratio": agreement_ratio,
+            "agrees_with_on_chain": None,
+            "reasoning": reasoning,
+        }
+
+    mech_answer = ANSWER_YES if has_occurred else ANSWER_NO
+
+    return {
+        "answer": mech_answer,
+        "has_occurred": has_occurred,
+        "is_valid": is_valid,
+        "is_determinable": is_determinable,
+        "agreement_ratio": agreement_ratio,
+        "agrees_with_on_chain": None,
+        "reasoning": reasoning,
+    }
+
+
+def is_cached_evaluation_valid(evaluation: Optional[dict]) -> bool:
+    """Return True if a cached evaluation is definitive (determinable).
+
+    A "valid" cached evaluation blocks a fresh Mech request. Undeterminable
+    or invalid cached evaluations are stored but do not block new calls.
+
+    :param evaluation: the evaluation dict produced by parse_mech_response.
+    :return: True if the evaluation is determinable and actionable.
+    """
+    if evaluation is None:
+        return False
+    return bool(
+        evaluation.get("is_valid")
+        and evaluation.get("is_determinable")
+        and evaluation.get("has_occurred") is not None
+    )
+
 
 def to_content(query: str) -> bytes:
     """Convert the given query string to payload content."""
@@ -114,6 +192,36 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
         if response.status_code != HTTP_OK:
             self.context.logger.error(
                 f"Could not retrieve response from Omen subgraph. "
+                f"Received status code {response.status_code}.\n{response}"
+            )
+            return None
+
+        return json.loads(response.body.decode())
+
+    def get_mech_gnosis_subgraph_result(
+        self,
+        query: str,
+    ) -> Generator[None, None, Optional[Dict[str, Any]]]:
+        """Query the Mech Marketplace Gnosis subgraph.
+
+        :param query: the GraphQL query string.
+        :yield: None
+        :return: the parsed JSON response, or None on error.
+        """
+        response = yield from self.get_http_response(
+            content=to_content(query),
+            **self.context.mech_gnosis_subgraph.get_spec(),
+        )
+
+        if response is None:
+            self.context.logger.error(
+                "Could not retrieve response from Mech Gnosis subgraph. "
+                "Response was None."
+            )
+            return None
+        if response.status_code != HTTP_OK:
+            self.context.logger.error(
+                f"Could not retrieve response from Mech Gnosis subgraph. "
                 f"Received status code {response.status_code}.\n{response}"
             )
             return None

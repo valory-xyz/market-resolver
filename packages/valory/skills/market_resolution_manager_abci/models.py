@@ -21,7 +21,7 @@
 
 from typing import Any, Dict, List
 
-from packages.valory.skills.abstract_round_abci.models import BaseParams
+from packages.valory.skills.abstract_round_abci.models import ApiSpecs, BaseParams
 from packages.valory.skills.abstract_round_abci.models import (
     BenchmarkTool as BaseBenchmarkTool,
 )
@@ -35,6 +35,10 @@ from packages.valory.skills.market_resolution_manager_abci.rounds import (
 
 Requests = BaseRequests
 BenchmarkTool = BaseBenchmarkTool
+
+
+class MechGnosisSubgraph(ApiSpecs):
+    """ApiSpecs wrapper for the Mech Marketplace Gnosis subgraph."""
 
 
 class SharedState(BaseSharedState):

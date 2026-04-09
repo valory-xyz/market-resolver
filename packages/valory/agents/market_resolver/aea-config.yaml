@@ -40,7 +40,7 @@ protocols:
 skills:
 - valory/abstract_abci:0.1.0:bafybeict6h3wfmddpvam5gmmanqzuokup6ppoev3t4j5uyl7xxahjaols4
 - valory/abstract_round_abci:0.1.0:bafybeihygetmlgnhawrbyswvpvv3wpztr2hlhxkljmohp4r7qcmvglpwdq
-- valory/market_resolver_abci:0.1.0:bafybeigh7n54i3774ylnreaq25zdijw2d2jxekq2x5yevlrqi3v2vkxvbi
+- valory/market_resolver_abci:0.1.0:bafybeif65rkyldec3fwt5ulg7zrlvpxiukv4e7weznh4kockk32vtszoge
 - valory/registration_abci:0.1.0:bafybeif3gpewppz5wr5mmgyvaowsamjufyons3oif7cb4x5ubvvfb6rtda
 - valory/reset_pause_abci:0.1.0:bafybeidcnf77bc3o7pssa5zesilpbm4ley2k45taii5j5rrvvty7uhu3lq
 - valory/termination_abci:0.1.0:bafybeia33hlouukdpwaxctunauudv5gpfdxndimra7yqiof4a3skcwdqkq
@@ -51,7 +51,7 @@ skills:
 - valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeiefyiq7e3wdi73jlgcyoszwofdiisprywrm5wzwwjsijcqfzy5hay
 - valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeicme52ijrxogbrrm3e3frclowpgeoko6po6nxmu2wi4kqjvqoysgm
 - valory/mech_interact_abci:0.1.0:bafybeibrmrdpys5xfivpmlyerbwlu2am2rmqb75bwub3cvcrvfwdbqxv54
-- valory/market_resolution_manager_abci:0.1.0:bafybeihl5e5qofqrkudl4hwg2ct7353opemvbcwg6mt5evnd7soiyvdqi4
+- valory/market_resolution_manager_abci:0.1.0:bafybeiets7ivs4xlerkd4ckuv6k3lcpufq2d7pun4pv3hkfazbbp2aj7uu
 default_ledger: ethereum
 required_ledgers:
 - ethereum
@@ -274,6 +274,15 @@ models:
       response_type: ${str:list}
       retries: ${int:5}
       url: ${str:https://gateway.thegraph.com/api/api-key/subgraphs/id/7s9rGBffUTL8kDZuxvvpuc46v44iuDarbrADBFw5uVp2}
+  mech_gnosis_subgraph:
+    args:
+      headers:
+        Content-Type: ${str:application/json}
+      method: ${str:POST}
+      response_key: ${str:data:sender}
+      response_type: ${str:dict}
+      retries: ${int:5}
+      url: ${str:https://api.subgraph.autonolas.tech/api/proxy/marketplace-gnosis}
   omen_subgraph:
     args:
       headers:
