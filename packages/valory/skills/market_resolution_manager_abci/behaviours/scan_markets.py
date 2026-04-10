@@ -35,15 +35,21 @@ from packages.valory.skills.market_resolution_manager_abci.states.base import (
     AnswerStatus,
 )
 
-# Omen subgraph query: pending markets from watched creators
+# Omen subgraph query: pending markets from watched creators.
 # answerFinalizedTimestamp: null = not yet finalized
 # openingTimestamp_lt: now = market is past opening time
-# Pending markets (no answer yet)
+# openingTimestamp_gt: oldest_allowed = discard markets older than the
+#   configured max age. The Omen subgraph gateway load-balances across
+#   indexer replicas, and some replicas are desynchronised: they serve
+#   old finalized markets with answerFinalizedTimestamp=null and all
+#   answer fields as null. Bounding openingTimestamp at the query level
+#   prevents these phantom markets from ever entering the pipeline.
 PENDING_MARKETS_QUERY = Template("""{
     fixedProductMarketMakers(
         where: {
             creator_in: [${creators}]
             openingTimestamp_lt: ${current_timestamp}
+            openingTimestamp_gt: ${oldest_allowed_timestamp}
             answerFinalizedTimestamp: null
         }
         first: 1000
@@ -66,12 +72,14 @@ PENDING_MARKETS_QUERY = Template("""{
     }
 }""")
 
-# Finalizing markets (answered but finalization still in the future -- can still be challenged)
+# Finalizing markets (answered but finalization still in the future -- can still be challenged).
+# Same openingTimestamp_gt guard as above against desynchronised replicas.
 FINALIZING_MARKETS_QUERY = Template("""{
     fixedProductMarketMakers(
         where: {
             creator_in: [${creators}]
             openingTimestamp_lt: ${current_timestamp}
+            openingTimestamp_gt: ${oldest_allowed_timestamp}
             answerFinalizedTimestamp_gt: ${current_timestamp}
         }
         first: 1000
@@ -389,11 +397,14 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         """
         creators_str = ", ".join(f'"{c.lower()}"' for c in watched)
         now = self.last_synced_timestamp
+        max_age = self.params.omen_subgraph_max_market_age_seconds
+        oldest_allowed = now - max_age
 
         # Query 1: pending (unanswered)
         query1 = PENDING_MARKETS_QUERY.substitute(
             creators=creators_str,
             current_timestamp=now,
+            oldest_allowed_timestamp=oldest_allowed,
         )
         result1 = yield from self.get_omen_subgraph_result(query1)
         pending = (
@@ -406,6 +417,7 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         query2 = FINALIZING_MARKETS_QUERY.substitute(
             creators=creators_str,
             current_timestamp=now,
+            oldest_allowed_timestamp=oldest_allowed,
         )
         result2 = yield from self.get_omen_subgraph_result(query2)
         finalizing = (

@@ -40,7 +40,7 @@ protocols:
 skills:
 - valory/abstract_abci:0.1.0:bafybeict6h3wfmddpvam5gmmanqzuokup6ppoev3t4j5uyl7xxahjaols4
 - valory/abstract_round_abci:0.1.0:bafybeihygetmlgnhawrbyswvpvv3wpztr2hlhxkljmohp4r7qcmvglpwdq
-- valory/market_resolver_abci:0.1.0:bafybeif65rkyldec3fwt5ulg7zrlvpxiukv4e7weznh4kockk32vtszoge
+- valory/market_resolver_abci:0.1.0:bafybeiaqmvuua3hzdao3yexfh2fizoeioijpmmamvwgp25suuc2mgpaciu
 - valory/registration_abci:0.1.0:bafybeif3gpewppz5wr5mmgyvaowsamjufyons3oif7cb4x5ubvvfb6rtda
 - valory/reset_pause_abci:0.1.0:bafybeidcnf77bc3o7pssa5zesilpbm4ley2k45taii5j5rrvvty7uhu3lq
 - valory/termination_abci:0.1.0:bafybeia33hlouukdpwaxctunauudv5gpfdxndimra7yqiof4a3skcwdqkq
@@ -51,7 +51,7 @@ skills:
 - valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeiefyiq7e3wdi73jlgcyoszwofdiisprywrm5wzwwjsijcqfzy5hay
 - valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeicme52ijrxogbrrm3e3frclowpgeoko6po6nxmu2wi4kqjvqoysgm
 - valory/mech_interact_abci:0.1.0:bafybeibrmrdpys5xfivpmlyerbwlu2am2rmqb75bwub3cvcrvfwdbqxv54
-- valory/market_resolution_manager_abci:0.1.0:bafybeiets7ivs4xlerkd4ckuv6k3lcpufq2d7pun4pv3hkfazbbp2aj7uu
+- valory/market_resolution_manager_abci:0.1.0:bafybeib7ncn45w5lgu6q5gised4ulvyc2fe5fwgmiwbgblhxsgxxhpg7ce
 default_ledger: ethereum
 required_ledgers:
 - ethereum
@@ -225,6 +225,7 @@ models:
       challenge_urgency_buffer: ${int:3600}
       max_challenge_bond: ${int:16000000000000000000}
       max_mech_retries: ${int:10}
+      omen_subgraph_max_market_age_seconds: ${int:31536000}
       mech_interact_round_timeout_seconds: ${int:1200}
       mech_interaction_sleep_time: ${int:10}
       use_mech_marketplace: ${bool:true}

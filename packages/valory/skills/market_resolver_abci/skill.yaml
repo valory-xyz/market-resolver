@@ -34,7 +34,7 @@ skills:
 - valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeiefyiq7e3wdi73jlgcyoszwofdiisprywrm5wzwwjsijcqfzy5hay
 - valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeicme52ijrxogbrrm3e3frclowpgeoko6po6nxmu2wi4kqjvqoysgm
 - valory/mech_interact_abci:0.1.0:bafybeibrmrdpys5xfivpmlyerbwlu2am2rmqb75bwub3cvcrvfwdbqxv54
-- valory/market_resolution_manager_abci:0.1.0:bafybeiets7ivs4xlerkd4ckuv6k3lcpufq2d7pun4pv3hkfazbbp2aj7uu
+- valory/market_resolution_manager_abci:0.1.0:bafybeib7ncn45w5lgu6q5gised4ulvyc2fe5fwgmiwbgblhxsgxxhpg7ce
 behaviours:
   main:
     args: {}
@@ -169,6 +169,7 @@ models:
       challenge_urgency_buffer: 3600
       max_challenge_bond: 16000000000000000000
       max_mech_retries: 10
+      omen_subgraph_max_market_age_seconds: 31536000
       mech_interact_round_timeout_seconds: 1200
       mech_interaction_sleep_time: 10
       use_mech_marketplace: true

@@ -82,6 +82,10 @@ class MarketResolutionManagerParams(  # pylint: disable=too-many-instance-attrib
             "max_challenge_bond", 16000000000000000000  # 16 xDAI
         )
         self.max_mech_retries: int = kwargs.pop("max_mech_retries", 10)
+        self.omen_subgraph_max_market_age_seconds: int = kwargs.pop(
+            "omen_subgraph_max_market_age_seconds",
+            365 * 86400,  # 1 year
+        )
         # Read without popping — MechParams also needs these
         self.mech_interact_round_timeout_seconds: int = kwargs.get(
             "mech_interact_round_timeout_seconds", 1200
