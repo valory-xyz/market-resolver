@@ -94,9 +94,14 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
             yield from self._send_payload(None)
             return
 
-        # Check if we have fresh Mech responses (from MechInteract)
-        mech_responses = self.synchronized_data.mech_responses
+        # Check if we have fresh Mech responses (from MechInteract).
+        # Skip if the evaluation was already populated by the subgraph
+        # cache path — MechInteract didn't run in that case.
         expected_nonce = (entry.get("mech_request") or {}).get("nonce")
+        if entry.get("evaluation") is None and expected_nonce:
+            mech_responses = self.synchronized_data.mech_responses
+        else:
+            mech_responses = []
         if mech_responses and expected_nonce:
             # Find the response matching our request (by nonce)
             for resp in mech_responses:

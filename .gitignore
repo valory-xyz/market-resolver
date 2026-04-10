@@ -59,6 +59,7 @@ agent/
 /market_resolver/
 logs/
 .env
+.env.*
 
 ethereum_private_key.txt
 keys.json

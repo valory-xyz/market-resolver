@@ -56,7 +56,7 @@ MECH_CACHE_QUERY_TEMPLATE = """
         blockTimestamp_gt: "{block_timestamp_gt}"
       }}
       orderBy: blockTimestamp
-      orderDirection: desc
+      orderDirection: asc
       first: 5
     ) {{
       id

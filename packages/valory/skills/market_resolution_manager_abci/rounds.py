@@ -88,7 +88,12 @@ class SynchronizedData(BaseSynchronizedData):
         serialized = self.db.get("mech_responses", "[]")
         if serialized is None:
             serialized = "[]"
-        responses = json.loads(serialized)
+        # When the cache path skips MechInteract, mech_responses may be
+        # a list (from a prior period) rather than a JSON string.
+        if isinstance(serialized, list):
+            responses = serialized
+        else:
+            responses = json.loads(serialized)
         return [MechInteractionResponse(**item) for item in responses]
 
 
