@@ -41,14 +41,18 @@ from packages.valory.skills.market_resolution_manager_abci.states.base import (
 from packages.valory.skills.mech_interact_abci.states.base import MechMetadata
 
 # GraphQL query template: prior Mech requests from our Safe for a given
-# question title, scoped to blocks after the market closed (openingTimestamp).
+# prompt, scoped to blocks after the market closed (openingTimestamp).
 # Variables are inlined because the base helper only posts the `query` field.
+#
+# NOTE: the Mech Marketplace Gnosis subgraph stores the market question in
+# ``parsedRequest.prompt``, NOT in ``parsedRequest.questionTitle`` (which is
+# always empty for our requests). We filter on ``prompt`` accordingly.
 MECH_CACHE_QUERY_TEMPLATE = """
 {{
   sender(id: "{sender}") {{
     requests(
       where: {{
-        parsedRequest_: {{ questionTitle: {question_title} }}
+        parsedRequest_: {{ prompt: {prompt} }}
         blockTimestamp_gt: "{block_timestamp_gt}"
       }}
       orderBy: blockTimestamp
@@ -58,7 +62,7 @@ MECH_CACHE_QUERY_TEMPLATE = """
       id
       blockTimestamp
       parsedRequest {{
-        questionTitle
+        prompt
         tool
       }}
       deliveries(first: 1) {{
@@ -221,7 +225,7 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
         # json.dumps handles escaping of quotes/backslashes in the title.
         query = MECH_CACHE_QUERY_TEMPLATE.format(
             sender=sender_id,
-            question_title=json.dumps(title),
+            prompt=json.dumps(title),
             block_timestamp_gt=int(closing_ts),
         )
 
@@ -249,7 +253,7 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
             parsed = req.get("parsedRequest") or {}
             if parsed.get("tool") != expected_tool:
                 continue
-            if parsed.get("questionTitle") != title:
+            if parsed.get("prompt") != title:
                 continue
             deliveries = req.get("deliveries") or []
             if not deliveries:
