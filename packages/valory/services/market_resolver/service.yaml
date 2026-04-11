@@ -7,7 +7,7 @@ license: Apache-2.0
 fingerprint:
   README.md: bafybeie6lb2mlmzmkycbcfma4onidhegfu4ipgpybg2av5mhfs5zx42b2m
 fingerprint_ignore_patterns: []
-agent: valory/market_resolver:0.1.0:bafybeifjgmtgwlhnfsm3rykqnzprj4dqd5u3jp4navfhyrhurlvavfjwu4
+agent: valory/market_resolver:0.1.0:bafybeicgdtufuoij3kl4u5ut6jfyuwg3zqrjjm3emaya46qrwpg5kwo4hq
 number_of_agents: 1
 deployment:
   agent:
@@ -101,7 +101,7 @@ models:
       initial_answer_bond: ${INITIAL_ANSWER_BOND:int:1000000000000000000}
       challenge_cooldown_fraction: ${CHALLENGE_COOLDOWN_FRACTION:float:0.25}
       challenge_urgency_buffer: ${CHALLENGE_URGENCY_BUFFER:int:3600}
-      max_challenge_bond: ${MAX_CHALLENGE_BOND:int:20000000000000000000}
+      max_challenge_bond: ${MAX_CHALLENGE_BOND:int:16000000000000000000}
       max_mech_retries: ${MAX_MECH_RETRIES:int:10}
       omen_subgraph_max_market_age_seconds: ${OMEN_SUBGRAPH_MAX_MARKET_AGE_SECONDS:int:31536000}
       mech_interact_round_timeout_seconds: ${MECH_INTERACT_ROUND_TIMEOUT_SECONDS:int:1200}

@@ -19,7 +19,7 @@
 
 """This module contains the BuildAnswerTxBehaviour."""
 
-from typing import Generator, Optional, cast
+from typing import Generator, Optional, Tuple, cast
 
 from packages.valory.contracts.gnosis_safe.contract import GnosisSafeContract
 from packages.valory.contracts.multisend.contract import (
@@ -196,6 +196,33 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
             yield from self._send_payload(None)
             return
 
+        # Pre-flight: refresh on-chain answer & bond directly from
+        # Realitio. The values stored in ``entry`` came from the
+        # previous subgraph scan and can be several minutes stale. In
+        # that window a third party (often a front-running bot) may
+        # have posted an answer on the same question. Without this
+        # check we would either (a) waste gas posting a tx that reverts
+        # on the Realitio bond check, or (b) donate our bond to the
+        # front-runner by defending an already-correct answer.
+        question_id_hex = entry.get("question_id")
+        if question_id_hex:
+            fresh = yield from self._read_onchain_answer_and_bond(question_id_hex)
+            if fresh is not None:
+                fresh_answer, fresh_bond = fresh
+                if fresh_answer != on_chain_answer or fresh_bond != int(
+                    entry.get("on_chain_bond") or 0
+                ):
+                    self.context.logger.info(
+                        f"Market {market_id}: on-chain state changed since "
+                        f"scan. scan={_decode_answer(on_chain_answer or 'none')} "
+                        f"bond={int(entry.get('on_chain_bond') or 0)} -> "
+                        f"live={_decode_answer(fresh_answer or 'none')} "
+                        f"bond={fresh_bond}"
+                    )
+                on_chain_answer = fresh_answer
+                entry["on_chain_answer"] = fresh_answer
+                entry["on_chain_bond"] = fresh_bond
+
         agrees = on_chain_answer == mech_answer if on_chain_answer else False
         evaluation["agrees_with_on_chain"] = agrees
         evaluation["answer"] = mech_answer
@@ -283,6 +310,69 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
 
         # Send tx_hash -> done_event -> FinishedWithAnswerTxRound -> TxSettlement
         yield from self._send_payload(tx_hash)
+
+    def _read_onchain_answer_and_bond(
+        self, question_id_hex: str
+    ) -> Generator[None, None, Optional[Tuple[Optional[str], int]]]:
+        """Read the current best answer and bond from Realitio.
+
+        Returns a tuple ``(best_answer_hex_or_None, bond)``. The answer
+        is None when the question has never been answered (best answer
+        is the zero sentinel AND bond is zero). On contract-api error,
+        returns None so the caller falls back to the stale scan values.
+
+        :param question_id_hex: the Realitio question id as a 0x-prefixed
+            hex string.
+        :yield: contract-api requests.
+        :return: (answer, bond) tuple, or None on failure.
+        """
+        try:
+            question_id_bytes = bytes.fromhex(question_id_hex[2:])
+        except (ValueError, TypeError):
+            return None
+
+        answer_resp = yield from self.get_contract_api_response(
+            performative=ContractApiMessage.Performative.GET_STATE,  # type: ignore
+            contract_address=self.params.realitio_contract,
+            contract_id=str(RealitioContract.contract_id),
+            contract_callable="get_best_answer",
+            question_id=question_id_bytes,
+        )
+        if (
+            answer_resp is None
+            or answer_resp.performative != ContractApiMessage.Performative.STATE
+        ):
+            self.context.logger.warning(
+                f"Market question {question_id_hex[:18]}...: "
+                f"get_best_answer failed, using stale scan values"
+            )
+            return None
+
+        bond_resp = yield from self.get_contract_api_response(
+            performative=ContractApiMessage.Performative.GET_STATE,  # type: ignore
+            contract_address=self.params.realitio_contract,
+            contract_id=str(RealitioContract.contract_id),
+            contract_callable="get_bond",
+            question_id=question_id_bytes,
+        )
+        if (
+            bond_resp is None
+            or bond_resp.performative != ContractApiMessage.Performative.STATE
+        ):
+            self.context.logger.warning(
+                f"Market question {question_id_hex[:18]}...: "
+                f"get_bond failed, using stale scan values"
+            )
+            return None
+
+        best_answer = cast(str, answer_resp.state.body.get("best_answer"))
+        bond = int(bond_resp.state.body.get("bond") or 0)
+
+        # Zero sentinel answer + zero bond == unanswered.
+        zero_answer = "0x" + "00" * 32
+        if best_answer == zero_answer and bond == 0:
+            return None, 0
+        return best_answer, bond
 
     def _build_submit_answer_tx(
         self,
