@@ -32,9 +32,9 @@ skills:
 - valory/funds_forwarder_abci:0.1.0:bafybeig4kflknvmbpbsaeeim4kurgpjvpduu36xfcjm3ehrjhxamt6byaa
 - valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeif5rxndrf7e4wpcfgyntcwhtowhzfxntuuvwqpwfgmbppiztfygbi
 - valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeiefyiq7e3wdi73jlgcyoszwofdiisprywrm5wzwwjsijcqfzy5hay
-- valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeielh2ad2otll2bfvdyhhnbmtduokz3yzvytplfuo22boxv5jhs2pa
+- valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeicaojcu6cystkcnnlf2573uqhs7i2ywbpbzof7uu7yarv3e6muomu
 - valory/mech_interact_abci:0.1.0:bafybeibrmrdpys5xfivpmlyerbwlu2am2rmqb75bwub3cvcrvfwdbqxv54
-- valory/market_resolution_manager_abci:0.1.0:bafybeigmbzzkcrrsvk6ynscpsbuwl3isnnffixstvaabia3yxa7ejobbqy
+- valory/market_resolution_manager_abci:0.1.0:bafybeiaemcmckiykdv2zwibyg7wnohku4qka7sqmlkvh526eugozpw3unu
 behaviours:
   main:
     args: {}
