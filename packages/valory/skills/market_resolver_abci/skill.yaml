@@ -30,11 +30,11 @@ skills:
 - valory/transaction_settlement_abci:0.1.0:bafybeiajyrszyyo6z4lxogutv4ougiaeoxak6xkq5gtrbey32gbgnirznq
 - valory/identify_service_owner_abci:0.1.0:bafybeid3uz3zy2feigoyw47jknqg3m5nwettuazprefzmz57jgktdsumne
 - valory/funds_forwarder_abci:0.1.0:bafybeig4kflknvmbpbsaeeim4kurgpjvpduu36xfcjm3ehrjhxamt6byaa
-- valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeif5rxndrf7e4wpcfgyntcwhtowhzfxntuuvwqpwfgmbppiztfygbi
-- valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeiefyiq7e3wdi73jlgcyoszwofdiisprywrm5wzwwjsijcqfzy5hay
-- valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeicaojcu6cystkcnnlf2573uqhs7i2ywbpbzof7uu7yarv3e6muomu
+- valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeih7cp5kz2phbffw3k45rcxsbyvw6egnitrxwwdlw7ihhkzdjkkvqm
+- valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeibfbtuliclpudh6pjzjoygphb7rbc335fstqw2yzjarbldcoseutq
+- valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeifkzh5wlnvm2k64zrua46um6hiofdyfhmanbjefwlngo7stkvynfu
 - valory/mech_interact_abci:0.1.0:bafybeibrmrdpys5xfivpmlyerbwlu2am2rmqb75bwub3cvcrvfwdbqxv54
-- valory/market_resolution_manager_abci:0.1.0:bafybeiaemcmckiykdv2zwibyg7wnohku4qka7sqmlkvh526eugozpw3unu
+- valory/market_resolution_manager_abci:0.1.0:bafybeiezkoqlfchf33ssujsw2ckmku7wesbx4t7yywoq7bxa6qbxut6nbm
 behaviours:
   main:
     args: {}
@@ -114,6 +114,7 @@ models:
       multisend_batch_size: 5
       ipfs_address: https://gateway.autonolas.tech/ipfs/
       on_chain_service_id: null
+      default_chain_id: gnosis
       request_retry_delay: 1.0
       request_timeout: 10.0
       reset_pause_duration: 1800
