@@ -159,6 +159,7 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
             performative=LedgerApiMessage.Performative.GET_STATE,  # type: ignore
             ledger_callable="get_balance",
             account=address,
+            chain_id=self.params.default_chain_id,
         )
         if ledger_api_response.performative != LedgerApiMessage.Performative.STATE:
             self.context.logger.error(

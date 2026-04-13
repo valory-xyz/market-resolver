@@ -337,6 +337,7 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
             contract_id=str(RealitioContract.contract_id),
             contract_callable="get_best_answer",
             question_id=question_id_bytes,
+            chain_id=self.params.default_chain_id,
         )
         if (
             answer_resp is None
@@ -354,6 +355,7 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
             contract_id=str(RealitioContract.contract_id),
             contract_callable="get_bond",
             question_id=question_id_bytes,
+            chain_id=self.params.default_chain_id,
         )
         if (
             bond_resp is None
@@ -394,6 +396,7 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
             question_id=bytes.fromhex(question_id[2:]),
             answer=bytes.fromhex(answer[2:]),
             max_previous=max_previous,
+            chain_id=self.params.default_chain_id,
         )
 
         if (
@@ -423,6 +426,7 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
             contract_id=str(MultiSendContract.contract_id),
             contract_callable="get_tx_data",
             multi_send_txs=multi_send_txs,
+            chain_id=self.params.default_chain_id,
         )
 
         if response.performative != ContractApiMessage.Performative.RAW_TRANSACTION:
@@ -478,6 +482,7 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
             value=value,
             data=data,
             operation=operation,
+            chain_id=self.params.default_chain_id,
         )
 
         if (

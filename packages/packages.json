@@ -1,9 +1,9 @@
 {
     "dev": {
-        "skill/valory/market_resolution_manager_abci/0.1.0": "bafybeiezkoqlfchf33ssujsw2ckmku7wesbx4t7yywoq7bxa6qbxut6nbm",
-        "skill/valory/market_resolver_abci/0.1.0": "bafybeibssvyyotxzesz4mh4el5iofagwcxfu4bisvc626mduqfkupb5api",
-        "agent/valory/market_resolver/0.1.0": "bafybeieaoy4hpiafcfpp6ekj74wqvij2lfc7okb365qyvitfrwzk4qeq74",
-        "service/valory/market_resolver/0.1.0": "bafybeidaijv44cuac5rel2cnjb6wsepcwzlnkfyuqnmoop4hhojfbvrtru"
+        "skill/valory/market_resolution_manager_abci/0.1.0": "bafybeigcuzxhngq6vrp6itwpddeeqmigmu34hnjtgnxcvlaldzkhu3w5o4",
+        "skill/valory/market_resolver_abci/0.1.0": "bafybeiaptks2bxwlnp4sniwpnxvqtuypwth2i6xnrxhcl4yrcdblvoarei",
+        "agent/valory/market_resolver/0.1.0": "bafybeiaozbr3b75rc5n2f5unu2nwkgq27n2xjyzm33wfgs6huxvi3qgl6u",
+        "service/valory/market_resolver/0.1.0": "bafybeigxwjz5d4rxh4mxurpn7vs2ycuymgmsay2mw6idyb6pizfo5tsvsm"
     },
     "third_party": {
         "protocol/valory/contract_api/1.0.0": "bafybeibld2xb5m7kyluiptkamp4nrt6oeomkohz7a3yppbv2oo7qw2e4la",
@@ -55,8 +55,8 @@
         "skill/valory/registration_abci/0.1.0": "bafybeif3gpewppz5wr5mmgyvaowsamjufyons3oif7cb4x5ubvvfb6rtda",
         "skill/valory/reset_pause_abci/0.1.0": "bafybeidcnf77bc3o7pssa5zesilpbm4ley2k45taii5j5rrvvty7uhu3lq",
         "skill/valory/termination_abci/0.1.0": "bafybeia33hlouukdpwaxctunauudv5gpfdxndimra7yqiof4a3skcwdqkq",
-        "skill/valory/identify_service_owner_abci/0.1.0": "bafybeid3uz3zy2feigoyw47jknqg3m5nwettuazprefzmz57jgktdsumne",
-        "skill/valory/funds_forwarder_abci/0.1.0": "bafybeig4kflknvmbpbsaeeim4kurgpjvpduu36xfcjm3ehrjhxamt6byaa",
+        "skill/valory/identify_service_owner_abci/0.1.0": "bafybeihj2q3kf5zfhqvpayvbis4uxpe45smnzdkdvmdwxya2oe4kfc5qam",
+        "skill/valory/funds_forwarder_abci/0.1.0": "bafybeid6yc7ld64oenx3ttbxahno6qcqk6fqffqrnl3d3ftwapkwqqvexq",
         "skill/valory/omen_ct_redeem_tokens_abci/0.1.0": "bafybeih7cp5kz2phbffw3k45rcxsbyvw6egnitrxwwdlw7ihhkzdjkkvqm",
         "skill/valory/omen_fpmm_remove_liquidity_abci/0.1.0": "bafybeibfbtuliclpudh6pjzjoygphb7rbc335fstqw2yzjarbldcoseutq",
         "skill/valory/omen_realitio_withdraw_bonds_abci/0.1.0": "bafybeifkzh5wlnvm2k64zrua46um6hiofdyfhmanbjefwlngo7stkvynfu"
