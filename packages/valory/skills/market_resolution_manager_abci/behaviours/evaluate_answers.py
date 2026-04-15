@@ -21,13 +21,11 @@
 
 import json
 from dataclasses import asdict
-from typing import Any, Dict, Generator, Optional
+from typing import Generator, Optional
 from uuid import uuid4
 
 from packages.valory.skills.market_resolution_manager_abci.behaviours.base import (
     MarketResolutionManagerBaseBehaviour,
-    is_cached_evaluation_valid,
-    parse_mech_response,
 )
 from packages.valory.skills.market_resolution_manager_abci.payloads import (
     EvaluateAnswersPayload,
@@ -39,39 +37,6 @@ from packages.valory.skills.market_resolution_manager_abci.states.base import (
     AnswerStatus,
 )
 from packages.valory.skills.mech_interact_abci.states.base import MechMetadata
-
-# GraphQL query template: prior Mech requests from our Safe for a given
-# prompt, scoped to blocks after the market closed (openingTimestamp).
-# Variables are inlined because the base helper only posts the `query` field.
-#
-# NOTE: the Mech Marketplace Gnosis subgraph stores the market question in
-# ``parsedRequest.prompt``, NOT in ``parsedRequest.questionTitle`` (which is
-# always empty for our requests). We filter on ``prompt`` accordingly.
-MECH_CACHE_QUERY_TEMPLATE = """
-{{
-  sender(id: "{sender}") {{
-    requests(
-      where: {{
-        parsedRequest_: {{ prompt: {prompt} }}
-        blockTimestamp_gt: "{block_timestamp_gt}"
-      }}
-      orderBy: blockTimestamp
-      orderDirection: asc
-      first: 5
-    ) {{
-      id
-      blockTimestamp
-      parsedRequest {{
-        prompt
-        tool
-      }}
-      deliveries(first: 1) {{
-        toolResponse
-      }}
-    }}
-  }}
-}}
-"""
 
 
 class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
@@ -118,7 +83,7 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
         # valid evaluations; undeterminable ones are filtered inside the
         # fetcher and we fall through to a fresh Mech request.
         if entry.get("evaluation") is None:
-            cached = yield from self._find_cached_valid_evaluation(market_id, entry)
+            cached = yield from self.find_cached_valid_mech_request(market_id, entry)
             if cached is not None:
                 mech_resp = cached["mech_response"]
                 evaluation = cached["evaluation"]
@@ -181,94 +146,6 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
 
         # Send mech_requests -> done_event -> MechInteract
         yield from self._send_payload(mech_requests_json, None)
-
-    def _find_cached_valid_evaluation(  # pylint: disable=too-many-locals
-        self, market_id: str, entry: Dict[str, Any]
-    ) -> Generator[None, None, Optional[Dict[str, Any]]]:
-        """Look up a prior Mech response for this market from our Safe.
-
-        Query the Mech Marketplace Gnosis subgraph for requests made by our
-        Safe on the exact question title, with a block timestamp after the
-        market closing time. Returns the latest matching request whose
-        delivery parses cleanly and whose tool matches the configured resolver
-        tool.
-
-        :param market_id: the market id (for logging).
-        :param entry: the DB entry for the market.
-        :yield: None
-        :return: dict with {"evaluation": ..., "mech_response": ...} on hit,
-            or None on miss / error.
-        """
-        title = entry.get("title")
-        closing_ts = entry.get("market_closing_timestamp")
-        if not title or not closing_ts:
-            return None
-
-        safe_address = self.synchronized_data.safe_contract_address
-        if not safe_address:
-            return None
-
-        # The subgraph indexes sender IDs in lowercase hex.
-        sender_id = safe_address.lower()
-        # json.dumps handles escaping of quotes/backslashes in the title.
-        query = MECH_CACHE_QUERY_TEMPLATE.format(
-            sender=sender_id,
-            prompt=json.dumps(title),
-            block_timestamp_gt=int(closing_ts),
-        )
-
-        self.context.logger.info(
-            f"Market {market_id}: querying Mech Gnosis subgraph for prior "
-            f"responses (sender={sender_id}, closing_ts={closing_ts})."
-        )
-
-        result = yield from self.get_mech_gnosis_subgraph_result(query)
-        if result is None:
-            return None
-
-        sender_data = (result.get("data") or {}).get("sender")
-        if not sender_data:
-            self.context.logger.info(
-                f"Market {market_id}: no prior Mech requests from our Safe "
-                f"on the subgraph."
-            )
-            return None
-
-        requests = sender_data.get("requests") or []
-        expected_tool = self.params.mech_tool_resolve_market
-
-        for req in requests:
-            parsed = req.get("parsedRequest") or {}
-            if parsed.get("tool") != expected_tool:
-                continue
-            if parsed.get("prompt") != title:
-                continue
-            deliveries = req.get("deliveries") or []
-            if not deliveries:
-                continue
-            tool_response = deliveries[0].get("toolResponse")
-            evaluation = parse_mech_response(tool_response)
-            if evaluation is None:
-                continue
-            if not is_cached_evaluation_valid(evaluation):
-                continue
-
-            return {
-                "evaluation": evaluation,
-                "mech_response": {
-                    "source": "subgraph",
-                    "subgraph_request_id": req.get("id"),
-                    "block_timestamp": int(req.get("blockTimestamp", 0)),
-                    "result": tool_response,
-                    "tool": parsed.get("tool"),
-                },
-            }
-
-        self.context.logger.info(
-            f"Market {market_id}: subgraph returned {len(requests)} prior "
-            f"requests, none matched tool/title/delivery/validity filters."
-        )
-        return None
 
     def _send_payload(
         self,

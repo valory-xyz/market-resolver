@@ -233,6 +233,43 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             # Determine if actionable
             status = entry["status"]
 
+            # Rehydrate missing evaluations from the Mech subgraph so markets
+            # carried over across restarts (or never selected before) can be
+            # auto-promoted to VERIFIED below without ever reaching Evaluate.
+            # Without this, a NEEDS_VERIFICATION market with a high bond would
+            # be stuck forever — bond-affordability gate blocks it from ever
+            # reaching the Evaluate round where the cache lookup normally runs.
+            if (
+                status == AnswerStatus.NEEDS_VERIFICATION
+                and entry.get("evaluation") is None
+            ):
+                cached = yield from self.find_cached_valid_mech_request(
+                    market_id, entry
+                )
+                if cached is not None:
+                    entry["evaluation"] = cached["evaluation"]
+                    entry["mech_response"] = cached["mech_response"]
+                    questions_db[market_id] = entry
+
+            # Auto-VERIFY: if a third party has posted the same answer our
+            # Mech already validated, there's nothing to challenge — someone
+            # else is paying the bond to enforce the answer we would have
+            # posted. Promote to VERIFIED so the scanner stops considering it.
+            if (
+                status == AnswerStatus.NEEDS_VERIFICATION
+                and entry.get("evaluation") is not None
+                and entry["evaluation"].get("answer") is not None
+                and entry.get("on_chain_answer") is not None
+                and entry["evaluation"]["answer"] == entry["on_chain_answer"]
+            ):
+                self.context.logger.info(
+                    f"  {market_id}: on-chain answer matches cached Mech "
+                    f"evaluation → promoting {status} -> VERIFIED"
+                )
+                entry["status"] = AnswerStatus.VERIFIED
+                questions_db[market_id] = entry
+                status = AnswerStatus.VERIFIED
+
             # Trusted/verified markets are never actionable
             if status in (AnswerStatus.TRUSTED_ANSWER, AnswerStatus.VERIFIED):
                 continue
