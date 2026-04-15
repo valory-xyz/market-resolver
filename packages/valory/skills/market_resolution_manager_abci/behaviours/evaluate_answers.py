@@ -68,14 +68,14 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
 
         # Re-challenge scenario: already have Mech data, skip Mech
         if (
-            action == AnswerStatus.CHALLENGE_PENDING
+            action == AnswerStatus.TRANSACTION_PENDING
             and entry.get("evaluation") is not None
         ):
             self.context.logger.info(
                 f"Market {market_id}: reusing existing Mech evaluation "
                 f"for re-challenge (skipping Mech request)."
             )
-            yield from self._send_payload(None, AnswerStatus.CHALLENGE_PENDING)
+            yield from self._send_payload(None, AnswerStatus.TRANSACTION_PENDING)
             return
 
         # Subgraph cache lookup: only when local evaluation is missing.

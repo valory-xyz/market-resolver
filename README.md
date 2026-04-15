@@ -78,7 +78,7 @@ CleanupTrackedMarkets -- remove finalized markets from DB
 New unanswered market              --> NEEDS_ANSWER
 New market with untrusted answer   --> NEEDS_VERIFICATION
 Mech agrees with untrusted answer  --> VERIFIED (no action needed)
-Mech disagrees / answer tx built   --> CHALLENGE_PENDING
+Mech disagrees / answer tx built   --> TRANSACTION_PENDING
 Answered by our safe or trusted addr --> TRUSTED_ANSWER
 ```
 

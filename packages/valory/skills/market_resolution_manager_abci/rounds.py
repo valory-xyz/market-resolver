@@ -44,9 +44,12 @@ from packages.valory.skills.mech_interact_abci.states.base import (
     MechInteractionResponse,
     MechMetadata,
 )
+from packages.valory.skills.transaction_settlement_abci.rounds import (
+    SynchronizedData as TxSettlementSyncedData,
+)
 
 
-class SynchronizedData(BaseSynchronizedData):
+class SynchronizedData(TxSettlementSyncedData):
     """Class to represent the synchronized data.
 
     The questions_db lives on SharedState (not here) — too heavy for Tendermint.
@@ -57,11 +60,6 @@ class SynchronizedData(BaseSynchronizedData):
     def tx_submitter(self) -> Optional[str]:
         """Get the round that submitted the tx through TxSettlement."""
         return self.db.get("tx_submitter", None)
-
-    @property
-    def final_tx_hash(self) -> Optional[str]:
-        """Get the final settled tx hash."""
-        return self.db.get("final_tx_hash", None)
 
     @property
     def selected_market_id(self) -> Optional[str]:
@@ -107,7 +105,6 @@ class ScanMarketsRound(CollectSameUntilThresholdRound):
     no_majority_event = Event.NO_MAJORITY
     collection_key = "participant_to_scan"
     selection_key = (
-        "n_markets",
         get_name(SynchronizedData.selected_market_id),
         get_name(SynchronizedData.selected_market_action),
     )
@@ -173,8 +170,8 @@ class BuildAnswerTxRound(CollectSameUntilThresholdRound):
     no_majority_event = Event.NO_MAJORITY
     collection_key = "participant_to_answer_tx"
     selection_key = (
-        "tx_submitter",
-        "most_voted_tx_hash",
+        get_name(SynchronizedData.tx_submitter),
+        get_name(SynchronizedData.most_voted_tx_hash),
     )
 
 
@@ -217,7 +214,7 @@ class PostTransactionRound(CollectSameUntilThresholdRound):
     none_event = Event.NONE
     no_majority_event = Event.NO_MAJORITY
     collection_key = "participant_to_post_tx"
-    selection_key: Tuple[str, ...] = ("ignored",)
+    selection_key: Tuple[str, ...] = ("content",)
 
     def end_block(  # pylint: disable=too-many-return-statements
         self,
@@ -406,7 +403,7 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
     db_post_conditions: Dict[AppState, Set[str]] = {
         FinishedWithMechRequestRound: {get_name(SynchronizedData.mech_requests)},
         FinishedWithMechPollRound: set(),
-        FinishedWithAnswerTxRound: {"most_voted_tx_hash"},
+        FinishedWithAnswerTxRound: {get_name(SynchronizedData.most_voted_tx_hash)},
         FinishedResolutionRound: set(),
         FinishedWithFundsForwarderPostTxRound: set(),
         FinishedWithFpmmRemoveLiquidityPostTxRound: set(),

@@ -29,7 +29,6 @@ from packages.valory.skills.abstract_round_abci.base import BaseTxPayload
 class ScanMarketsPayload(BaseTxPayload):
     """Payload for the ScanMarketsRound."""
 
-    n_markets: Optional[int] = None
     selected_market_id: Optional[str] = None
     selected_market_action: Optional[str] = None
 

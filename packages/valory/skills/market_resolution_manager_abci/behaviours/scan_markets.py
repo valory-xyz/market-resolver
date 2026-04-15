@@ -192,7 +192,7 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
                         )
                         continue
                     if entry.get("evaluation") is not None:
-                        new_status = AnswerStatus.CHALLENGE_PENDING
+                        new_status = AnswerStatus.TRANSACTION_PENDING
                         questions_db[market_id] = self._update_entry(
                             entry, market, latest_answerer, new_status
                         )
@@ -319,7 +319,7 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
                 actionable.append(
                     {"market_id": market_id, "action": AnswerStatus.NEEDS_VERIFICATION}
                 )
-            elif status == AnswerStatus.CHALLENGE_PENDING:
+            elif status == AnswerStatus.TRANSACTION_PENDING:
                 finalization_deadline = (
                     int(entry.get("last_answer_timestamp") or 0) + timeout
                 )
@@ -333,10 +333,10 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
 
                 # First challenge: act immediately
                 # Re-challenge (after counter): apply cooldown
-                prior_challenge = entry.get("challenge") or {}
-                if prior_challenge.get("escalation_count", 0) > 0:
+                prior_tx = entry.get("pending_tx") or {}
+                if prior_tx.get("escalation_count", 0) > 0:
                     cooldown = timeout * self.params.challenge_cooldown_fraction
-                    last_challenge_ts = prior_challenge.get("timestamp", 0)
+                    last_challenge_ts = prior_tx.get("timestamp", 0)
                     urgency = (
                         now
                         >= finalization_deadline - self.params.challenge_urgency_buffer
@@ -345,12 +345,12 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
                     if not (urgency or cooldown_elapsed):
                         self.context.logger.info(
                             f"  Skipping [{status}] {market_id} -- "
-                            f"re-challenge cooldown (escalation #{prior_challenge['escalation_count']})"
+                            f"re-challenge cooldown (escalation #{prior_tx['escalation_count']})"
                         )
                         continue
 
                 actionable.append(
-                    {"market_id": market_id, "action": AnswerStatus.CHALLENGE_PENDING}
+                    {"market_id": market_id, "action": AnswerStatus.TRANSACTION_PENDING}
                 )
 
         # Sort: urgent challenges first (closest to finalization), then unanswered
@@ -386,7 +386,7 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         n_challenge = sum(
             1
             for e in questions_db.values()
-            if e["status"] == AnswerStatus.CHALLENGE_PENDING
+            if e["status"] == AnswerStatus.TRANSACTION_PENDING
         )
         self.context.logger.info(
             f"Scan complete: {len(questions_db)} markets tracked -- "
@@ -524,7 +524,7 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             "mech_request": None,
             "mech_response": None,
             "evaluation": None,
-            "challenge": None,
+            "pending_tx": None,
             "mech_retries": 0,
         }
 
@@ -569,7 +569,6 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         sender = self.context.agent_address
         payload = ScanMarketsPayload(
             sender=sender,
-            n_markets=len(questions_db),
             selected_market_id=selected_id,
             selected_market_action=selected_action,
         )

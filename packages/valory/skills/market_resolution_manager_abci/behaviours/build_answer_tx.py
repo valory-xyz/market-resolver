@@ -245,7 +245,7 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
             yield from self._send_payload(None)
             return
 
-        challenge = entry.get("challenge") or {}
+        challenge = entry.get("pending_tx") or {}
         escalation_count = challenge.get("escalation_count", 0)
 
         on_chain_bond = int(entry.get("on_chain_bond") or 0)
@@ -292,8 +292,8 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
             return
 
         # Update DB
-        entry["status"] = AnswerStatus.CHALLENGE_PENDING
-        entry["challenge"] = {
+        entry["status"] = AnswerStatus.TRANSACTION_PENDING
+        entry["pending_tx"] = {
             "tx_hash": tx_hash,
             "bond": required_bond,
             "answer": mech_answer,
@@ -304,7 +304,7 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
         self.questions_db = questions_db
 
         self.context.logger.info(
-            f"Market {market_id}: status -> CHALLENGE_PENDING, "
+            f"Market {market_id}: status -> TRANSACTION_PENDING, "
             f"submitting tx to TxSettlement"
         )
 
@@ -388,13 +388,22 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
         Returns the payload hash string for TxSettlement, or None on error.
         """
         # Step 1: Get the Realitio submitAnswer calldata
+        try:
+            question_id_bytes = bytes.fromhex(question_id[2:])
+            answer_bytes = bytes.fromhex(answer[2:])
+        except (ValueError, TypeError):
+            self.context.logger.error(
+                f"Invalid hex for question_id={question_id!r} or answer={answer!r}"
+            )
+            return None
+
         response = yield from self.get_contract_api_response(
             performative=ContractApiMessage.Performative.GET_STATE,  # type: ignore
             contract_address=self.params.realitio_contract,
             contract_id=str(RealitioContract.contract_id),
             contract_callable="get_submit_answer_tx",
-            question_id=bytes.fromhex(question_id[2:]),
-            answer=bytes.fromhex(answer[2:]),
+            question_id=question_id_bytes,
+            answer=answer_bytes,
             max_previous=max_previous,
             chain_id=self.params.default_chain_id,
         )
