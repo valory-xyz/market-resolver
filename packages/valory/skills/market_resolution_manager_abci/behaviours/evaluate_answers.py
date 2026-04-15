@@ -114,42 +114,30 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
             return
 
         # Subgraph cache lookup: only when local evaluation is missing.
-        # Intended for service restart / state loss recovery.
+        # Intended for service restart / state loss recovery. Returns only
+        # valid evaluations; undeterminable ones are filtered inside the
+        # fetcher and we fall through to a fresh Mech request.
         if entry.get("evaluation") is None:
-            cached = yield from self._fetch_mech_response_from_subgraph(
-                market_id, entry
-            )
+            cached = yield from self._find_cached_valid_evaluation(market_id, entry)
             if cached is not None:
-                entry["evaluation"] = cached["evaluation"]
-                entry["mech_response"] = cached["mech_response"]
-                questions_db[market_id] = entry
-                self.questions_db = questions_db
-
                 mech_resp = cached["mech_response"]
                 evaluation = cached["evaluation"]
-                if is_cached_evaluation_valid(evaluation):
-                    self.context.logger.info(
-                        f"Market {market_id}: using cached Mech response "
-                        f"from subgraph "
-                        f"(request_id={mech_resp.get('subgraph_request_id')}, "
-                        f"block_timestamp={mech_resp.get('block_timestamp')}, "
-                        f"has_occurred={evaluation.get('has_occurred')}, "
-                        f"answer={evaluation.get('answer')}, "
-                        f"agreement_ratio={evaluation.get('agreement_ratio')}). "
-                        f"Skipping fresh Mech request."
-                    )
-                    yield from self._send_payload(None, action)
-                    return
+                entry["evaluation"] = evaluation
+                entry["mech_response"] = mech_resp
+                questions_db[market_id] = entry
+                self.questions_db = questions_db
                 self.context.logger.info(
-                    f"Market {market_id}: cached Mech response from subgraph "
-                    f"is undeterminable "
+                    f"Market {market_id}: using cached Mech response "
+                    f"from subgraph "
                     f"(request_id={mech_resp.get('subgraph_request_id')}, "
                     f"block_timestamp={mech_resp.get('block_timestamp')}, "
-                    f"is_valid={evaluation.get('is_valid')}, "
-                    f"is_determinable={evaluation.get('is_determinable')}, "
-                    f"has_occurred={evaluation.get('has_occurred')}). "
-                    f"Stored; falling through to fresh Mech request."
+                    f"has_occurred={evaluation.get('has_occurred')}, "
+                    f"answer={evaluation.get('answer')}, "
+                    f"agreement_ratio={evaluation.get('agreement_ratio')}). "
+                    f"Skipping fresh Mech request."
                 )
+                yield from self._send_payload(None, action)
+                return
 
         # Check retry limit
         retries = entry.get("mech_retries", 0)
@@ -194,7 +182,7 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
         # Send mech_requests -> done_event -> MechInteract
         yield from self._send_payload(mech_requests_json, None)
 
-    def _fetch_mech_response_from_subgraph(  # pylint: disable=too-many-locals
+    def _find_cached_valid_evaluation(  # pylint: disable=too-many-locals
         self, market_id: str, entry: Dict[str, Any]
     ) -> Generator[None, None, Optional[Dict[str, Any]]]:
         """Look up a prior Mech response for this market from our Safe.
@@ -262,6 +250,8 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
             evaluation = parse_mech_response(tool_response)
             if evaluation is None:
                 continue
+            if not is_cached_evaluation_valid(evaluation):
+                continue
 
             return {
                 "evaluation": evaluation,
@@ -276,7 +266,7 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
 
         self.context.logger.info(
             f"Market {market_id}: subgraph returned {len(requests)} prior "
-            f"requests, none matched tool/title/delivery filters."
+            f"requests, none matched tool/title/delivery/validity filters."
         )
         return None
 

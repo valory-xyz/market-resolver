@@ -34,7 +34,7 @@ skills:
 - valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeibfbtuliclpudh6pjzjoygphb7rbc335fstqw2yzjarbldcoseutq
 - valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeifkzh5wlnvm2k64zrua46um6hiofdyfhmanbjefwlngo7stkvynfu
 - valory/mech_interact_abci:0.1.0:bafybeibrmrdpys5xfivpmlyerbwlu2am2rmqb75bwub3cvcrvfwdbqxv54
-- valory/market_resolution_manager_abci:0.1.0:bafybeieuoc2natd26bvph4lqohs3frvo5uyfyiimstxabijklnfq344chm
+- valory/market_resolution_manager_abci:0.1.0:bafybeigaalaftxxbhvfd66qvjt26murlgjg4q4u344xf54srzi3assn3qm
 behaviours:
   main:
     args: {}
