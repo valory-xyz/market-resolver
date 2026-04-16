@@ -10,8 +10,8 @@ fingerprint:
   README.md: bafybeicebua5cqf3pfr34hy5mmnr6i7m7wgxlkzbto6woi5dkuv4fqbymi
   __init__.py: bafybeiedhf4rirdachml54zzde7nl3nhuwz4c5xwskrc5udfphefbrdsfu
   behaviours/__init__.py: bafybeignnrbklzekhqurn6ptli5zhzsov2qtdzr5se4xe4hqdywt2vbtvu
-  behaviours/base.py: bafybeiaxmvgv7gebxtguaiinjb3o5b27vuyq3yu5lydisudmvm27nw323y
-  behaviours/build_answer_tx.py: bafybeieoswzratenkhhhk7z2w6t7iiornzpietcp72eqw5qioaep7zjllu
+  behaviours/base.py: bafybeidfv2s4remsygoefmjabwkq4yftguohc5hdolmzsgfelq2fwxhoou
+  behaviours/build_answer_tx.py: bafybeie4cvtbtxk5cvmlb2mb7mcpgshmxb22z7hx6hvveuoyr5yef7zjei
   behaviours/evaluate_answers.py: bafybeidfpihakdznzoo4yuimm6h36p7l3gdlrswj2jri6w5oeiuz5aajli
   behaviours/post_transaction.py: bafybeihuqutrw22m2bcawnhsbsuymrbv475aetud4rtqs7hlqr6yahytxu
   behaviours/round_behaviour.py: bafybeiecxju6t7zsojnrhrefy4a7c75lkbveoxcayntw6heacao2qqkfdm

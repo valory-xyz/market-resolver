@@ -139,60 +139,35 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
             yield from self._send_payload(None)
             return
 
-        is_valid = evaluation.get("is_valid", True)
-        is_determinable = evaluation.get("is_determinable", False)
-        has_occurred = evaluation.get("has_occurred")
+        mech_answer = evaluation.get("answer")
         on_chain_answer = entry.get("on_chain_answer")
 
-        # Not determinable -- set retry cooldown based on context
-        if not is_determinable:
+        # Case B (undeterminable): answer=None — set retry cooldown
+        if mech_answer is None:
             on_chain_bond = int(entry.get("on_chain_bond") or 0)
             timeout = int(entry.get("realitio_timeout", 86400))
             last_answer_ts = int(entry.get("last_answer_timestamp") or 0)
             now = int(self.last_synced_timestamp)
 
             if on_chain_bond > 0 and last_answer_ts > 0:
-                # Untrusted answer exists -- retry before finalization
                 finalization = last_answer_ts + timeout
                 retry_buffer = int(timeout * self.params.challenge_cooldown_fraction)
                 retry_after = max(now, finalization - retry_buffer)
                 self.context.logger.info(
-                    f"Market {market_id}: not determinable, untrusted answer "
+                    f"Market {market_id}: undeterminable, untrusted answer "
                     f"present. Retry after {retry_after} "
                     f"({retry_buffer}s before finalization)."
                 )
             else:
-                # Unanswered -- retry after 24h
                 retry_after = now + 86400
                 self.context.logger.info(
-                    f"Market {market_id}: not determinable, no answer yet. "
+                    f"Market {market_id}: undeterminable, no answer yet. "
                     f"Retry after {retry_after} (24h)."
                 )
 
             entry["retry_after"] = retry_after
-            # Keep original status (NEEDS_ANSWER or NEEDS_VERIFICATION)
-            if entry["status"] not in (
-                AnswerStatus.NEEDS_ANSWER,
-                AnswerStatus.NEEDS_VERIFICATION,
-            ):
-                entry["status"] = AnswerStatus.NEEDS_VERIFICATION
             questions_db[market_id] = entry
             self.questions_db = questions_db
-            yield from self._send_payload(None)
-            return
-
-        # Determine our answer
-        if not is_valid:
-            mech_answer = ANSWER_INVALID
-        elif has_occurred is True:
-            mech_answer = ANSWER_YES
-        elif has_occurred is False:
-            mech_answer = ANSWER_NO
-        else:
-            self.context.logger.info(
-                f"Market {market_id}: Mech returned determinable but "
-                f"has_occurred is None. Skipping."
-            )
             yield from self._send_payload(None)
             return
 
