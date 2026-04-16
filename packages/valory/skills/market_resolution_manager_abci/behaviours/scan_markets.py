@@ -195,20 +195,22 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             answerer = entry.get("last_answerer", "").lower()
             on_chain_answer = entry.get("on_chain_answer")
             evaluation = entry.get("evaluation")
+            mech_answer = evaluation.get("answer") if evaluation else None
 
             if on_chain_answer is None:
                 entry["status"] = AnswerStatus.NEEDS_ANSWER
             elif answerer in trusted:
                 entry["status"] = AnswerStatus.TRUSTED_ANSWER
-            elif (
-                evaluation is not None
-                and evaluation.get("answer") is not None
-                and evaluation["answer"] == on_chain_answer
-            ):
+            elif mech_answer is not None and mech_answer == on_chain_answer:
                 entry["status"] = AnswerStatus.VERIFIED
-            elif evaluation is not None and evaluation.get("answer") is not None:
+            elif mech_answer is not None:
                 entry["status"] = AnswerStatus.TRANSACTION_PENDING
             else:
+                # No evaluation, or undeterminable (answer=None).
+                # Clear stale undeterminable evaluations so a fresh Mech
+                # request is made once retry_after expires.
+                entry["evaluation"] = None
+                entry["mech_response"] = None
                 entry["status"] = AnswerStatus.NEEDS_VERIFICATION
 
         # Step 7: Select actionable market
