@@ -135,20 +135,27 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             return
 
         # Step 1: Query Omen subgraph for pending markets
-        markets = yield from self._fetch_pending_and_finalizing_markets(watched_addresses)
-        if markets is None or len(markets) == 0:
-            self.context.logger.info("No pending/finalizing markets found.")
+        fetched_markets = yield from self._fetch_pending_and_finalizing_markets(
+            watched_addresses
+        )
+        if fetched_markets is None:
+            self.context.logger.error("Subgraph error fetching markets.")
             yield from self._send_none_payload()
             return
 
-        self.context.logger.info(f"Found {len(markets)} pending/finalizing market(s).")
+        self.context.logger.info(f"Found {len(fetched_markets)} pending/finalizing market(s).")
 
         # Step 2: Query Realitio subgraph for latest answerers
-        question_ids = [m["question"]["id"] for m in markets if m.get("currentAnswer")]
-        answerers = yield from self._fetch_latest_answerers(question_ids)
+        question_ids = [m["question"]["id"] for m in fetched_markets if m.get("currentAnswer")]
+        answerers = yield from self._fetch_current_answerers(question_ids)
 
-        # Step 3: Classify questions and update DB
+        # Step 3: Purge stale DB entries (markets no longer pending/finalizing)
         questions_db = dict(self.questions_db)
+        fetched_ids = {m["id"] for m in fetched_markets}
+        for mid in set(questions_db) - fetched_ids:
+            del questions_db[mid]
+
+        # Step 4: Classify questions and update DB
         trusted = set(addr.lower() for addr in self.params.trusted_addresses)
         trusted.add(self.synchronized_data.safe_contract_address.lower())
 
@@ -164,13 +171,13 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         actionable: List[Dict[str, Any]] = []
         now = self.last_synced_timestamp
 
-        for market in markets:
+        for market in fetched_markets:
             market_id = market["id"]
             question_id = market["question"]["id"]
             current_answer = market.get("currentAnswer")
             current_answer_ts = market.get("currentAnswerTimestamp")
             timeout = int(market.get("timeout", 86400))
-            latest_answerer = answerers.get(question_id, "").lower()
+            current_answerer = answerers.get(question_id, "").lower()
 
             # Re-scan: update existing DB entries if answer changed
             if market_id in questions_db:
@@ -180,36 +187,36 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
 
                 if current_answer_ts and stored_ts != current_answer_ts:
                     # Answer changed on-chain
-                    if latest_answerer in trusted:
+                    if current_answerer in trusted:
                         new_status = AnswerStatus.TRUSTED_ANSWER
                         questions_db[market_id] = self._update_entry(
-                            entry, market, latest_answerer, new_status
+                            entry, market, current_answerer, new_status
                         )
                         self.context.logger.info(
                             f"  {market_id}: answer changed, "
                             f"{old_status} -> {new_status} "
-                            f"(trusted answerer {latest_answerer})"
+                            f"(trusted answerer {current_answerer})"
                         )
                         continue
                     if entry.get("evaluation") is not None:
                         new_status = AnswerStatus.TRANSACTION_PENDING
                         questions_db[market_id] = self._update_entry(
-                            entry, market, latest_answerer, new_status
+                            entry, market, current_answerer, new_status
                         )
                         self.context.logger.info(
                             f"  {market_id}: answer changed, "
                             f"{old_status} -> {new_status} "
-                            f"(untrusted {latest_answerer}, has evaluation)"
+                            f"(untrusted {current_answerer}, has evaluation)"
                         )
                     else:
                         new_status = AnswerStatus.NEEDS_VERIFICATION
                         questions_db[market_id] = self._update_entry(
-                            entry, market, latest_answerer, new_status
+                            entry, market, current_answerer, new_status
                         )
                         self.context.logger.info(
                             f"  {market_id}: answer changed, "
                             f"{old_status} -> {new_status} "
-                            f"(untrusted {latest_answerer})"
+                            f"(untrusted {current_answerer})"
                         )
 
                 entry = questions_db[market_id]
@@ -218,15 +225,15 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
                 if current_answer is None:
                     entry = self._new_entry(market, "", AnswerStatus.NEEDS_ANSWER, now)
                     questions_db[market_id] = entry
-                elif latest_answerer in trusted:
+                elif current_answerer in trusted:
                     entry = self._new_entry(
-                        market, latest_answerer, AnswerStatus.TRUSTED_ANSWER, now
+                        market, current_answerer, AnswerStatus.TRUSTED_ANSWER, now
                     )
                     questions_db[market_id] = entry
                     continue
                 else:
                     entry = self._new_entry(
-                        market, latest_answerer, AnswerStatus.NEEDS_VERIFICATION, now
+                        market, current_answerer, AnswerStatus.NEEDS_VERIFICATION, now
                     )
                     questions_db[market_id] = entry
 
@@ -480,7 +487,7 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         )
         return markets
 
-    def _fetch_latest_answerers(
+    def _fetch_current_answerers(
         self, question_ids: List[str]
     ) -> Generator[None, None, Dict[str, str]]:
         """Fetch latest answerer for each question from Realitio subgraph."""

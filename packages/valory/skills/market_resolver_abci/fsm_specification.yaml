@@ -37,7 +37,6 @@ states:
 - BuildAnswerTxRound
 - CheckLateTxHashesRound
 - CheckTransactionHistoryRound
-- CleanupTrackedMarketsRound
 - CollectSignatureRound
 - CtRedeemTokensRound
 - EvaluateAnswersRound
@@ -65,9 +64,9 @@ states:
 - ValidateTransactionRound
 transition_func:
     (BuildAnswerTxRound, DONE): RandomnessTransactionSubmissionRound
-    (BuildAnswerTxRound, NONE): CleanupTrackedMarketsRound
-    (BuildAnswerTxRound, NO_MAJORITY): CleanupTrackedMarketsRound
-    (BuildAnswerTxRound, ROUND_TIMEOUT): CleanupTrackedMarketsRound
+    (BuildAnswerTxRound, NONE): ResetAndPauseRound
+    (BuildAnswerTxRound, NO_MAJORITY): ResetAndPauseRound
+    (BuildAnswerTxRound, ROUND_TIMEOUT): ResetAndPauseRound
     (CheckLateTxHashesRound, CHECK_LATE_ARRIVING_MESSAGE): SynchronizeLateMessagesRound
     (CheckLateTxHashesRound, CHECK_TIMEOUT): CheckLateTxHashesRound
     (CheckLateTxHashesRound, DONE): PostTransactionRound
@@ -80,10 +79,6 @@ transition_func:
     (CheckTransactionHistoryRound, NEGATIVE): SelectKeeperTransactionSubmissionBRound
     (CheckTransactionHistoryRound, NONE): ResetAndPauseRound
     (CheckTransactionHistoryRound, NO_MAJORITY): CheckTransactionHistoryRound
-    (CleanupTrackedMarketsRound, DONE): ResetAndPauseRound
-    (CleanupTrackedMarketsRound, NONE): ResetAndPauseRound
-    (CleanupTrackedMarketsRound, NO_MAJORITY): ResetAndPauseRound
-    (CleanupTrackedMarketsRound, ROUND_TIMEOUT): ResetAndPauseRound
     (CollectSignatureRound, DONE): FinalizationRound
     (CollectSignatureRound, NO_MAJORITY): ResetRound
     (CollectSignatureRound, ROUND_TIMEOUT): CollectSignatureRound
@@ -93,8 +88,8 @@ transition_func:
     (CtRedeemTokensRound, ROUND_TIMEOUT): RealitioWithdrawBondsRound
     (EvaluateAnswersRound, DONE): MechVersionDetectionRound
     (EvaluateAnswersRound, NONE): BuildAnswerTxRound
-    (EvaluateAnswersRound, NO_MAJORITY): CleanupTrackedMarketsRound
-    (EvaluateAnswersRound, ROUND_TIMEOUT): CleanupTrackedMarketsRound
+    (EvaluateAnswersRound, NO_MAJORITY): ResetAndPauseRound
+    (EvaluateAnswersRound, ROUND_TIMEOUT): ResetAndPauseRound
     (FinalizationRound, CHECK_HISTORY): CheckTransactionHistoryRound
     (FinalizationRound, CHECK_LATE_ARRIVING_MESSAGE): SynchronizeLateMessagesRound
     (FinalizationRound, DONE): ValidateTransactionRound
@@ -134,16 +129,16 @@ transition_func:
     (MechVersionDetectionRound, ROUND_TIMEOUT): MechVersionDetectionRound
     (MechVersionDetectionRound, V1): MechRequestRound
     (MechVersionDetectionRound, V2): MechInformationRound
-    (PostTransactionRound, ANSWER_TX_DONE): CleanupTrackedMarketsRound
+    (PostTransactionRound, ANSWER_TX_DONE): ResetAndPauseRound
     (PostTransactionRound, CT_REDEEM_TOKENS_TX_DONE): RealitioWithdrawBondsRound
-    (PostTransactionRound, DONE): CleanupTrackedMarketsRound
+    (PostTransactionRound, DONE): ResetAndPauseRound
     (PostTransactionRound, FPMM_REMOVE_LIQUIDITY_TX_DONE): CtRedeemTokensRound
     (PostTransactionRound, FUNDS_FORWARDER_TX_DONE): FpmmRemoveLiquidityRound
     (PostTransactionRound, MECH_REQUEST_DONE): MechResponseRound
-    (PostTransactionRound, NONE): CleanupTrackedMarketsRound
-    (PostTransactionRound, NO_MAJORITY): CleanupTrackedMarketsRound
+    (PostTransactionRound, NONE): ResetAndPauseRound
+    (PostTransactionRound, NO_MAJORITY): ResetAndPauseRound
     (PostTransactionRound, REALITIO_WITHDRAW_BONDS_TX_DONE): ScanMarketsRound
-    (PostTransactionRound, ROUND_TIMEOUT): CleanupTrackedMarketsRound
+    (PostTransactionRound, ROUND_TIMEOUT): ResetAndPauseRound
     (RandomnessTransactionSubmissionRound, DONE): SelectKeeperTransactionSubmissionARound
     (RandomnessTransactionSubmissionRound, NONE): RandomnessTransactionSubmissionRound
     (RandomnessTransactionSubmissionRound, NO_MAJORITY): RandomnessTransactionSubmissionRound
@@ -162,7 +157,7 @@ transition_func:
     (ResetRound, NO_MAJORITY): ResetAndPauseRound
     (ResetRound, RESET_TIMEOUT): ResetAndPauseRound
     (ScanMarketsRound, DONE): EvaluateAnswersRound
-    (ScanMarketsRound, NONE): CleanupTrackedMarketsRound
+    (ScanMarketsRound, NONE): ResetAndPauseRound
     (ScanMarketsRound, NO_MAJORITY): ScanMarketsRound
     (ScanMarketsRound, ROUND_TIMEOUT): ScanMarketsRound
     (SelectKeeperTransactionSubmissionARound, DONE): CollectSignatureRound

@@ -28,9 +28,6 @@ from packages.valory.skills.abstract_round_abci.behaviours import (
 from packages.valory.skills.market_resolution_manager_abci.behaviours.build_answer_tx import (
     BuildAnswerTxBehaviour,
 )
-from packages.valory.skills.market_resolution_manager_abci.behaviours.cleanup_tracked_markets import (
-    CleanupTrackedMarketsBehaviour,
-)
 from packages.valory.skills.market_resolution_manager_abci.behaviours.evaluate_answers import (
     EvaluateAnswersBehaviour,
 )
@@ -55,5 +52,4 @@ class MarketResolutionManagerRoundBehaviour(AbstractRoundBehaviour):
         EvaluateAnswersBehaviour,
         BuildAnswerTxBehaviour,
         PostTransactionBehaviour,
-        CleanupTrackedMarketsBehaviour,
     }
