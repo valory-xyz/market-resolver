@@ -63,38 +63,12 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
             yield from self._send_payload(None, None)
             return
 
-        # Reuse existing evaluation for any action. Covers: re-challenge
-        # (TRANSACTION_PENDING), scan-rehydrated cache where the cached
-        # answer disagreed with the current on-chain answer (needs challenge
-        # tx), or any later cycle where the evaluation is already local.
+        # Reuse existing evaluation (populated by scan_markets from the
+        # Mech subgraph cache, or from a prior cycle's Mech response).
         if entry.get("evaluation") is not None:
             self.context.logger.info(
                 f"Market {market_id}: reusing existing Mech evaluation "
                 f"(action={action}), skipping Mech request."
-            )
-            yield from self._send_payload(None, action)
-            return
-
-        # Subgraph cache lookup: restart / state-loss recovery. Returns only
-        # valid evaluations; undeterminable ones are filtered inside the
-        # fetcher and we fall through to a fresh Mech request.
-        cached = yield from self.find_cached_valid_mech_request(market_id, entry)
-        if cached is not None:
-            mech_resp = cached["mech_response"]
-            evaluation = cached["evaluation"]
-            entry["evaluation"] = evaluation
-            entry["mech_response"] = mech_resp
-            questions_db[market_id] = entry
-            self.questions_db = questions_db
-            self.context.logger.info(
-                f"Market {market_id}: using cached Mech response "
-                f"from subgraph "
-                f"(request_id={mech_resp.get('subgraph_request_id')}, "
-                f"block_timestamp={mech_resp.get('block_timestamp')}, "
-                f"has_occurred={evaluation.get('has_occurred')}, "
-                f"answer={evaluation.get('answer')}, "
-                f"agreement_ratio={evaluation.get('agreement_ratio')}). "
-                f"Skipping fresh Mech request."
             )
             yield from self._send_payload(None, action)
             return

@@ -128,20 +128,20 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         self,
     ) -> Generator:
         """Scan markets and classify questions."""
-        watched = self.params.watched_creator_addresses
-        if not watched:
+        watched_addresses = self.params.watched_creator_addresses
+        if not watched_addresses:
             self.context.logger.info("No watched creator addresses configured.")
             yield from self._send_none_payload()
             return
 
         # Step 1: Query Omen subgraph for pending markets
-        markets = yield from self._fetch_pending_markets(watched)
+        markets = yield from self._fetch_pending_and_finalizing_markets(watched_addresses)
         if markets is None or len(markets) == 0:
-            self.context.logger.info("No pending markets found.")
+            self.context.logger.info("No pending/finalizing markets found.")
             yield from self._send_none_payload()
             return
 
-        self.context.logger.info(f"Found {len(markets)} pending market(s).")
+        self.context.logger.info(f"Found {len(markets)} pending/finalizing market(s).")
 
         # Step 2: Query Realitio subgraph for latest answerers
         question_ids = [m["question"]["id"] for m in markets if m.get("currentAnswer")]
@@ -233,23 +233,24 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             # Determine if actionable
             status = entry["status"]
 
-            # Rehydrate missing evaluations from the Mech subgraph so markets
-            # carried over across restarts (or never selected before) can be
-            # auto-promoted to VERIFIED below without ever reaching Evaluate.
-            # Without this, a NEEDS_VERIFICATION market with a high bond would
-            # be stuck forever — bond-affordability gate blocks it from ever
-            # reaching the Evaluate round where the cache lookup normally runs.
+            # Rehydrate missing evaluations from the Mech subgraph.
+            # Covers restart recovery and markets never selected before.
+            # Skips trusted/verified (no Mech needed) and already-checked
+            # markets (subgraph returned no valid prior request).
             if (
-                status == AnswerStatus.NEEDS_VERIFICATION
+                status not in (AnswerStatus.TRUSTED_ANSWER, AnswerStatus.VERIFIED)
                 and entry.get("evaluation") is None
+                and not entry.get("cache_checked")
             ):
-                cached = yield from self.find_cached_valid_mech_request(
+                cached = yield from self.find_cached_valid_mech_delivery(
                     market_id, entry
                 )
-                if cached is not None:
+                if cached:
                     entry["evaluation"] = cached["evaluation"]
                     entry["mech_response"] = cached["mech_response"]
-                    questions_db[market_id] = entry
+                elif cached is not None:
+                    entry["cache_checked"] = True
+                questions_db[market_id] = entry
 
             # Auto-VERIFY: if a third party has posted the same answer our
             # Mech already validated, there's nothing to challenge — someone
@@ -423,7 +424,7 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             selected["action"],
         )
 
-    def _fetch_pending_markets(
+    def _fetch_pending_and_finalizing_markets(
         self, watched: List[str]
     ) -> Generator[None, None, Optional[List[Dict[str, Any]]]]:
         """Fetch pending + finalizing markets from Omen subgraph.

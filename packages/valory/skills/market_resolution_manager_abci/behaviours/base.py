@@ -292,35 +292,27 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
 
         return json.loads(response.body.decode())
 
-    def find_cached_valid_mech_request(  # pylint: disable=too-many-locals
+    def find_cached_valid_mech_delivery(  # pylint: disable=too-many-locals
         self, market_id: str, entry: Dict[str, Any]
     ) -> Generator[None, None, Optional[Dict[str, Any]]]:
         """Look up a prior valid Mech response for this market from our Safe.
 
-        Query the Mech Marketplace Gnosis subgraph for requests made by our
-        Safe on the exact question title, with a block timestamp after the
-        market closing time. Returns the earliest matching request whose
-        delivery parses cleanly, matches the configured resolver tool, and
-        yields a valid (determinable) evaluation.
-
-        :param market_id: the market id (for logging).
-        :param entry: the DB entry for the market.
-        :yield: None
-        :return: dict with {"evaluation": ..., "mech_response": ...} on hit,
-            or None on miss / error.
+        Returns:
+        - ``{"evaluation": ..., "mech_response": ...}`` on cache hit.
+        - ``{}`` (empty dict) on a definitive miss (subgraph responded but
+          no matching valid request found).
+        - ``None`` on subgraph error (caller should retry next cycle).
         """
         title = entry.get("title")
         closing_ts = entry.get("market_closing_timestamp")
         if not title or not closing_ts:
-            return None
+            return {}
 
         safe_address = self.synchronized_data.safe_contract_address
         if not safe_address:
             return None
 
-        # The subgraph indexes sender IDs in lowercase hex.
         sender_id = safe_address.lower()
-        # json.dumps handles escaping of quotes/backslashes in the title.
         query = MECH_CACHE_QUERY_TEMPLATE.format(
             sender=sender_id,
             prompt=json.dumps(title),
@@ -338,11 +330,7 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
 
         sender_data = (result.get("data") or {}).get("sender")
         if not sender_data:
-            self.context.logger.info(
-                f"Market {market_id}: no prior Mech requests from our Safe "
-                f"on the subgraph."
-            )
-            return None
+            return {}
 
         requests = sender_data.get("requests") or []
         expected_tool = self.params.mech_tool_resolve_market
@@ -378,4 +366,4 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
             f"Market {market_id}: subgraph returned {len(requests)} prior "
             f"requests, none matched tool/title/delivery/validity filters."
         )
-        return None
+        return {}
