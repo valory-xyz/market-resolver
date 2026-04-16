@@ -13,7 +13,7 @@ fingerprint:
   behaviours/base.py: bafybeig55pnkkck6x5aoqvp7jvadrsdrbw2ztv7puk4gdo5dke54lwjyyy
   behaviours/build_answer_tx.py: bafybeieoswzratenkhhhk7z2w6t7iiornzpietcp72eqw5qioaep7zjllu
   behaviours/cleanup_tracked_markets.py: bafybeiewsi3rrwgg6vksirm7bpu6qm7m455vzmzis37oizrz3qpfzmax3a
-  behaviours/evaluate_answers.py: bafybeigxrllzemxvaav6lifppk5by3sa76rjk2csca7c2j5as3bciqwv44
+  behaviours/evaluate_answers.py: bafybeihukzvyk3iyu32dfkx2jcsb7gil4tufoyeqev4j3h3chzoxiozudy
   behaviours/post_transaction.py: bafybeihuqutrw22m2bcawnhsbsuymrbv475aetud4rtqs7hlqr6yahytxu
   behaviours/round_behaviour.py: bafybeiauzj5hs6t5hzq6ksyxeafak7of5f3mfrl2kgizjw55pq435ymak4
   behaviours/scan_markets.py: bafybeihq75kflw5r7643gt6hx5i2vbma24ukvxjozguckc3y2jjxmeqroq
@@ -32,7 +32,7 @@ connections: []
 contracts:
 - valory/gnosis_safe:0.1.0:bafybeice337zvg3ol4cwpw2iikxcukmthwmw32ytwtdnkcju222qfc323y
 - valory/multisend:0.1.0:bafybeihx7c3xj6c5v4tgvu3ipnj7seyc4dkmovoyzu4isgbwdrhj2oo6uq
-- valory/realitio:0.1.0:bafybeidhivb4ty47ki3fxo2tmztt47bi3zw2xthu4xdp73tidx6eby2tge
+- valory/realitio:0.1.0:bafybeibthnl5gmuxehkwwseevyuier4iewcx2qd5wk4p7besvhea2kducy
 protocols:
 - valory/ledger_api:1.0.0:bafybeiecq56phjfws36rgrefw6niyo4ezesloodsfis647mpm5ygqo4ysi
 - valory/contract_api:1.0.0:bafybeibld2xb5m7kyluiptkamp4nrt6oeomkohz7a3yppbv2oo7qw2e4la
@@ -43,7 +43,7 @@ skills:
 - valory/funds_forwarder_abci:0.1.0:bafybeid6yc7ld64oenx3ttbxahno6qcqk6fqffqrnl3d3ftwapkwqqvexq
 - valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeih7cp5kz2phbffw3k45rcxsbyvw6egnitrxwwdlw7ihhkzdjkkvqm
 - valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeibfbtuliclpudh6pjzjoygphb7rbc335fstqw2yzjarbldcoseutq
-- valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeicmrxhqnuzgookhm4ewqw5f4w4w2xafxm7vamptmqxbnwgvxx6ywq
+- valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeiflqycyzizq4b4gabfxm6re5mfsoqlpfqh5nn67b5lfjz3c7rdimu
 behaviours:
   main:
     args: {}
