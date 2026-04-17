@@ -11,15 +11,15 @@ fingerprint:
   __init__.py: bafybeiedhf4rirdachml54zzde7nl3nhuwz4c5xwskrc5udfphefbrdsfu
   behaviours/__init__.py: bafybeignnrbklzekhqurn6ptli5zhzsov2qtdzr5se4xe4hqdywt2vbtvu
   behaviours/base.py: bafybeidfv2s4remsygoefmjabwkq4yftguohc5hdolmzsgfelq2fwxhoou
-  behaviours/build_answer_tx.py: bafybeie4cvtbtxk5cvmlb2mb7mcpgshmxb22z7hx6hvveuoyr5yef7zjei
+  behaviours/build_answer_tx.py: bafybeia7fndj4puvnpp6xbi2zeqmi7xp35gkaavs6rs4w4erhzfarinyje
   behaviours/evaluate_answers.py: bafybeidfpihakdznzoo4yuimm6h36p7l3gdlrswj2jri6w5oeiuz5aajli
   behaviours/post_transaction.py: bafybeihuqutrw22m2bcawnhsbsuymrbv475aetud4rtqs7hlqr6yahytxu
   behaviours/round_behaviour.py: bafybeiecxju6t7zsojnrhrefy4a7c75lkbveoxcayntw6heacao2qqkfdm
-  behaviours/scan_markets.py: bafybeihts2i6f7xpwwo4j2glvc3bj2a4l65uup47cduylgwhfgnj5ayibq
+  behaviours/scan_markets.py: bafybeih6lqrapvcr2o2cn53l7ah5ak3zjzwp2aq4bvchaxonv6oab6an6a
   dialogues.py: bafybeict7mdksmjklx6wy2zplunpcfwhgxv5votxbsodidyum2phx3tv34
   fsm_specification.yaml: bafybeicvrqqxqsu2smewf5lorfaud3j3caraw743huzqtn2gj555rylqxa
   handlers.py: bafybeigby2ymzvsoiwbgtdd4esk6xrkrafp2b22yqz5xi4ekrnqwqqoq4y
-  models.py: bafybeihzwcbu4fwcagovnlx3km7rdqnjlbzvjaru2fhlha2zrhlyix63qm
+  models.py: bafybeid7imcx474xa5thuc5qz5si25jpxzys7xqmz4ptxbquncp7uzibwe
   payloads.py: bafybeih6zkrc5mnkpifctn4cg3myqr3qrdw5v42hg7ldfbuzw7gjbgeoja
   rounds.py: bafybeigyfqap5njlgiwvjplpvark2xi744tpst6wswpo45mvc7yby2yahq
   states/__init__.py: bafybeiho5s4sehwxmgtp4ddgntnkxhjks5cflihdtag7zqy6btjrhzcyti
@@ -112,6 +112,8 @@ models:
       max_challenge_bond: 100000000000000000000
       max_escalation_rounds: 5
       max_mech_retries: 10
+      prefetch_mech_evaluations: false
+      mech_retry_cooldown: 3600
       omen_subgraph_max_market_age_seconds: 31536000
       cleanup_history_depth: 1
       cleanup_history_depth_current: null

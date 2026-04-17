@@ -228,17 +228,21 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             if status in (AnswerStatus.TRUSTED_ANSWER, AnswerStatus.VERIFIED):
                 continue
 
-            # Bond affordability
-            on_chain_bond = int(entry.get("on_chain_bond") or 0)
-            required_bond = (
-                on_chain_bond * 2
-                if on_chain_bond > 0
-                else self.params.initial_answer_bond
-            )
-            if required_bond > self.params.max_challenge_bond:
-                continue
-            if required_bond > safe_balance:
-                continue
+            # Bond affordability — skip when prefetch is off.
+            # When prefetch_mech_evaluations is on, we always select
+            # markets so every market gets a Mech evaluation.
+            # build_answer_tx gates the actual tx submission on bond.
+            if not self.params.prefetch_mech_evaluations:
+                on_chain_bond = int(entry.get("on_chain_bond") or 0)
+                required_bond = (
+                    on_chain_bond * 2
+                    if on_chain_bond > 0
+                    else self.params.initial_answer_bond
+                )
+                if required_bond > self.params.max_challenge_bond:
+                    continue
+                if required_bond > safe_balance:
+                    continue
 
             # Retry / cooldown gates
             if status in (AnswerStatus.NEEDS_ANSWER, AnswerStatus.NEEDS_VERIFICATION):
