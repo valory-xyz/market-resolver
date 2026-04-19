@@ -163,7 +163,7 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         trusted.add(self.synchronized_data.safe_contract_address.lower())
         now = self.last_synced_timestamp
 
-        # Step 4: Upsert — sync on-chain state into DB
+        # Step 4: Upsert -- sync on-chain state into DB
         for market in fetched_markets:
             market_id = market["id"]
             question_id = market["question"]["id"]
@@ -178,17 +178,20 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             else:
                 questions_db[market_id] = self._new_entry(market, current_answerer, now)
 
-        # Step 5: Rehydrate Mech cache for entries missing evaluation
+        # Step 5: Rehydrate Mech cache for entries missing evaluation.
+        # We re-query the subgraph on every scan so that late deliveries
+        # (responses that arrive after our in-process
+        # ``mech_response_round`` timed out) are still picked up.
+        # Otherwise a Mech that is slow but eventually responsive forces
+        # us to re-request the same market forever.
         for market_id, entry in questions_db.items():
-            if entry.get("evaluation") is None and not entry.get("cache_checked"):
+            if entry.get("evaluation") is None:
                 cached = yield from self.find_cached_valid_mech_delivery(
                     market_id, entry
                 )
                 if cached:
                     entry["evaluation"] = cached["evaluation"]
                     entry["mech_response"] = cached["mech_response"]
-                elif cached is not None:
-                    entry["cache_checked"] = True
 
         # Step 6: Classify statuses from current data
         for entry in questions_db.values():
@@ -228,7 +231,7 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             if status in (AnswerStatus.TRUSTED_ANSWER, AnswerStatus.VERIFIED):
                 continue
 
-            # Bond affordability — skip when prefetch is off.
+            # Bond affordability -- skip when prefetch is off.
             # When prefetch_mech_evaluations is on, we always select
             # markets so every market gets a Mech evaluation.
             # build_answer_tx gates the actual tx submission on bond.
@@ -249,7 +252,7 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
                 retry_after = entry.get("retry_after", 0)
                 if retry_after and now < retry_after:
                     continue
-            elif status == AnswerStatus.TRANSACTION_PENDING:
+            elif status == AnswerStatus.TRANSACTION_PENDING:  # pragma: no branch
                 timeout = int(entry.get("realitio_timeout", 86400))
                 finalization_deadline = (
                     int(entry.get("last_answer_timestamp") or 0) + timeout
@@ -291,7 +294,7 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             selected["action"],
         )
 
-    def _fetch_pending_and_finalizing_markets(
+    def _fetch_pending_and_finalizing_markets(  # pylint: disable=too-many-locals
         self, watched: List[str]
     ) -> Generator[None, None, Optional[List[Dict[str, Any]]]]:
         """Fetch pending + finalizing markets from Omen subgraph.

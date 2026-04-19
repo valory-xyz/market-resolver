@@ -96,7 +96,7 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
 
         # Check if we have fresh Mech responses (from MechInteract).
         # Skip if the evaluation was already populated by the subgraph
-        # cache path — MechInteract didn't run in that case.
+        # cache path -- MechInteract didn't run in that case.
         expected_nonce = (entry.get("mech_request") or {}).get("nonce")
         if entry.get("evaluation") is None and expected_nonce:
             mech_responses = self.synchronized_data.mech_responses
@@ -135,7 +135,7 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
         now = int(self.last_synced_timestamp)
         cooldown = self.params.mech_retry_cooldown
 
-        # No usable evaluation — either no Mech response yet, or the
+        # No usable evaluation -- either no Mech response yet, or the
         # response was garbage (parse_mech_response returned None).
         # When we just processed a garbage response (expected_nonce was
         # present), apply a retry cooldown so we don't hammer Mech.
@@ -159,7 +159,7 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
         mech_answer = evaluation.get("answer")
         on_chain_answer = entry.get("on_chain_answer")
 
-        # Case B (undeterminable): answer=None — set retry cooldown
+        # Case B (undeterminable): answer=None -- set retry cooldown
         if mech_answer is None:
             on_chain_bond = int(entry.get("on_chain_bond") or 0)
             timeout = int(entry.get("realitio_timeout", 86400))

@@ -54,17 +54,17 @@ from packages.valory.skills.termination_abci.rounds import (
 )
 
 abci_app_transition_mapping: AbciAppTransitionMapping = {
-    # Registration → IdentifyServiceOwner
+    # Registration -> IdentifyServiceOwner
     FinishedRegistrationRound: IdentifyServiceOwnerAbci.IdentifyServiceOwnerRound,
-    # IdentifyServiceOwner → FundsForwarder (ok) / FpmmRemoveLiquidity (error — skip FundsForwarder)
+    # IdentifyServiceOwner -> FundsForwarder (ok) / FpmmRemoveLiquidity (error -- skip FundsForwarder)
     IdentifyServiceOwnerAbci.FinishedIdentifyServiceOwnerRound: FundsForwarderAbci.FundsForwarderRound,
     IdentifyServiceOwnerAbci.FinishedIdentifyServiceOwnerErrorRound: OmenFpmmRemoveLiquidityAbci.FpmmRemoveLiquidityRound,
-    # FundsForwarder: tx → TxSettlement (returns via PostTx → FpmmRemoveLiquidity).
-    # No tx → FpmmRemoveLiquidity directly.
+    # FundsForwarder: tx -> TxSettlement (returns via PostTx -> FpmmRemoveLiquidity).
+    # No tx -> FpmmRemoveLiquidity directly.
     FundsForwarderAbci.FinishedFundsForwarderNoTxRound: OmenFpmmRemoveLiquidityAbci.FpmmRemoveLiquidityRound,
     FundsForwarderAbci.FinishedFundsForwarderWithTxRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
-    # Linear recovery chain: each skill either builds a multisend (→ TxSettlement →
-    # PostTx → next skill) or produces no tx (→ next skill directly). Every cycle walks
+    # Linear recovery chain: each skill either builds a multisend (-> TxSettlement ->
+    # PostTx -> next skill) or produces no tx (-> next skill directly). Every cycle walks
     # through all three skills in order before reaching the core resolution flow.
     #
     # Step 1: FpmmRemoveLiquidity
@@ -93,12 +93,12 @@ abci_app_transition_mapping: AbciAppTransitionMapping = {
     MechFinalStates.FinishedMechRequestSkipRound: ResetAndPauseRound,
     MechFinalStates.FinishedMechResponseTimeoutRound: ResetAndPauseRound,
     MarketResolutionManagerAbci.FinishedWithAnswerTxRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
-    # TxSettlement → PostTransactionRound (multiplexes by tx_submitter)
+    # TxSettlement -> PostTransactionRound (multiplexes by tx_submitter)
     TransactionSettlementAbci.FinishedTransactionSubmissionRound: MarketResolutionManagerAbci.PostTransactionRound,
     TransactionSettlementAbci.FailedRound: ResetAndPauseRound,
     MarketResolutionManagerAbci.FinishedWithMechPollRound: MechResponseStates.MechResponseRound,
     MarketResolutionManagerAbci.FinishedResolutionRound: ResetAndPauseRound,
-    # Reset → next period
+    # Reset -> next period
     FinishedResetAndPauseRound: IdentifyServiceOwnerAbci.IdentifyServiceOwnerRound,
     FinishedResetAndPauseErrorRound: RegistrationRound,
 }

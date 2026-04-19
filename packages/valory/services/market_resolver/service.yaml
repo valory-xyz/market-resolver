@@ -99,7 +99,7 @@ models:
       watched_creator_addresses: ${WATCHED_CREATOR_ADDRESSES:list:["0x89c5cc945dd550BcFfb72Fe42BfF002429F46Fec","0xffc8029154ecd55abed15bd428ba596e7d23f557"]}
       trusted_addresses: ${TRUSTED_ADDRESSES:list:["0x89c5cc945dd550BcFfb72Fe42BfF002429F46Fec","0xffc8029154ecd55abed15bd428ba596e7d23f557"]}
       mech_tool_resolve_market: ${MECH_TOOL_RESOLVE_MARKET:str:resolve-market-jury-v1}
-      initial_answer_bond: ${INITIAL_ANSWER_BOND:int:1000000000000000000}
+      initial_answer_bond: ${INITIAL_ANSWER_BOND:int:5000000000000000000}
       challenge_cooldown_fraction: ${CHALLENGE_COOLDOWN_FRACTION:float:0.25}
       challenge_urgency_buffer: ${CHALLENGE_URGENCY_BUFFER:int:3600}
       max_challenge_bond: ${MAX_CHALLENGE_BOND:int:20000000000000000000}

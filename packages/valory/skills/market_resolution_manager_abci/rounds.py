@@ -51,7 +51,7 @@ from packages.valory.skills.transaction_settlement_abci.rounds import (
 class SynchronizedData(TxSettlementSyncedData):
     """Class to represent the synchronized data.
 
-    The questions_db lives on SharedState (not here) — too heavy for Tendermint.
+    The questions_db lives on SharedState (not here) -- too heavy for Tendermint.
     Mech requests/responses are stored here for MechInteract integration.
     """
 
@@ -110,12 +110,12 @@ class ScanMarketsRound(CollectSameUntilThresholdRound):
 
 
 class EvaluateAnswersRound(CollectSameUntilThresholdRound):
-    """Round to evaluate answers — request Mech or reuse existing data.
+    """Round to evaluate answers -- request Mech or reuse existing data.
 
     Custom end_block to handle two "data present" paths:
-    - mech_requests set → DONE → FinishedWithMechRequestRound (needs Mech)
-    - evaluation_result set → NONE → BuildAnswerTxRound (has data, skip Mech)
-    - both None → NO_MAJORITY fallback
+    - mech_requests set -> DONE -> FinishedWithMechRequestRound (needs Mech)
+    - evaluation_result set -> NONE -> BuildAnswerTxRound (has data, skip Mech)
+    - both None -> NO_MAJORITY fallback
     """
 
     payload_class = EvaluateAnswersPayload
@@ -133,8 +133,8 @@ class EvaluateAnswersRound(CollectSameUntilThresholdRound):
         """Process the end of the block.
 
         Routes based on which field is set:
-        - mech_requests → DONE → FinishedWithMechRequestRound
-        - evaluation_result → NONE → BuildAnswerTxRound
+        - mech_requests -> DONE -> FinishedWithMechRequestRound
+        - evaluation_result -> NONE -> BuildAnswerTxRound
         """
         if self.threshold_reached:
             values = dict(zip(self.selection_key, self.most_voted_payload_values))
@@ -178,13 +178,13 @@ class PostTransactionRound(CollectSameUntilThresholdRound):
     """Route after TxSettlement based on which tx was submitted.
 
     Custom end_block checks the payload content to emit the right event:
-    - MECH_REQUEST_DONE → MechResponseRound (poll for Mech delivery)
-    - ANSWER_TX_DONE → FinishedResolutionRound
-    - FUNDS_FORWARDER_TX_DONE → FpmmRemoveLiquidityRound (enter recovery chain)
-    - FPMM_REMOVE_LIQUIDITY_TX_DONE → CtRedeemTokensRound (next chain step)
-    - CT_REDEEM_TOKENS_TX_DONE → RealitioWithdrawBondsRound (next chain step)
-    - REALITIO_WITHDRAW_BONDS_TX_DONE → ScanMarketsRound (chain complete)
-    - ERROR / anything else → FinishedResolutionRound
+    - MECH_REQUEST_DONE -> MechResponseRound (poll for Mech delivery)
+    - ANSWER_TX_DONE -> FinishedResolutionRound
+    - FUNDS_FORWARDER_TX_DONE -> FpmmRemoveLiquidityRound (enter recovery chain)
+    - FPMM_REMOVE_LIQUIDITY_TX_DONE -> CtRedeemTokensRound (next chain step)
+    - CT_REDEEM_TOKENS_TX_DONE -> RealitioWithdrawBondsRound (next chain step)
+    - REALITIO_WITHDRAW_BONDS_TX_DONE -> ScanMarketsRound (chain complete)
+    - ERROR / anything else -> FinishedResolutionRound
     """
 
     MECH_REQUEST_DONE_PAYLOAD = "MECH_REQUEST_DONE"

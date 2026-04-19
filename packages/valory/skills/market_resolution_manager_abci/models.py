@@ -92,7 +92,7 @@ class MarketResolutionManagerParams(  # pylint: disable=too-many-instance-attrib
             "omen_subgraph_max_market_age_seconds",
             365 * 86400,  # 1 year
         )
-        # Read without popping — MechParams also needs these
+        # Read without popping -- MechParams also needs these
         self.mech_interact_round_timeout_seconds: int = kwargs.get(
             "mech_interact_round_timeout_seconds", 1200
         )

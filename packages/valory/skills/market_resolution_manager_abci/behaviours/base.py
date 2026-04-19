@@ -74,16 +74,18 @@ MECH_CACHE_QUERY_TEMPLATE = """
 """
 
 
-def parse_mech_response(result: Optional[str]) -> Optional[dict]:
+def parse_mech_response(  # pylint: disable=too-many-return-statements
+    result: Optional[str],
+) -> Optional[dict]:
     """Parse a resolve-market-jury-v1 Mech result with strict pattern matching.
 
     Only four exact ``(is_valid, is_determinable, has_occurred)`` patterns
     are recognised:
 
-    - **Case A** ``(False, None, None)`` → market is invalid, answer=INVALID
-    - **Case B** ``(True, False, None)`` → undeterminable, answer=None (retry)
-    - **Case C1** ``(True, True, True)`` → answer=YES
-    - **Case C2** ``(True, True, False)`` → answer=NO
+    - **Case A** ``(False, None, None)`` -> market is invalid, answer=INVALID
+    - **Case B** ``(True, False, None)`` -> undeterminable, answer=None (retry)
+    - **Case C1** ``(True, True, True)`` -> answer=YES
+    - **Case C2** ``(True, True, False)`` -> answer=NO
 
     Any other combination is garbage (e.g. API errors returning
     ``(False, False, None)``) and returns ``None`` so callers retry.
@@ -112,7 +114,7 @@ def parse_mech_response(result: Optional[str]) -> Optional[dict]:
             "reasoning": reasoning,
         }
 
-    # Case A: question is invalid → submit INVALID answer
+    # Case A: question is invalid -> submit INVALID answer
     if is_valid is False and is_determinable is None and has_occurred is None:
         return _make(ANSWER_INVALID)
 
@@ -120,7 +122,7 @@ def parse_mech_response(result: Optional[str]) -> Optional[dict]:
     if is_valid is not True:
         return None  # garbage
 
-    # Case B: undeterminable → retry later
+    # Case B: undeterminable -> retry later
     if is_determinable is False:
         return _make(None)
 
