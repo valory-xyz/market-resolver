@@ -44,7 +44,7 @@ connections: []
 contracts:
 - valory/gnosis_safe:0.1.0:bafybeice337zvg3ol4cwpw2iikxcukmthwmw32ytwtdnkcju222qfc323y
 - valory/multisend:0.1.0:bafybeihx7c3xj6c5v4tgvu3ipnj7seyc4dkmovoyzu4isgbwdrhj2oo6uq
-- valory/realitio:0.1.0:bafybeicrpra4hgpms6cxiredtzq2zu774qrshinaoafquhiifaucycquoq
+- valory/realitio:0.1.0:bafybeibthnl5gmuxehkwwseevyuier4iewcx2qd5wk4p7besvhea2kducy
 protocols:
 - valory/ledger_api:1.0.0:bafybeiecq56phjfws36rgrefw6niyo4ezesloodsfis647mpm5ygqo4ysi
 - valory/contract_api:1.0.0:bafybeibld2xb5m7kyluiptkamp4nrt6oeomkohz7a3yppbv2oo7qw2e4la
@@ -53,9 +53,9 @@ skills:
 - valory/mech_interact_abci:0.1.0:bafybeied5l5xlygjyo3uju5bw52pidjvbkgdahhuzvahh6qis7kd3ht6ta
 - valory/transaction_settlement_abci:0.1.0:bafybeiajyrszyyo6z4lxogutv4ougiaeoxak6xkq5gtrbey32gbgnirznq
 - valory/funds_forwarder_abci:0.1.0:bafybeid6yc7ld64oenx3ttbxahno6qcqk6fqffqrnl3d3ftwapkwqqvexq
-- valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeih37wyqjxr5nvybuvjpbyerhz3ohfdpaefujjzrdkkh4b7sm7mire
-- valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeiccguscfpi2oz3gumnsgwncywo3y3jklotpbog6nw4kmfkqxbujg4
-- valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeiaxtbve5k47pmbj7rtbk232ygtlufwjyvp2js2depos4xajyeozye
+- valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeieff6ju7vumtg4ovr6y2thqxjv5we4mca4ucjxqm7xqyyrekw3uw4
+- valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeibfbtuliclpudh6pjzjoygphb7rbc335fstqw2yzjarbldcoseutq
+- valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeiflqycyzizq4b4gabfxm6re5mfsoqlpfqh5nn67b5lfjz3c7rdimu
 behaviours:
   main:
     args: {}
