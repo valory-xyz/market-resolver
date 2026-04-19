@@ -7,7 +7,7 @@ license: Apache-2.0
 fingerprint:
   README.md: bafybeie6lb2mlmzmkycbcfma4onidhegfu4ipgpybg2av5mhfs5zx42b2m
 fingerprint_ignore_patterns: []
-agent: valory/market_resolver:0.1.0:bafybeifigd5epmiepiwakqsdomnwzidqwiiyrbuhu6wi5d74ckofsqqotu
+agent: valory/market_resolver:0.1.0:bafybeieqpswl6earyg5hntzrd33x7mpqzh6osjgtvxxabsvf5alwgc5cmu
 number_of_agents: 1
 deployment:
   agent:
@@ -99,11 +99,13 @@ models:
       watched_creator_addresses: ${WATCHED_CREATOR_ADDRESSES:list:["0x89c5cc945dd550BcFfb72Fe42BfF002429F46Fec","0xffc8029154ecd55abed15bd428ba596e7d23f557"]}
       trusted_addresses: ${TRUSTED_ADDRESSES:list:["0x89c5cc945dd550BcFfb72Fe42BfF002429F46Fec","0xffc8029154ecd55abed15bd428ba596e7d23f557"]}
       mech_tool_resolve_market: ${MECH_TOOL_RESOLVE_MARKET:str:resolve-market-jury-v1}
-      initial_answer_bond: ${INITIAL_ANSWER_BOND:int:1000000000000000000}
+      initial_answer_bond: ${INITIAL_ANSWER_BOND:int:5000000000000000000}
       challenge_cooldown_fraction: ${CHALLENGE_COOLDOWN_FRACTION:float:0.25}
       challenge_urgency_buffer: ${CHALLENGE_URGENCY_BUFFER:int:3600}
       max_challenge_bond: ${MAX_CHALLENGE_BOND:int:20000000000000000000}
       max_mech_retries: ${MAX_MECH_RETRIES:int:10}
+      prefetch_mech_evaluations: ${PREFETCH_MECH_EVALUATIONS:bool:true}
+      mech_retry_cooldown: ${MECH_RETRY_COOLDOWN:int:3600}
       omen_subgraph_max_market_age_seconds: ${OMEN_SUBGRAPH_MAX_MARKET_AGE_SECONDS:int:31536000}
       mech_interact_round_timeout_seconds: ${MECH_INTERACT_ROUND_TIMEOUT_SECONDS:int:1200}
       mech_interaction_sleep_time: ${MECH_INTERACTION_SLEEP_TIME:int:10}

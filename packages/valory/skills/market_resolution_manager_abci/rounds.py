@@ -34,7 +34,6 @@ from packages.valory.skills.abstract_round_abci.base import (
 )
 from packages.valory.skills.market_resolution_manager_abci.payloads import (
     BuildAnswerTxPayload,
-    CleanupTrackedMarketsPayload,
     EvaluateAnswersPayload,
     PostTransactionPayload,
     ScanMarketsPayload,
@@ -52,7 +51,7 @@ from packages.valory.skills.transaction_settlement_abci.rounds import (
 class SynchronizedData(TxSettlementSyncedData):
     """Class to represent the synchronized data.
 
-    The questions_db lives on SharedState (not here) — too heavy for Tendermint.
+    The questions_db lives on SharedState (not here) -- too heavy for Tendermint.
     Mech requests/responses are stored here for MechInteract integration.
     """
 
@@ -111,12 +110,12 @@ class ScanMarketsRound(CollectSameUntilThresholdRound):
 
 
 class EvaluateAnswersRound(CollectSameUntilThresholdRound):
-    """Round to evaluate answers — request Mech or reuse existing data.
+    """Round to evaluate answers -- request Mech or reuse existing data.
 
     Custom end_block to handle two "data present" paths:
-    - mech_requests set → DONE → FinishedWithMechRequestRound (needs Mech)
-    - evaluation_result set → NONE → BuildAnswerTxRound (has data, skip Mech)
-    - both None → NO_MAJORITY fallback
+    - mech_requests set -> DONE -> FinishedWithMechRequestRound (needs Mech)
+    - evaluation_result set -> NONE -> BuildAnswerTxRound (has data, skip Mech)
+    - both None -> NO_MAJORITY fallback
     """
 
     payload_class = EvaluateAnswersPayload
@@ -134,8 +133,8 @@ class EvaluateAnswersRound(CollectSameUntilThresholdRound):
         """Process the end of the block.
 
         Routes based on which field is set:
-        - mech_requests → DONE → FinishedWithMechRequestRound
-        - evaluation_result → NONE → BuildAnswerTxRound
+        - mech_requests -> DONE -> FinishedWithMechRequestRound
+        - evaluation_result -> NONE -> BuildAnswerTxRound
         """
         if self.threshold_reached:
             values = dict(zip(self.selection_key, self.most_voted_payload_values))
@@ -175,29 +174,17 @@ class BuildAnswerTxRound(CollectSameUntilThresholdRound):
     )
 
 
-class CleanupTrackedMarketsRound(CollectSameUntilThresholdRound):
-    """Round to purge finalized questions from the database."""
-
-    payload_class = CleanupTrackedMarketsPayload
-    synchronized_data_class = SynchronizedData
-    done_event = Event.DONE
-    none_event = Event.NONE
-    no_majority_event = Event.NO_MAJORITY
-    collection_key = "participant_to_cleanup"
-    selection_key = ("n_cleaned",)
-
-
 class PostTransactionRound(CollectSameUntilThresholdRound):
     """Route after TxSettlement based on which tx was submitted.
 
     Custom end_block checks the payload content to emit the right event:
-    - MECH_REQUEST_DONE → MechResponseRound (poll for Mech delivery)
-    - ANSWER_TX_DONE → CleanupTrackedMarketsRound
-    - FUNDS_FORWARDER_TX_DONE → FpmmRemoveLiquidityRound (enter recovery chain)
-    - FPMM_REMOVE_LIQUIDITY_TX_DONE → CtRedeemTokensRound (next chain step)
-    - CT_REDEEM_TOKENS_TX_DONE → RealitioWithdrawBondsRound (next chain step)
-    - REALITIO_WITHDRAW_BONDS_TX_DONE → ScanMarketsRound (chain complete)
-    - ERROR / anything else → CleanupTrackedMarketsRound
+    - MECH_REQUEST_DONE -> MechResponseRound (poll for Mech delivery)
+    - ANSWER_TX_DONE -> FinishedResolutionRound
+    - FUNDS_FORWARDER_TX_DONE -> FpmmRemoveLiquidityRound (enter recovery chain)
+    - FPMM_REMOVE_LIQUIDITY_TX_DONE -> CtRedeemTokensRound (next chain step)
+    - CT_REDEEM_TOKENS_TX_DONE -> RealitioWithdrawBondsRound (next chain step)
+    - REALITIO_WITHDRAW_BONDS_TX_DONE -> ScanMarketsRound (chain complete)
+    - ERROR / anything else -> FinishedResolutionRound
     """
 
     MECH_REQUEST_DONE_PAYLOAD = "MECH_REQUEST_DONE"
@@ -278,48 +265,43 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
 
     Initial round: ScanMarketsRound
 
-    Initial states: {BuildAnswerTxRound, CleanupTrackedMarketsRound, PostTransactionRound, ScanMarketsRound}
+    Initial states: {BuildAnswerTxRound, PostTransactionRound, ScanMarketsRound}
 
     Transition states:
         0. ScanMarketsRound
             - done: 1.
-            - none: 4.
+            - none: 7.
             - no majority: 0.
             - round timeout: 0.
         1. EvaluateAnswersRound
-            - done: 5.
-            - none: 2.
-            - no majority: 4.
-            - round timeout: 4.
-        2. BuildAnswerTxRound
-            - done: 7.
-            - none: 4.
-            - no majority: 4.
-            - round timeout: 4.
-        3. PostTransactionRound
-            - mech request done: 6.
-            - answer tx done: 4.
-            - funds forwarder tx done: 9.
-            - fpmm remove liquidity tx done: 10.
-            - ct redeem tokens tx done: 11.
-            - realitio withdraw bonds tx done: 12.
             - done: 4.
-            - none: 4.
-            - no majority: 4.
-            - round timeout: 4.
-        4. CleanupTrackedMarketsRound
-            - done: 8.
-            - none: 8.
-            - no majority: 8.
-            - round timeout: 8.
-        5. FinishedWithMechRequestRound
-        6. FinishedWithMechPollRound
-        7. FinishedWithAnswerTxRound
-        8. FinishedResolutionRound
-        9. FinishedWithFundsForwarderPostTxRound
-        10. FinishedWithFpmmRemoveLiquidityPostTxRound
-        11. FinishedWithCtRedeemTokensPostTxRound
-        12. FinishedWithRealitioWithdrawBondsPostTxRound
+            - none: 2.
+            - no majority: 7.
+            - round timeout: 7.
+        2. BuildAnswerTxRound
+            - done: 6.
+            - none: 7.
+            - no majority: 7.
+            - round timeout: 7.
+        3. PostTransactionRound
+            - mech request done: 5.
+            - answer tx done: 7.
+            - funds forwarder tx done: 8.
+            - fpmm remove liquidity tx done: 9.
+            - ct redeem tokens tx done: 10.
+            - realitio withdraw bonds tx done: 11.
+            - done: 7.
+            - none: 7.
+            - no majority: 7.
+            - round timeout: 7.
+        4. FinishedWithMechRequestRound
+        5. FinishedWithMechPollRound
+        6. FinishedWithAnswerTxRound
+        7. FinishedResolutionRound
+        8. FinishedWithFundsForwarderPostTxRound
+        9. FinishedWithFpmmRemoveLiquidityPostTxRound
+        10. FinishedWithCtRedeemTokensPostTxRound
+        11. FinishedWithRealitioWithdrawBondsPostTxRound
 
     Final states: {FinishedResolutionRound, FinishedWithAnswerTxRound, FinishedWithCtRedeemTokensPostTxRound, FinishedWithFpmmRemoveLiquidityPostTxRound, FinishedWithFundsForwarderPostTxRound, FinishedWithMechPollRound, FinishedWithMechRequestRound, FinishedWithRealitioWithdrawBondsPostTxRound}
 
@@ -331,41 +313,34 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
     initial_states: Set[AppState] = {
         ScanMarketsRound,
         BuildAnswerTxRound,
-        CleanupTrackedMarketsRound,
         PostTransactionRound,
     }
     transition_function: AbciAppTransitionFunction = {
         ScanMarketsRound: {
             Event.DONE: EvaluateAnswersRound,
-            Event.NONE: CleanupTrackedMarketsRound,
+            Event.NONE: FinishedResolutionRound,
             Event.NO_MAJORITY: ScanMarketsRound,
             Event.ROUND_TIMEOUT: ScanMarketsRound,
         },
         EvaluateAnswersRound: {
             Event.DONE: FinishedWithMechRequestRound,
             Event.NONE: BuildAnswerTxRound,
-            Event.NO_MAJORITY: CleanupTrackedMarketsRound,
-            Event.ROUND_TIMEOUT: CleanupTrackedMarketsRound,
+            Event.NO_MAJORITY: FinishedResolutionRound,
+            Event.ROUND_TIMEOUT: FinishedResolutionRound,
         },
         BuildAnswerTxRound: {
             Event.DONE: FinishedWithAnswerTxRound,
-            Event.NONE: CleanupTrackedMarketsRound,
-            Event.NO_MAJORITY: CleanupTrackedMarketsRound,
-            Event.ROUND_TIMEOUT: CleanupTrackedMarketsRound,
+            Event.NONE: FinishedResolutionRound,
+            Event.NO_MAJORITY: FinishedResolutionRound,
+            Event.ROUND_TIMEOUT: FinishedResolutionRound,
         },
         PostTransactionRound: {
             Event.MECH_REQUEST_DONE: FinishedWithMechPollRound,
-            Event.ANSWER_TX_DONE: CleanupTrackedMarketsRound,
+            Event.ANSWER_TX_DONE: FinishedResolutionRound,
             Event.FUNDS_FORWARDER_TX_DONE: FinishedWithFundsForwarderPostTxRound,
             Event.FPMM_REMOVE_LIQUIDITY_TX_DONE: FinishedWithFpmmRemoveLiquidityPostTxRound,
             Event.CT_REDEEM_TOKENS_TX_DONE: FinishedWithCtRedeemTokensPostTxRound,
             Event.REALITIO_WITHDRAW_BONDS_TX_DONE: FinishedWithRealitioWithdrawBondsPostTxRound,
-            Event.DONE: CleanupTrackedMarketsRound,
-            Event.NONE: CleanupTrackedMarketsRound,
-            Event.NO_MAJORITY: CleanupTrackedMarketsRound,
-            Event.ROUND_TIMEOUT: CleanupTrackedMarketsRound,
-        },
-        CleanupTrackedMarketsRound: {
             Event.DONE: FinishedResolutionRound,
             Event.NONE: FinishedResolutionRound,
             Event.NO_MAJORITY: FinishedResolutionRound,
@@ -397,7 +372,6 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
     db_pre_conditions: Dict[AppState, Set[str]] = {
         ScanMarketsRound: set(),
         BuildAnswerTxRound: set(),
-        CleanupTrackedMarketsRound: set(),
         PostTransactionRound: set(),
     }
     db_post_conditions: Dict[AppState, Set[str]] = {

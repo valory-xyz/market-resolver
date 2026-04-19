@@ -22,12 +22,10 @@ final_states:
 label: MarketResolutionManagerAbciApp
 start_states:
 - BuildAnswerTxRound
-- CleanupTrackedMarketsRound
 - PostTransactionRound
 - ScanMarketsRound
 states:
 - BuildAnswerTxRound
-- CleanupTrackedMarketsRound
 - EvaluateAnswersRound
 - FinishedResolutionRound
 - FinishedWithAnswerTxRound
@@ -41,28 +39,24 @@ states:
 - ScanMarketsRound
 transition_func:
     (BuildAnswerTxRound, DONE): FinishedWithAnswerTxRound
-    (BuildAnswerTxRound, NONE): CleanupTrackedMarketsRound
-    (BuildAnswerTxRound, NO_MAJORITY): CleanupTrackedMarketsRound
-    (BuildAnswerTxRound, ROUND_TIMEOUT): CleanupTrackedMarketsRound
-    (CleanupTrackedMarketsRound, DONE): FinishedResolutionRound
-    (CleanupTrackedMarketsRound, NONE): FinishedResolutionRound
-    (CleanupTrackedMarketsRound, NO_MAJORITY): FinishedResolutionRound
-    (CleanupTrackedMarketsRound, ROUND_TIMEOUT): FinishedResolutionRound
+    (BuildAnswerTxRound, NONE): FinishedResolutionRound
+    (BuildAnswerTxRound, NO_MAJORITY): FinishedResolutionRound
+    (BuildAnswerTxRound, ROUND_TIMEOUT): FinishedResolutionRound
     (EvaluateAnswersRound, DONE): FinishedWithMechRequestRound
     (EvaluateAnswersRound, NONE): BuildAnswerTxRound
-    (EvaluateAnswersRound, NO_MAJORITY): CleanupTrackedMarketsRound
-    (EvaluateAnswersRound, ROUND_TIMEOUT): CleanupTrackedMarketsRound
-    (PostTransactionRound, ANSWER_TX_DONE): CleanupTrackedMarketsRound
+    (EvaluateAnswersRound, NO_MAJORITY): FinishedResolutionRound
+    (EvaluateAnswersRound, ROUND_TIMEOUT): FinishedResolutionRound
+    (PostTransactionRound, ANSWER_TX_DONE): FinishedResolutionRound
     (PostTransactionRound, CT_REDEEM_TOKENS_TX_DONE): FinishedWithCtRedeemTokensPostTxRound
-    (PostTransactionRound, DONE): CleanupTrackedMarketsRound
+    (PostTransactionRound, DONE): FinishedResolutionRound
     (PostTransactionRound, FPMM_REMOVE_LIQUIDITY_TX_DONE): FinishedWithFpmmRemoveLiquidityPostTxRound
     (PostTransactionRound, FUNDS_FORWARDER_TX_DONE): FinishedWithFundsForwarderPostTxRound
     (PostTransactionRound, MECH_REQUEST_DONE): FinishedWithMechPollRound
-    (PostTransactionRound, NONE): CleanupTrackedMarketsRound
-    (PostTransactionRound, NO_MAJORITY): CleanupTrackedMarketsRound
+    (PostTransactionRound, NONE): FinishedResolutionRound
+    (PostTransactionRound, NO_MAJORITY): FinishedResolutionRound
     (PostTransactionRound, REALITIO_WITHDRAW_BONDS_TX_DONE): FinishedWithRealitioWithdrawBondsPostTxRound
-    (PostTransactionRound, ROUND_TIMEOUT): CleanupTrackedMarketsRound
+    (PostTransactionRound, ROUND_TIMEOUT): FinishedResolutionRound
     (ScanMarketsRound, DONE): EvaluateAnswersRound
-    (ScanMarketsRound, NONE): CleanupTrackedMarketsRound
+    (ScanMarketsRound, NONE): FinishedResolutionRound
     (ScanMarketsRound, NO_MAJORITY): ScanMarketsRound
     (ScanMarketsRound, ROUND_TIMEOUT): ScanMarketsRound

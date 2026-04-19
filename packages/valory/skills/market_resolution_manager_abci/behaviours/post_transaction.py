@@ -70,7 +70,7 @@ class PostTransactionBehaviour(MarketResolutionManagerBaseBehaviour):
         elif tx_submitter == RealitioWithdrawBondsRound.auto_round_id():
             content = PostTransactionRound.REALITIO_WITHDRAW_BONDS_TX_DONE_PAYLOAD
         else:
-            # Unknown tx submitter — fall through to cleanup to avoid a stuck FSM.
+            # Unknown tx submitter -- fall through to cleanup to avoid a stuck FSM.
             content = PostTransactionRound.ANSWER_TX_DONE_PAYLOAD
 
         sender = self.context.agent_address

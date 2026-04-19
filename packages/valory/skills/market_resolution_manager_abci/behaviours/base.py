@@ -38,6 +38,7 @@ HTTP_OK = 200
 # Realitio answer encoding (outcome index for binary Yes/No markets).
 ANSWER_YES = "0x0000000000000000000000000000000000000000000000000000000000000000"
 ANSWER_NO = "0x0000000000000000000000000000000000000000000000000000000000000001"
+ANSWER_INVALID = "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
 
 # GraphQL query template: prior Mech requests from our Safe for a given
 # prompt, scoped to blocks after the market closed (openingTimestamp).
@@ -73,24 +74,21 @@ MECH_CACHE_QUERY_TEMPLATE = """
 """
 
 
-def parse_mech_response(result: Optional[str]) -> Optional[dict]:
-    """Parse a resolve-market-jury-v1 Mech result into an evaluation dict.
+def parse_mech_response(  # pylint: disable=too-many-return-statements
+    result: Optional[str],
+) -> Optional[dict]:
+    """Parse a resolve-market-jury-v1 Mech result with strict pattern matching.
 
-    Expected result JSON schema::
+    Only four exact ``(is_valid, is_determinable, has_occurred)`` patterns
+    are recognised:
 
-        {
-            "is_valid": true/false,
-            "is_determinable": true/false,
-            "has_occurred": true/false/null,
-            "votes": [...],
-            "judge_reasoning": "...",
-            "agreement_ratio": 0.0-1.0
-        }
+    - **Case A** ``(False, None, None)`` -> market is invalid, answer=INVALID
+    - **Case B** ``(True, False, None)`` -> undeterminable, answer=None (retry)
+    - **Case C1** ``(True, True, True)`` -> answer=YES
+    - **Case C2** ``(True, True, False)`` -> answer=NO
 
-    :param result: raw string (JSON) returned by the Mech tool, or None.
-    :return: evaluation dict (with "answer" set to the Realitio-encoded hex
-        for determinable results, or None for undeterminable/invalid), or
-        None if the payload is absent or unparseable.
+    Any other combination is garbage (e.g. API errors returning
+    ``(False, False, None)``) and returns ``None`` so callers retry.
     """
     if result is None:
         return None
@@ -99,15 +97,15 @@ def parse_mech_response(result: Optional[str]) -> Optional[dict]:
     except (json.JSONDecodeError, TypeError):
         return None
 
-    is_valid = data.get("is_valid", False)
-    is_determinable = data.get("is_determinable", False)
+    is_valid = data.get("is_valid")
+    is_determinable = data.get("is_determinable")
     has_occurred = data.get("has_occurred")
     agreement_ratio = float(data.get("agreement_ratio", 0.0))
     reasoning = data.get("judge_reasoning", "")
 
-    if not is_valid or not is_determinable or has_occurred is None:
+    def _make(answer: Optional[str]) -> dict:
         return {
-            "answer": None,
+            "answer": answer,
             "has_occurred": has_occurred,
             "is_valid": is_valid,
             "is_determinable": is_determinable,
@@ -116,35 +114,37 @@ def parse_mech_response(result: Optional[str]) -> Optional[dict]:
             "reasoning": reasoning,
         }
 
-    mech_answer = ANSWER_YES if has_occurred else ANSWER_NO
+    # Case A: question is invalid -> submit INVALID answer
+    if is_valid is False and is_determinable is None and has_occurred is None:
+        return _make(ANSWER_INVALID)
 
-    return {
-        "answer": mech_answer,
-        "has_occurred": has_occurred,
-        "is_valid": is_valid,
-        "is_determinable": is_determinable,
-        "agreement_ratio": agreement_ratio,
-        "agrees_with_on_chain": None,
-        "reasoning": reasoning,
-    }
+    # Cases B, C1, C2 require is_valid=True
+    if is_valid is not True:
+        return None  # garbage
+
+    # Case B: undeterminable -> retry later
+    if is_determinable is False:
+        return _make(None)
+
+    # Case C1 / C2: determined
+    if is_determinable is True and has_occurred is True:
+        return _make(ANSWER_YES)
+    if is_determinable is True and has_occurred is False:
+        return _make(ANSWER_NO)
+
+    # Anything else (e.g. is_determinable=True but has_occurred=None)
+    return None
 
 
 def is_cached_evaluation_valid(evaluation: Optional[dict]) -> bool:
-    """Return True if a cached evaluation is definitive (determinable).
+    """Return True if a cached evaluation has a definitive answer.
 
-    A "valid" cached evaluation blocks a fresh Mech request. Undeterminable
-    or invalid cached evaluations are stored but do not block new calls.
-
-    :param evaluation: the evaluation dict produced by parse_mech_response.
-    :return: True if the evaluation is determinable and actionable.
+    Cases A (INVALID), C1 (YES), C2 (NO) have answer set and are cacheable.
+    Case B (undeterminable, answer=None) and garbage (None) are not.
     """
     if evaluation is None:
         return False
-    return bool(
-        evaluation.get("is_valid")
-        and evaluation.get("is_determinable")
-        and evaluation.get("has_occurred") is not None
-    )
+    return evaluation.get("answer") is not None
 
 
 def to_content(query: str) -> bytes:

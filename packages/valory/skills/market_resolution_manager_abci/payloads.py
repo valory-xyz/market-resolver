@@ -59,10 +59,3 @@ class PostTransactionPayload(BaseTxPayload):
     """Payload for the PostTransactionRound."""
 
     content: str = ""
-
-
-@dataclass(frozen=True)
-class CleanupTrackedMarketsPayload(BaseTxPayload):
-    """Payload for the CleanupTrackedMarketsRound."""
-
-    n_cleaned: Optional[int] = None

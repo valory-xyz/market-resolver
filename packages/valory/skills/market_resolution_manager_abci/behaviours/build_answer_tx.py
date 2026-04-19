@@ -96,7 +96,7 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
 
         # Check if we have fresh Mech responses (from MechInteract).
         # Skip if the evaluation was already populated by the subgraph
-        # cache path — MechInteract didn't run in that case.
+        # cache path -- MechInteract didn't run in that case.
         expected_nonce = (entry.get("mech_request") or {}).get("nonce")
         if entry.get("evaluation") is None and expected_nonce:
             mech_responses = self.synchronized_data.mech_responses
@@ -132,67 +132,62 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
             self.questions_db = questions_db
 
         evaluation = entry.get("evaluation")
+        now = int(self.last_synced_timestamp)
+        cooldown = self.params.mech_retry_cooldown
+
+        # No usable evaluation -- either no Mech response yet, or the
+        # response was garbage (parse_mech_response returned None).
+        # When we just processed a garbage response (expected_nonce was
+        # present), apply a retry cooldown so we don't hammer Mech.
         if evaluation is None:
-            self.context.logger.info(
-                f"Market {market_id}: no evaluation data available."
-            )
+            if expected_nonce:
+                retry_after = now + cooldown
+                entry["retry_after"] = retry_after
+                questions_db[market_id] = entry
+                self.questions_db = questions_db
+                self.context.logger.info(
+                    f"Market {market_id}: Mech returned garbage. "
+                    f"Retry after {retry_after} ({cooldown}s cooldown)."
+                )
+            else:
+                self.context.logger.info(
+                    f"Market {market_id}: no evaluation data available."
+                )
             yield from self._send_payload(None)
             return
 
-        is_valid = evaluation.get("is_valid", True)
-        is_determinable = evaluation.get("is_determinable", False)
-        has_occurred = evaluation.get("has_occurred")
+        mech_answer = evaluation.get("answer")
         on_chain_answer = entry.get("on_chain_answer")
 
-        # Not determinable -- set retry cooldown based on context
-        if not is_determinable:
+        # Case B (undeterminable): answer=None -- set retry cooldown
+        if mech_answer is None:
             on_chain_bond = int(entry.get("on_chain_bond") or 0)
             timeout = int(entry.get("realitio_timeout", 86400))
             last_answer_ts = int(entry.get("last_answer_timestamp") or 0)
-            now = int(self.last_synced_timestamp)
 
             if on_chain_bond > 0 and last_answer_ts > 0:
-                # Untrusted answer exists -- retry before finalization
                 finalization = last_answer_ts + timeout
                 retry_buffer = int(timeout * self.params.challenge_cooldown_fraction)
-                retry_after = max(now, finalization - retry_buffer)
+                # Minimum cooldown floor: never less than mech_retry_cooldown,
+                # even close to finalization, to avoid tight retry loops.
+                retry_after = max(
+                    now + cooldown,
+                    finalization - retry_buffer,
+                )
                 self.context.logger.info(
-                    f"Market {market_id}: not determinable, untrusted answer "
-                    f"present. Retry after {retry_after} "
-                    f"({retry_buffer}s before finalization)."
+                    f"Market {market_id}: undeterminable, untrusted answer "
+                    f"present. Retry after {retry_after}."
                 )
             else:
-                # Unanswered -- retry after 24h
                 retry_after = now + 86400
                 self.context.logger.info(
-                    f"Market {market_id}: not determinable, no answer yet. "
+                    f"Market {market_id}: undeterminable, no answer yet. "
                     f"Retry after {retry_after} (24h)."
                 )
 
             entry["retry_after"] = retry_after
-            # Keep original status (NEEDS_ANSWER or NEEDS_VERIFICATION)
-            if entry["status"] not in (
-                AnswerStatus.NEEDS_ANSWER,
-                AnswerStatus.NEEDS_VERIFICATION,
-            ):
-                entry["status"] = AnswerStatus.NEEDS_VERIFICATION
             questions_db[market_id] = entry
             self.questions_db = questions_db
-            yield from self._send_payload(None)
-            return
-
-        # Determine our answer
-        if not is_valid:
-            mech_answer = ANSWER_INVALID
-        elif has_occurred is True:
-            mech_answer = ANSWER_YES
-        elif has_occurred is False:
-            mech_answer = ANSWER_NO
-        else:
-            self.context.logger.info(
-                f"Market {market_id}: Mech returned determinable but "
-                f"has_occurred is None. Skipping."
-            )
             yield from self._send_payload(None)
             return
 
@@ -259,10 +254,30 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
             action = "CHALLENGE"
 
         if required_bond > self.params.max_challenge_bond:
-            self.context.logger.warning(
-                f"Market {market_id}: required bond ({required_bond}) "
-                f"exceeds max ({self.params.max_challenge_bond})."
+            self.context.logger.info(
+                f"Market {market_id}: required bond "
+                f"{required_bond / 10**18:.1f} xDAI exceeds max "
+                f"{self.params.max_challenge_bond / 10**18:.1f} xDAI. "
+                f"Evaluation cached, skipping tx."
             )
+            questions_db[market_id] = entry
+            self.questions_db = questions_db
+            yield from self._send_payload(None)
+            return
+
+        safe_address = self.synchronized_data.safe_contract_address
+        safe_balance = yield from self.get_native_balance(safe_address)
+        if safe_balance is None:
+            safe_balance = 0
+        if required_bond > safe_balance:
+            self.context.logger.info(
+                f"Market {market_id}: required bond "
+                f"{required_bond / 10**18:.1f} xDAI exceeds safe balance "
+                f"{safe_balance / 10**18:.1f} xDAI. "
+                f"Evaluation cached, skipping tx."
+            )
+            questions_db[market_id] = entry
+            self.questions_db = questions_db
             yield from self._send_payload(None)
             return
 

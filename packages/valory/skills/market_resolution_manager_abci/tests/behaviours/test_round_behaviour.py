@@ -17,14 +17,8 @@
 #
 # ------------------------------------------------------------------------------
 
-"""This module contains the round behaviour for the market resolution manager."""
+"""Tests for behaviours/round_behaviour.py."""
 
-from typing import Set, Type
-
-from packages.valory.skills.abstract_round_abci.behaviours import (
-    AbstractRoundBehaviour,
-    BaseBehaviour,
-)
 from packages.valory.skills.market_resolution_manager_abci.behaviours.build_answer_tx import (
     BuildAnswerTxBehaviour,
 )
@@ -34,6 +28,9 @@ from packages.valory.skills.market_resolution_manager_abci.behaviours.evaluate_a
 from packages.valory.skills.market_resolution_manager_abci.behaviours.post_transaction import (
     PostTransactionBehaviour,
 )
+from packages.valory.skills.market_resolution_manager_abci.behaviours.round_behaviour import (
+    MarketResolutionManagerRoundBehaviour,
+)
 from packages.valory.skills.market_resolution_manager_abci.behaviours.scan_markets import (
     ScanMarketsBehaviour,
 )
@@ -42,14 +39,27 @@ from packages.valory.skills.market_resolution_manager_abci.rounds import (
 )
 
 
-class MarketResolutionManagerRoundBehaviour(AbstractRoundBehaviour):
-    """This behaviour manages the consensus stages for market resolution."""
+class TestMarketResolutionManagerRoundBehaviour:
+    """Tests for MarketResolutionManagerRoundBehaviour."""
 
-    initial_behaviour_cls = ScanMarketsBehaviour
-    abci_app_cls = MarketResolutionManagerAbciApp  # type: ignore
-    behaviours: Set[Type[BaseBehaviour]] = {
-        ScanMarketsBehaviour,
-        EvaluateAnswersBehaviour,
-        BuildAnswerTxBehaviour,
-        PostTransactionBehaviour,
-    }
+    def test_initial_behaviour_is_scan_markets(self) -> None:
+        """Initial behaviour is ScanMarketsBehaviour."""
+        assert (
+            MarketResolutionManagerRoundBehaviour.initial_behaviour_cls
+            is ScanMarketsBehaviour
+        )
+
+    def test_abci_app_cls(self) -> None:
+        """abci_app_cls is MarketResolutionManagerAbciApp."""
+        assert (
+            MarketResolutionManagerRoundBehaviour.abci_app_cls
+            is MarketResolutionManagerAbciApp
+        )
+
+    def test_all_behaviours_registered(self) -> None:
+        """All four behaviour classes are in the behaviours set."""
+        behaviours = MarketResolutionManagerRoundBehaviour.behaviours
+        assert ScanMarketsBehaviour in behaviours
+        assert EvaluateAnswersBehaviour in behaviours
+        assert BuildAnswerTxBehaviour in behaviours
+        assert PostTransactionBehaviour in behaviours
