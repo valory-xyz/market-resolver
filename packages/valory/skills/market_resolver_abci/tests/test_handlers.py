@@ -121,8 +121,10 @@ class TestGetHandler:
     def test_unknown_host_returns_none(self) -> None:
         """URL not matching any known host returns None."""
         handler = _make_handler()
+        # "unknown-host.test" contains none of the whitelisted tokens
+        # (example.com, localhost, 127.0.0.1, 0.0.0.0, or a Propel subdomain).
         func, kwargs = handler._get_handler(
-            "http://evil.example.com/healthcheck", "get"
+            "http://unknown-host.test/healthcheck", "get"
         )
         assert func is None
 
@@ -158,7 +160,7 @@ class TestHandleMethod:
     def test_url_not_matching_calls_super(self) -> None:
         """URL not matching handler regex calls super().handle."""
         handler = _make_handler()
-        msg = _make_http_message(url="http://evil.example.com/healthcheck")
+        msg = _make_http_message(url="http://unknown-host.test/healthcheck")
 
         with patch.object(type(handler).__bases__[0], "handle") as mock_super:
             handler.handle(msg)
@@ -166,24 +168,24 @@ class TestHandleMethod:
 
     def test_valid_request_dispatches_to_handler(self) -> None:
         """Valid request dispatches to the matched route handler."""
-        handler = _make_handler()
         msg = _make_http_message(url="http://localhost:8000/healthcheck", method="get")
 
-        # Set up a mock dialogue
-        mock_dialogue = MagicMock()
-        handler.context.http_dialogues.update.return_value = mock_dialogue
-
-        with patch.object(handler, "_handle_get_health") as mock_health:
+        # Patch the CLASS method before handler.setup() runs, so the
+        # route table stores a reference to the patched callable.
+        with patch.object(HttpHandler, "_handle_get_health") as mock_health:
+            handler = _make_handler()
+            mock_dialogue = MagicMock()
+            handler.context.http_dialogues.update.return_value = mock_dialogue
             handler.handle(msg)
             mock_health.assert_called_once()
 
     def test_invalid_dialogue_returns_early(self) -> None:
         """None dialogue returns without calling handler."""
-        handler = _make_handler()
         msg = _make_http_message(url="http://localhost:8000/healthcheck", method="get")
-        handler.context.http_dialogues.update.return_value = None
 
-        with patch.object(handler, "_handle_get_health") as mock_health:
+        with patch.object(HttpHandler, "_handle_get_health") as mock_health:
+            handler = _make_handler()
+            handler.context.http_dialogues.update.return_value = None
             handler.handle(msg)
             mock_health.assert_not_called()
 
@@ -250,6 +252,9 @@ class TestHandleGetHealth:
         round_sequence.block_stall_deadline_expired = block_stall
         round_sequence.latest_synchronized_data = MagicMock()
         round_sequence.latest_synchronized_data.db = MagicMock()
+        # SynchronizedData.period_count reads db.reset_index -- force an int
+        # so the health payload is JSON-serializable.
+        round_sequence.latest_synchronized_data.db.reset_index = 0
 
         if has_abci_app:
             round_sequence._abci_app = MagicMock()
