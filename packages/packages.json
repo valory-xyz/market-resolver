@@ -1,9 +1,9 @@
 {
     "dev": {
-        "skill/valory/market_resolution_manager_abci/0.1.0": "bafybeifs3g5focv5co326cnv2znqg57gp7cbbmoqocyrvnu4geplj7zjje",
-        "skill/valory/market_resolver_abci/0.1.0": "bafybeidqneblcaspvlyh2nxzz4nxwfky23vjul774ujsmruuzu72qge5fq",
-        "agent/valory/market_resolver/0.1.0": "bafybeiatdg7lgdspu2r2pksphl7sghix6j7cecyrs2a5pazayzhjriobsq",
-        "service/valory/market_resolver/0.1.0": "bafybeic44czqvstvfxiw62la46ybw2lmpwc4pay5dv53wxisq72nhludfm"
+        "skill/valory/market_resolution_manager_abci/0.1.0": "bafybeih4fcx5v45fkluf3z7ecyyeaxikyrhyuykkoqugnbwqz66mmgcpce",
+        "skill/valory/market_resolver_abci/0.1.0": "bafybeigrfghsrcpyxmul2xjgewfzropnq32a6dmp5u4oi45kmej273cjce",
+        "agent/valory/market_resolver/0.1.0": "bafybeifd4rpciq6orw525wcouw27bbmdsrx4zgw52rjjyn3cyqa464duza",
+        "service/valory/market_resolver/0.1.0": "bafybeic7q3wn6hozhbqfrvuhxon7qqnh4qihhyxxinap3dl6ouifpkx4su"
     },
     "third_party": {
         "protocol/valory/contract_api/1.0.0": "bafybeibld2xb5m7kyluiptkamp4nrt6oeomkohz7a3yppbv2oo7qw2e4la",
@@ -57,8 +57,8 @@
         "skill/valory/termination_abci/0.1.0": "bafybeia33hlouukdpwaxctunauudv5gpfdxndimra7yqiof4a3skcwdqkq",
         "skill/valory/identify_service_owner_abci/0.1.0": "bafybeihj2q3kf5zfhqvpayvbis4uxpe45smnzdkdvmdwxya2oe4kfc5qam",
         "skill/valory/funds_forwarder_abci/0.1.0": "bafybeid6yc7ld64oenx3ttbxahno6qcqk6fqffqrnl3d3ftwapkwqqvexq",
-        "skill/valory/omen_ct_redeem_tokens_abci/0.1.0": "bafybeihwpocfw2gftuwpoousnd24px5atw45l5wtevpy52houbb4hguktu",
-        "skill/valory/omen_fpmm_remove_liquidity_abci/0.1.0": "bafybeib6igxyg73c7263y7mrxkquqk3czazcpu2e2tg42ej2sui5wqu3t4",
-        "skill/valory/omen_realitio_withdraw_bonds_abci/0.1.0": "bafybeifznhshkrgh3kvfznemlskkcw7zioennqvoqihyjg6iny5lysoxk4"
+        "skill/valory/omen_ct_redeem_tokens_abci/0.1.0": "bafybeidgprbwav2ry4nkyadda3e2qjdotpgrlacihevhqb6xvk357kvc7q",
+        "skill/valory/omen_fpmm_remove_liquidity_abci/0.1.0": "bafybeifpecbnemklo7hreul4ecakevzcz3v4xdgqg27bacan2fjrez5omy",
+        "skill/valory/omen_realitio_withdraw_bonds_abci/0.1.0": "bafybeid5krli6yaaesbnhg43u3hvob4me2as5jf2c3ooxavhjbov2w3c3m"
     }
 }

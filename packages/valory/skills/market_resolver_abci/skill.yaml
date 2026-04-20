@@ -35,11 +35,11 @@ skills:
 - valory/transaction_settlement_abci:0.1.0:bafybeiajyrszyyo6z4lxogutv4ougiaeoxak6xkq5gtrbey32gbgnirznq
 - valory/identify_service_owner_abci:0.1.0:bafybeihj2q3kf5zfhqvpayvbis4uxpe45smnzdkdvmdwxya2oe4kfc5qam
 - valory/funds_forwarder_abci:0.1.0:bafybeid6yc7ld64oenx3ttbxahno6qcqk6fqffqrnl3d3ftwapkwqqvexq
-- valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeihwpocfw2gftuwpoousnd24px5atw45l5wtevpy52houbb4hguktu
-- valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeib6igxyg73c7263y7mrxkquqk3czazcpu2e2tg42ej2sui5wqu3t4
-- valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeifznhshkrgh3kvfznemlskkcw7zioennqvoqihyjg6iny5lysoxk4
+- valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeidgprbwav2ry4nkyadda3e2qjdotpgrlacihevhqb6xvk357kvc7q
+- valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeifpecbnemklo7hreul4ecakevzcz3v4xdgqg27bacan2fjrez5omy
+- valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeid5krli6yaaesbnhg43u3hvob4me2as5jf2c3ooxavhjbov2w3c3m
 - valory/mech_interact_abci:0.1.0:bafybeied5l5xlygjyo3uju5bw52pidjvbkgdahhuzvahh6qis7kd3ht6ta
-- valory/market_resolution_manager_abci:0.1.0:bafybeifs3g5focv5co326cnv2znqg57gp7cbbmoqocyrvnu4geplj7zjje
+- valory/market_resolution_manager_abci:0.1.0:bafybeih4fcx5v45fkluf3z7ecyyeaxikyrhyuykkoqugnbwqz66mmgcpce
 behaviours:
   main:
     args: {}
