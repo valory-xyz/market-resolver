@@ -14,7 +14,7 @@ fingerprint:
   dialogues.py: bafybeidhc2scoo5hrmpovzoem5s36b3yas6vggkkajoijautv7g3bqaeb4
   fsm_specification.yaml: bafybeihg2yozryq6pdzu43hxl3nhitmsulevthk5v4qlyhbytt3marjar4
   handlers.py: bafybeicpi4lz6jowj3yjlp4cdhstlxl4ryql7joqiowmq4oknpnfyrd4oq
-  models.py: bafybeidok3qfy5iwoy6incrryxn566yeayzb26prs7gyajdk5jz3b54hmu
+  models.py: bafybeif3tqhuhj44mymtlnwe5qtg3ilg3qd45lxuryklyvd32m7ljchsqe
   tests/__init__.py: bafybeibb6rglfusig6k56wjqe6pofhyjt2hbknwk6culahlooxo73bx2lu
   tests/test_behaviours.py: bafybeihencjmvknad45fimyeefym5x727iodmwbv435rswbyrmv6nqm3qi
   tests/test_composition.py: bafybeia4e3ntcm3xrrezln5ke2z7m63ir34uigylytk66mlja6zjh7pb5u
@@ -35,11 +35,11 @@ skills:
 - valory/transaction_settlement_abci:0.1.0:bafybeiajyrszyyo6z4lxogutv4ougiaeoxak6xkq5gtrbey32gbgnirznq
 - valory/identify_service_owner_abci:0.1.0:bafybeihj2q3kf5zfhqvpayvbis4uxpe45smnzdkdvmdwxya2oe4kfc5qam
 - valory/funds_forwarder_abci:0.1.0:bafybeid6yc7ld64oenx3ttbxahno6qcqk6fqffqrnl3d3ftwapkwqqvexq
-- valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeieff6ju7vumtg4ovr6y2thqxjv5we4mca4ucjxqm7xqyyrekw3uw4
-- valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeibfbtuliclpudh6pjzjoygphb7rbc335fstqw2yzjarbldcoseutq
-- valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeiflqycyzizq4b4gabfxm6re5mfsoqlpfqh5nn67b5lfjz3c7rdimu
+- valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeihwpocfw2gftuwpoousnd24px5atw45l5wtevpy52houbb4hguktu
+- valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeib6igxyg73c7263y7mrxkquqk3czazcpu2e2tg42ej2sui5wqu3t4
+- valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeifznhshkrgh3kvfznemlskkcw7zioennqvoqihyjg6iny5lysoxk4
 - valory/mech_interact_abci:0.1.0:bafybeied5l5xlygjyo3uju5bw52pidjvbkgdahhuzvahh6qis7kd3ht6ta
-- valory/market_resolution_manager_abci:0.1.0:bafybeihalnags2jjvtm3ryhkaibd5ww555adprblj5tm5jpzammcm7ocgq
+- valory/market_resolution_manager_abci:0.1.0:bafybeifs3g5focv5co326cnv2znqg57gp7cbbmoqocyrvnu4geplj7zjje
 behaviours:
   main:
     args: {}
@@ -165,6 +165,7 @@ models:
       liquidity_removal_lead_time: 86400
       fpmm_remove_liquidity_batch_size: 1
       ct_redeem_tokens_batch_size: 5
+      ct_redeem_tokens_min_payout: 1
       realitio_withdraw_bonds_batch_size: 10
       min_realitio_withdraw_balance: 1000000000000000000
       watched_creator_addresses: []

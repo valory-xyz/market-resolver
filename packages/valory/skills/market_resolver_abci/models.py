@@ -21,14 +21,12 @@
 
 # pylint: disable=superfluous-parens,too-many-ancestors
 
-from typing import Any, Dict
-
 from packages.valory.skills.abstract_round_abci.models import ApiSpecs
 from packages.valory.skills.abstract_round_abci.models import (
     BenchmarkTool as BaseBenchmarkTool,
 )
 from packages.valory.skills.abstract_round_abci.models import Requests as BaseRequests
-from packages.valory.skills.abstract_round_abci.models import (
+from packages.valory.skills.market_resolution_manager_abci.models import (
     SharedState as BaseSharedState,
 )
 from packages.valory.skills.funds_forwarder_abci.models import FundsForwarderParams
@@ -113,7 +111,6 @@ class SharedState(BaseSharedState):
     """Keep the current shared state of the skill."""
 
     abci_app_cls = MarketResolverAbciApp
-    questions_db: Dict[str, Any] = {}
 
     def setup(self) -> None:
         """Set up."""

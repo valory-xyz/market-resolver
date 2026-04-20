@@ -7,7 +7,7 @@ license: Apache-2.0
 fingerprint:
   README.md: bafybeie6lb2mlmzmkycbcfma4onidhegfu4ipgpybg2av5mhfs5zx42b2m
 fingerprint_ignore_patterns: []
-agent: valory/market_resolver:0.1.0:bafybeifbexid3n6rsejzn7vjjgjoakityckle5mhbml7bxp3nozr2owgoi
+agent: valory/market_resolver:0.1.0:bafybeiatdg7lgdspu2r2pksphl7sghix6j7cecyrs2a5pazayzhjriobsq
 number_of_agents: 1
 deployment:
   agent:
@@ -94,6 +94,7 @@ models:
       liquidity_removal_lead_time: ${LIQUIDITY_REMOVAL_LEAD_TIME:int:86400}
       fpmm_remove_liquidity_batch_size: ${FPMM_REMOVE_LIQUIDITY_BATCH_SIZE:int:1}
       ct_redeem_tokens_batch_size: ${CT_REDEEM_TOKENS_BATCH_SIZE:int:5}
+      ct_redeem_tokens_min_payout: ${CT_REDEEM_TOKENS_MIN_PAYOUT:int:1}
       realitio_withdraw_bonds_batch_size: ${REALITIO_WITHDRAW_BONDS_BATCH_SIZE:int:10}
       min_realitio_withdraw_balance: ${MIN_REALITIO_WITHDRAW_BALANCE:int:1000000000000000000}
       watched_creator_addresses: ${WATCHED_CREATOR_ADDRESSES:list:["0x89c5cc945dd550BcFfb72Fe42BfF002429F46Fec","0xffc8029154ecd55abed15bd428ba596e7d23f557"]}

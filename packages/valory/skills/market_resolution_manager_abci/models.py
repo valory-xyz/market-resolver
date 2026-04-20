@@ -32,6 +32,12 @@ from packages.valory.skills.abstract_round_abci.models import (
 from packages.valory.skills.market_resolution_manager_abci.rounds import (
     MarketResolutionManagerAbciApp,
 )
+from packages.valory.skills.mech_interact_abci.models import (
+    SharedState as MechInteractSharedState,
+)
+from packages.valory.skills.omen_ct_redeem_tokens_abci.models import (
+    SharedState as CtRedeemTokensSharedState,
+)
 
 Requests = BaseRequests
 BenchmarkTool = BaseBenchmarkTool
@@ -41,7 +47,9 @@ class MechGnosisSubgraph(ApiSpecs):
     """ApiSpecs wrapper for the Mech Marketplace Gnosis subgraph."""
 
 
-class SharedState(BaseSharedState):
+class SharedState(
+    MechInteractSharedState, CtRedeemTokensSharedState, BaseSharedState
+):
     """Keep the current shared state of the skill."""
 
     abci_app_cls = MarketResolutionManagerAbciApp
