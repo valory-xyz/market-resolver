@@ -26,9 +26,6 @@ from packages.valory.skills.abstract_round_abci.models import (
     BenchmarkTool as BaseBenchmarkTool,
 )
 from packages.valory.skills.abstract_round_abci.models import Requests as BaseRequests
-from packages.valory.skills.market_resolution_manager_abci.models import (
-    SharedState as BaseSharedState,
-)
 from packages.valory.skills.funds_forwarder_abci.models import FundsForwarderParams
 from packages.valory.skills.funds_forwarder_abci.rounds import (
     Event as FundsForwarderEvent,
@@ -41,6 +38,9 @@ from packages.valory.skills.market_resolution_manager_abci.models import (
 )
 from packages.valory.skills.market_resolution_manager_abci.models import (
     MechGnosisSubgraph as BaseMechGnosisSubgraph,
+)
+from packages.valory.skills.market_resolution_manager_abci.models import (
+    SharedState as BaseSharedState,
 )
 from packages.valory.skills.market_resolution_manager_abci.rounds import (
     Event as MarketResolutionManagerEvent,

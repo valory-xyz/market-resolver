@@ -7,7 +7,7 @@ license: Apache-2.0
 fingerprint:
   README.md: bafybeie6lb2mlmzmkycbcfma4onidhegfu4ipgpybg2av5mhfs5zx42b2m
 fingerprint_ignore_patterns: []
-agent: valory/market_resolver:0.1.0:bafybeifd4rpciq6orw525wcouw27bbmdsrx4zgw52rjjyn3cyqa464duza
+agent: valory/market_resolver:0.1.0:bafybeifftxqzbrpeomyp2gxc6gfcsbdebdrf7zo2n24tyv3l4frus6vlge
 number_of_agents: 1
 deployment:
   agent:
@@ -98,7 +98,7 @@ models:
       realitio_withdraw_bonds_batch_size: ${REALITIO_WITHDRAW_BONDS_BATCH_SIZE:int:10}
       min_realitio_withdraw_balance: ${MIN_REALITIO_WITHDRAW_BALANCE:int:1000000000000000000}
       watched_creator_addresses: ${WATCHED_CREATOR_ADDRESSES:list:["0x89c5cc945dd550BcFfb72Fe42BfF002429F46Fec","0xffc8029154ecd55abed15bd428ba596e7d23f557"]}
-      trusted_addresses: ${TRUSTED_ADDRESSES:list:["0x89c5cc945dd550BcFfb72Fe42BfF002429F46Fec","0xffc8029154ecd55abed15bd428ba596e7d23f557"]}
+      trusted_addresses: ${TRUSTED_ADDRESSES:list:["0x89c5cc945dd550BcFfb72Fe42BfF002429F46Fec","0xffc8029154ecd55abed15bd428ba596e7d23f557","0x77B2d88299A40845e8FfbE9Edc4BF6e89136c60d","0xEB2A22b27C7Ad5eeE424Fd90b376c745E60f914E"]}
       mech_tool_resolve_market: ${MECH_TOOL_RESOLVE_MARKET:str:resolve-market-jury-v1}
       initial_answer_bond: ${INITIAL_ANSWER_BOND:int:5000000000000000000}
       challenge_cooldown_fraction: ${CHALLENGE_COOLDOWN_FRACTION:float:0.25}

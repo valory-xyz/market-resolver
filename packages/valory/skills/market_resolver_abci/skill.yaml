@@ -14,7 +14,7 @@ fingerprint:
   dialogues.py: bafybeidhc2scoo5hrmpovzoem5s36b3yas6vggkkajoijautv7g3bqaeb4
   fsm_specification.yaml: bafybeihg2yozryq6pdzu43hxl3nhitmsulevthk5v4qlyhbytt3marjar4
   handlers.py: bafybeicpi4lz6jowj3yjlp4cdhstlxl4ryql7joqiowmq4oknpnfyrd4oq
-  models.py: bafybeif3tqhuhj44mymtlnwe5qtg3ilg3qd45lxuryklyvd32m7ljchsqe
+  models.py: bafybeif2cdzucy4ewjcuorn35mogyfwtrz6cnb47euqyslitxnlzhwqbvu
   tests/__init__.py: bafybeibb6rglfusig6k56wjqe6pofhyjt2hbknwk6culahlooxo73bx2lu
   tests/test_behaviours.py: bafybeihencjmvknad45fimyeefym5x727iodmwbv435rswbyrmv6nqm3qi
   tests/test_composition.py: bafybeia4e3ntcm3xrrezln5ke2z7m63ir34uigylytk66mlja6zjh7pb5u
@@ -39,7 +39,7 @@ skills:
 - valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeifpecbnemklo7hreul4ecakevzcz3v4xdgqg27bacan2fjrez5omy
 - valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeid5krli6yaaesbnhg43u3hvob4me2as5jf2c3ooxavhjbov2w3c3m
 - valory/mech_interact_abci:0.1.0:bafybeied5l5xlygjyo3uju5bw52pidjvbkgdahhuzvahh6qis7kd3ht6ta
-- valory/market_resolution_manager_abci:0.1.0:bafybeih4fcx5v45fkluf3z7ecyyeaxikyrhyuykkoqugnbwqz66mmgcpce
+- valory/market_resolution_manager_abci:0.1.0:bafybeib6ksf36d7atsqa36rwqjq6qlogkuyhfe7pxkto4b4zf3rv4kp6zu
 behaviours:
   main:
     args: {}

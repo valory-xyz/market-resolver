@@ -47,9 +47,7 @@ class MechGnosisSubgraph(ApiSpecs):
     """ApiSpecs wrapper for the Mech Marketplace Gnosis subgraph."""
 
 
-class SharedState(
-    MechInteractSharedState, CtRedeemTokensSharedState, BaseSharedState
-):
+class SharedState(MechInteractSharedState, CtRedeemTokensSharedState, BaseSharedState):
     """Keep the current shared state of the skill."""
 
     abci_app_cls = MarketResolutionManagerAbciApp
