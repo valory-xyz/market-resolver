@@ -16,71 +16,43 @@ This is a sibling service to [market-creator](https://github.com/valory-xyz/mark
 
 ## Architecture
 
-The service is composed of 8 chained ABCI apps:
+Each cycle walks through a recovery chain (forward excess funds, remove
+LP, redeem CT positions, claim Realitio bonds), then the resolution
+core (scan markets, evaluate via Mech, answer or challenge), then
+pauses. Any step that needs to go on-chain routes through a shared
+`TransactionSettlement` + `PostTransaction` multiplexer.
 
 ```
 Registration
     |
-IdentifyServiceOwner -- identify the service owner for fund forwarding
+    v
+IdentifyServiceOwner
     |
-FundsForwarder -- sweep excess xDAI to service owner
+    v
++-- FundsForwarder            --+
+|                               |
++-- OmenFpmmRemoveLiquidity   --+-- recovery chain
+|                               |  (each step: tx via TxSettlement,
++-- OmenCtRedeemTokens        --+   or no-op; PostTransaction routes
+|                               |   back to the next step)
++-- OmenRealitioWithdrawBonds --+
     |
-OmenFundsRecoverer -- remove liquidity, redeem positions, claim bonds
-    |
-MarketResolutionManager -- core logic (scan, evaluate, answer/challenge)
-    |
-MechInteract -- request/receive AI evaluation from Mech marketplace
-    |
-TransactionSettlement -- submit Safe multisig transactions on-chain
-    |
-    +---> PostTransaction -- route based on tx type:
-    |         |--- Mech request tx --> MechResponse (poll for delivery)
-    |         |--- Answer/challenge tx --> Cleanup
-    |
-    +---> CleanupTrackedMarkets -- remove finalized markets from DB
-    |
-ResetAndPause -- wait 5 min, then restart cycle
-```
-
-### Core Skill: MarketResolutionManager
-
-The core FSM manages the market lifecycle:
-
-```
-ScanMarkets -- query Omen subgraph for pending + finalizing markets
-    |
-    |--- DONE (actionable market found) --> EvaluateAnswers
-    |--- NONE (nothing to do) --> Cleanup
-    |
-EvaluateAnswers -- decide: request Mech or reuse existing evaluation
-    |
-    |--- DONE (needs Mech) --> MechInteract (external)
-    |--- NONE (has evaluation) --> BuildAnswerTx (skip Mech)
-    |
-BuildAnswerTx -- build Realitio submitAnswer tx via Safe multisend
-    |
-    |--- DONE (tx built) --> TxSettlement (external)
-    |--- NONE (verified/skipped) --> Cleanup
-    |
-PostTransaction -- route after TxSettlement based on tx_submitter
-    |
-    |--- MECH_REQUEST_DONE --> MechResponse (poll for delivery)
-    |--- ANSWER_TX_DONE --> Cleanup
-    |
-CleanupTrackedMarkets -- remove finalized markets from DB
-    |
-    --> ResetAndPause
+    v
+MarketResolutionManager  --  pick one market; evaluate via MechInteract
+    |                         if needed; submit answer / challenge
+    v
+ResetAndPause  --  wait, then next cycle
 ```
 
 ### Market Status Lifecycle (AnswerStatus enum)
 
-```
-New unanswered market              --> NEEDS_ANSWER
-New market with untrusted answer   --> NEEDS_VERIFICATION
-Mech agrees with untrusted answer  --> VERIFIED (no action needed)
-Mech disagrees / answer tx built   --> TRANSACTION_PENDING
-Answered by our safe or trusted addr --> TRUSTED_ANSWER
-```
+| Status | Meaning |
+|--------|---------|
+| `NEEDS_ANSWER` | Not answered on-chain yet |
+| `NEEDS_VERIFICATION` | Answered by an untrusted party, no Mech evaluation yet |
+| `VERIFIED` | Mech agrees with the on-chain answer |
+| `TRUSTED_ANSWER` | Answered by an address in `TRUSTED_ADDRESSES` |
+| `TRANSACTION_PENDING` | Tx built / in-flight (initial answer or challenge) |
 
 ### Key Design Decisions
 
@@ -89,55 +61,51 @@ Answered by our safe or trusted addr --> TRUSTED_ANSWER
 - **Bond-based risk control** -- `max_challenge_bond` caps the maximum xDAI the agent will put up. No `max_escalation_rounds` needed.
 - **Mech reuse** -- when someone counter-challenges a market we already evaluated, the agent reuses the existing evaluation instead of making a new Mech request.
 
-## Prerequisites
+## Prepare the environment
 
-- Python 3.10-3.14
-- [Poetry](https://python-poetry.org/)
-- [tox](https://tox.wiki/)
+- System requirements:
 
-## Setup
+  - Python `>=3.10, <3.15`
+  - [Tendermint](https://docs.tendermint.com/v0.34/introduction/install.html) `==0.34.19`
+  - [uv](https://docs.astral.sh/uv/)
+  - [Docker Engine](https://docs.docker.com/engine/install/)
+  - [Docker Compose](https://docs.docker.com/compose/install/)
 
-```bash
-poetry install --no-root
-```
+Clone and install:
 
-## Development
+      git clone https://github.com/valory-xyz/market-resolver.git
 
-```bash
-# Sync third-party packages from IPFS
-autonomy init --reset --author valory --remote --ipfs --ipfs-node "/dns/registry.autonolas.tech/tcp/443/https"
-autonomy packages sync --all
+- Create development environment:
 
-# Run tests
-tox -e py3.11-linux
+      uv sync --all-groups
+      source .venv/bin/activate
 
-# Format code
-tox -e isort && tox -e black
+- Configure the Open Autonomy framework:
 
-# Lint
-tox -e flake8 && tox -e mypy && tox -e pylint
+      autonomy init --reset --author valory --remote --ipfs --ipfs-node "/dns/registry.autonolas.tech/tcp/443/https"
 
-# Verify FSM specs
-autonomy analyse fsm-specs --package packages/valory/skills/market_resolution_manager_abci
-autonomy analyse fsm-specs --package packages/valory/skills/market_resolver_abci
+- Pull packages required to run the service:
 
-# Lock package hashes
-autonomy packages lock
-```
+      autonomy packages sync --update-packages
 
 ## Configuration
 
-Key parameters (configurable via service.yaml or environment variables):
+Description of selected variables to configure the service:
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `initial_answer_bond` | 1 xDAI | Bond for first answer on unanswered markets |
-| `max_challenge_bond` | 16 xDAI | Maximum bond the agent will put up |
-| `reset_pause_duration` | 300 (5 min) | Pause between cycles |
-| `max_mech_retries` | 10 | Max Mech requests per market |
-| `mech_tool_resolve_market` | resolve-market-jury-v1 | Mech tool for evaluation |
-| `watched_creator_addresses` | [] | Market creators to monitor |
-| `trusted_addresses` | [] | Answerers whose answers we trust |
+| Variable | Default | Description |
+|------|---------|-------------|
+| `ALL_PARTICIPANTS` | `["0x0000000000000000000000000000000000000000"]` | List of agent EOAs in the service. |
+| `CT_SUBGRAPH_URL` | `https://gateway.thegraph.com/api/api-key/subgraphs/id/7s9rGBffUTL8kDZuxvvpuc46v44iuDarbrADBFw5uVp2` | Conditional Tokens subgraph. |
+| `EXPECTED_SERVICE_OWNER_ADDRESS` | `0x0000000000000000000000000000000000000000` | Address used by `IdentifyServiceOwner` to verify the fund-forwarder target. |
+| `GNOSIS_LEDGER_RPC` | `https://rpc.gnosischain.com` | Gnosis Chain RPC endpoint. The public default is rate-limited; use a private RPC in production. |
+| `INITIAL_ANSWER_BOND` | `10000000000000000` (0.01 xDAI) | Bond for the first answer on an unanswered market. Realitio doubles per escalation.  |
+| `MAX_CHALLENGE_BOND` | `40000000000000000` (0.04 xDAI) | Cap on challenge escalation; agent stops bidding once the next bond would exceed this. |
+| `OMEN_SUBGRAPH_URL` | `https://gateway.thegraph.com/api/api-key/subgraphs/id/9fUVQpFwzpdWS9bq5WkAnmKbNNcoBwatMR4yZq81pbbz` | Omen subgraph. |
+| `ON_CHAIN_SERVICE_ID` | `null` | Olas registry service id. |
+| `REALITIO_SUBGRAPH_URL` | `https://gateway.thegraph.com/api/api-key/subgraphs/id/E7ymrCnNcQdAAgLbdFWzGE5mvr5Mb5T9VfT43FqA7bNh` | Realitio subgraph. |
+| `SAFE_CONTRACT_ADDRESS` | `0x0000000000000000000000000000000000000000` | Gnosis Safe multisig controlled by the agents. |
+| `TRUSTED_ADDRESSES` | `[]` (fill in) | Answerers whose answers we treat as authoritative. |
+| `WATCHED_CREATOR_ADDRESSES` | `[]` (fill in) | Market creators whose markets we scan. |
 
 ## License
 
