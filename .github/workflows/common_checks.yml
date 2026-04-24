@@ -230,3 +230,22 @@ jobs:
           flags: unittests
           name: codecov-umbrella
           fail_ci_if_error: false
+
+  all_checks_passed:
+    name: All checks passed
+    runs-on: ubuntu-24.04
+    needs:
+      - lock_check
+      - copyright_and_dependencies_check
+      - linter_checks
+      - scan
+      - test
+    if: always()
+    steps:
+      - name: Verify all required jobs succeeded
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}" == "true" ]]; then
+            echo "One or more required jobs failed, were cancelled, or were skipped"
+            exit 1
+          fi
+          echo "All required jobs passed"
