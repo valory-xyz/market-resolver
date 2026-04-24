@@ -119,10 +119,10 @@ models:
       watched_creator_addresses: []
       trusted_addresses: []
       mech_tool: resolve-market-jury-v1
-      initial_answer_bond: 10000000000000000000
+      initial_answer_bond: 10000000000000000
       challenge_cooldown_fraction: 0.25
       challenge_urgency_buffer: 3600
-      max_challenge_bond: 100000000000000000000
+      max_challenge_bond: 40000000000000000
       max_escalation_rounds: 5
       max_mech_retries: 10
       prefetch_mech_evaluations: false
