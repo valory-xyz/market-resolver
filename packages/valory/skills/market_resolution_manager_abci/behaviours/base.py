@@ -94,14 +94,15 @@ def parse_mech_response(  # pylint: disable=too-many-return-statements
         return None
     try:
         data = json.loads(result)
-    except (json.JSONDecodeError, TypeError):
+        if not isinstance(data, dict):
+            return None
+        is_valid = data.get("is_valid")
+        is_determinable = data.get("is_determinable")
+        has_occurred = data.get("has_occurred")
+        agreement_ratio = float(data.get("agreement_ratio") or 0.0)
+        reasoning = data.get("judge_reasoning", "")
+    except (json.JSONDecodeError, TypeError, ValueError):
         return None
-
-    is_valid = data.get("is_valid")
-    is_determinable = data.get("is_determinable")
-    has_occurred = data.get("has_occurred")
-    agreement_ratio = float(data.get("agreement_ratio", 0.0))
-    reasoning = data.get("judge_reasoning", "")
 
     def _make(answer: Optional[str]) -> dict:
         return {
@@ -230,7 +231,13 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
             )
             return None
 
-        return json.loads(response.body.decode())
+        try:
+            return json.loads(response.body.decode())
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            self.context.logger.error(
+                f"Omen subgraph returned 200 with non-JSON body: {exc}"
+            )
+            return None
 
     def get_mech_gnosis_subgraph_result(
         self,
@@ -260,7 +267,13 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
             )
             return None
 
-        return json.loads(response.body.decode())
+        try:
+            return json.loads(response.body.decode())
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            self.context.logger.error(
+                f"Mech Gnosis subgraph returned 200 with non-JSON body: {exc}"
+            )
+            return None
 
     def get_realitio_subgraph_result(
         self,
@@ -290,7 +303,13 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
             )
             return None
 
-        return json.loads(response.body.decode())
+        try:
+            return json.loads(response.body.decode())
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            self.context.logger.error(
+                f"Realitio subgraph returned 200 with non-JSON body: {exc}"
+            )
+            return None
 
     def find_cached_valid_mech_delivery(  # pylint: disable=too-many-locals
         self, market_id: str, entry: Dict[str, Any]

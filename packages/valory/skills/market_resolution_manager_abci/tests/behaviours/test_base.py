@@ -180,6 +180,49 @@ class TestParseMechResponse:
         assert result is not None
         assert result["reasoning"] == ""
 
+    def test_agreement_ratio_explicit_null_coerces_to_zero(self) -> None:
+        """`agreement_ratio: null` in the payload coerces to 0.0 without crashing.
+
+        `dict.get(k, 0.0)` returns `None` (not the default) when the key
+        is present with value null, which would crash `float(None)`.
+        """
+        result = parse_mech_response(
+            json.dumps(
+                {
+                    "is_valid": True,
+                    "is_determinable": True,
+                    "has_occurred": True,
+                    "agreement_ratio": None,
+                }
+            )
+        )
+        assert result is not None
+        assert result["agreement_ratio"] == 0.0
+
+    def test_non_dict_top_level_json_returns_none(self) -> None:
+        """Non-dict top-level JSON (string / list / null) returns None.
+
+        Without the isinstance guard, `data.get(...)` would raise
+        AttributeError and crash the round.
+        """
+        assert parse_mech_response(json.dumps("just a string")) is None
+        assert parse_mech_response(json.dumps([1, 2, 3])) is None
+        assert parse_mech_response(json.dumps(None)) is None
+
+    def test_non_numeric_agreement_ratio_returns_none(self) -> None:
+        """A string in `agreement_ratio` raises ValueError inside float(); catch it."""
+        result = parse_mech_response(
+            json.dumps(
+                {
+                    "is_valid": True,
+                    "is_determinable": True,
+                    "has_occurred": True,
+                    "agreement_ratio": "not-a-number",
+                }
+            )
+        )
+        assert result is None
+
 
 # ---------------------------------------------------------------------------
 # is_cached_evaluation_valid
@@ -351,6 +394,35 @@ class TestGetOmenSubgraphResult:
 
         assert result is None
 
+    def test_200_with_non_json_body_returns_none(self) -> None:
+        """200 OK with non-JSON body (e.g. CDN HTML page) returns None, no crash.
+
+        The Graph gateway occasionally serves HTML interstitials with a
+        200 response under load. The helper must not propagate
+        JSONDecodeError -- callers rely on the None contract.
+        """
+        b = _make_behaviour()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.body = b"<html><body>Cloudflare rate-limit</body></html>"
+
+        with patch.object(b, "get_http_response", new=_make_gen(mock_resp)):
+            result = _exhaust_gen(b.get_omen_subgraph_result("{ query }"))
+
+        assert result is None
+
+    def test_200_with_invalid_utf8_body_returns_none(self) -> None:
+        """200 OK with body that cannot be decoded as UTF-8 returns None."""
+        b = _make_behaviour()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.body = b"\xff\xfe\xfd\xfc"  # invalid UTF-8
+
+        with patch.object(b, "get_http_response", new=_make_gen(mock_resp)):
+            result = _exhaust_gen(b.get_omen_subgraph_result("{ query }"))
+
+        assert result is None
+
 
 class TestGetMechGnosisSubgraphResult:
     """Tests for get_mech_gnosis_subgraph_result."""
@@ -379,6 +451,18 @@ class TestGetMechGnosisSubgraphResult:
         b = _make_behaviour()
         mock_resp = MagicMock()
         mock_resp.status_code = 503
+
+        with patch.object(b, "get_http_response", new=_make_gen(mock_resp)):
+            result = _exhaust_gen(b.get_mech_gnosis_subgraph_result("{ q }"))
+
+        assert result is None
+
+    def test_200_with_non_json_body_returns_none(self) -> None:
+        """200 OK with non-JSON body returns None, no crash."""
+        b = _make_behaviour()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.body = b"<html>rate limited</html>"
 
         with patch.object(b, "get_http_response", new=_make_gen(mock_resp)):
             result = _exhaust_gen(b.get_mech_gnosis_subgraph_result("{ q }"))
@@ -416,6 +500,18 @@ class TestGetRealitioSubgraphResult:
 
         with patch.object(b, "get_http_response", new=_make_gen(mock_resp)):
             result = _exhaust_gen(b.get_realitio_subgraph_result("{ q }"))
+        assert result is None
+
+    def test_200_with_non_json_body_returns_none(self) -> None:
+        """200 OK with non-JSON body returns None, no crash."""
+        b = _make_behaviour()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.body = b"<html>maintenance</html>"
+
+        with patch.object(b, "get_http_response", new=_make_gen(mock_resp)):
+            result = _exhaust_gen(b.get_realitio_subgraph_result("{ q }"))
+
         assert result is None
 
 
