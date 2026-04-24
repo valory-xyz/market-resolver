@@ -1,0 +1,9 @@
+token_id-"component_id"
+321-"skill/valory/market_resolution_manager_abci/0.1.0"
+322-"skill/valory/market_resolver_abci/0.1.0"
+---
+token_id-"agent_id"
+108-"agent/valory/market_resolver/0.1.0"
+---
+token_id-"service_id" (Gnosis)
+3040-"service/valory/market_resolver:0.1.0"

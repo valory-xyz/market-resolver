@@ -45,17 +45,26 @@ packages/valory/skills/termination_abci
 packages/valory/skills/transaction_settlement_abci
 packages/valory/skills/funds_forwarder_abci
 packages/valory/skills/identify_service_owner_abci
+packages/valory/skills/omen_ct_redeem_tokens_abci
+packages/valory/skills/omen_fpmm_remove_liquidity_abci
+packages/valory/skills/omen_realitio_withdraw_bonds_abci
 packages/valory/contracts/staking_token
+packages/valory/contracts/fpmm
 
 leak_report
+data/
 __pycache__
 temp/
 agent/
+/market_resolver/
 logs/
 .env
+.env.*
 
 ethereum_private_key.txt
 keys.json
 fetched_service/
+testing/trader_keys.json
+testing/test_markets.json
 keys_json/
 .idea

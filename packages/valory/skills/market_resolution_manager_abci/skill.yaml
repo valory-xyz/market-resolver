@@ -1,0 +1,206 @@
+name: market_resolution_manager_abci
+author: valory
+version: 0.1.0
+type: skill
+description: The market resolution manager skill handles scanning, evaluating, and
+  challenging Omen prediction market answers.
+license: Apache-2.0
+aea_version: '>=2.0.0, <3.0.0'
+fingerprint:
+  README.md: bafybeicebua5cqf3pfr34hy5mmnr6i7m7wgxlkzbto6woi5dkuv4fqbymi
+  __init__.py: bafybeiedhf4rirdachml54zzde7nl3nhuwz4c5xwskrc5udfphefbrdsfu
+  behaviours/__init__.py: bafybeignnrbklzekhqurn6ptli5zhzsov2qtdzr5se4xe4hqdywt2vbtvu
+  behaviours/base.py: bafybeidrc2pnhkjz6q5vrs4sbaqysn2obaoqyfx6tsr6compbjfabrqaga
+  behaviours/build_answer_tx.py: bafybeifrxowhhrmcn3j4yr45vikuj7ecbvp256gkjq7zcdhw6wvpl5j574
+  behaviours/evaluate_answers.py: bafybeidfpihakdznzoo4yuimm6h36p7l3gdlrswj2jri6w5oeiuz5aajli
+  behaviours/post_transaction.py: bafybeih3sx6y2xhuc5gkoeed6skfb6zyur4xc36b2vma2hprpk4lqhgvlq
+  behaviours/round_behaviour.py: bafybeiecxju6t7zsojnrhrefy4a7c75lkbveoxcayntw6heacao2qqkfdm
+  behaviours/scan_markets.py: bafybeicvljqwbqfzmeua5qay4n5crfi4zswkquz6445bcgqqnmlrh4p7ou
+  dialogues.py: bafybeict7mdksmjklx6wy2zplunpcfwhgxv5votxbsodidyum2phx3tv34
+  fsm_specification.yaml: bafybeicvrqqxqsu2smewf5lorfaud3j3caraw743huzqtn2gj555rylqxa
+  handlers.py: bafybeigby2ymzvsoiwbgtdd4esk6xrkrafp2b22yqz5xi4ekrnqwqqoq4y
+  models.py: bafybeierz7z47tnzekypuc6tghfnf5bjulcey45jijj67oik7nz7tcvrru
+  payloads.py: bafybeih6zkrc5mnkpifctn4cg3myqr3qrdw5v42hg7ldfbuzw7gjbgeoja
+  rounds.py: bafybeiaecllsbm4pmfoqzrtmkrliejmek2ppqhmqi4z3rorfghy5ppw2j4
+  states/__init__.py: bafybeiho5s4sehwxmgtp4ddgntnkxhjks5cflihdtag7zqy6btjrhzcyti
+  states/base.py: bafybeihbbmjqry5uqgn7m76cbupe3moanw7427uki7la6z57yehfiwm6xi
+  tests/__init__.py: bafybeidpf4le7kmwrvl6u3s4yl2mrlznnu7scha3hvcpd3s2omwo7bdwkq
+  tests/behaviours/__init__.py: bafybeierpqlj4wjvfsa2acmkibioivviqudq4ulu5ifuqwcvdcfewzdgau
+  tests/behaviours/conftest.py: bafybeiab62qul2ktrqegbrtzxonsil4hw4dur5b6h5nlxbvviix55b72um
+  tests/behaviours/test_base.py: bafybeig3mumrr55tuuj2rpohlile5kwre43uay5a3poxx3l4v2jjpw7emi
+  tests/behaviours/test_build_answer_tx.py: bafybeicxwjlb25foqgrhfroh3lz74wltaecowotbdeww4lh762ugy7bmae
+  tests/behaviours/test_evaluate_answers.py: bafybeigyaitq3chjkaw7xaoprsncxw5qldjgkimhcxpmpdc5wrgk5psb7m
+  tests/behaviours/test_post_transaction.py: bafybeibihvgozgvlrfyrkpq7gg3hpvzp5h7g633oggqnu5auqtnfyakbcy
+  tests/behaviours/test_round_behaviour.py: bafybeifcvxp5vlshg4xbego4frjsahvvvmjebj5s27l5ba7eyijsxry7ka
+  tests/behaviours/test_scan_markets.py: bafybeie3ee7bo6dk6qhqd5zd2dzehbfys6uzs2igw5hkxrwzpyjfvv4ppa
+  tests/conftest.py: bafybeiaemzro7plaeklgfk5kvsw62kzgf5uym4e4xqcxwfwzqfcpnct4eq
+  tests/test_dialogues.py: bafybeiaue4klz37jrmqlu46xj442v3mazx3fqmuay7thbakeyfy4ohrac4
+  tests/test_handlers.py: bafybeib66usugomzo47zrgo635ewzjikixorkuelk5tdgdbckzx4dwfpia
+  tests/test_models.py: bafybeibdst4ck3z5z5hy4d56t5s4oighz4b7dpx5adq3iximowi6u5tu4e
+  tests/test_payloads.py: bafybeiakjhvniimjyynaeq3n3udkdnjcvm4tuzafyrirsvwjgwwqkxb5j4
+  tests/test_rounds.py: bafybeiditzviuiglgrhkwb3necgwclrcrfmouurafyvyny5afflnf24clm
+fingerprint_ignore_patterns: []
+connections: []
+contracts:
+- valory/gnosis_safe:0.1.0:bafybeicm3rxjpqc4kcjmxoj5ixqfzu6jn4alalyn3xuqxa5y2g22kpp72m
+- valory/multisend:0.1.0:bafybeihx7c3xj6c5v4tgvu3ipnj7seyc4dkmovoyzu4isgbwdrhj2oo6uq
+- valory/realitio:0.1.0:bafybeibthnl5gmuxehkwwseevyuier4iewcx2qd5wk4p7besvhea2kducy
+protocols:
+- valory/ledger_api:1.0.0:bafybeiecq56phjfws36rgrefw6niyo4ezesloodsfis647mpm5ygqo4ysi
+- valory/contract_api:1.0.0:bafybeibld2xb5m7kyluiptkamp4nrt6oeomkohz7a3yppbv2oo7qw2e4la
+skills:
+- valory/abstract_round_abci:0.1.0:bafybeihgbc5geup3ljdfgyontr2p5e4myxjkthaplm5ei727uw2pawstcy
+- valory/mech_interact_abci:0.1.0:bafybeicxqsip4uer3o4dnocumvwctplnurlyzsxyzyg6wr4yqwxgnicmca
+- valory/transaction_settlement_abci:0.1.0:bafybeic6f4ujckiutqxueagohb5iv7kgzpamhuhiq7shn6fmiwbkt3cqny
+- valory/funds_forwarder_abci:0.1.0:bafybeid7aqeqxzhipd4nqwk63ahscdp2shiixqyqsk3po7dmdmt5lxfizi
+- valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeibidqspdprqy4mfvjgsuynt3ni4fi37oea2eeu2jacfogbip4t5sy
+- valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeiegqqqigg4yrme6uteb226irdpresoubwriukllx5da56pfvidwpi
+- valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeiaksjsb7yhzbhp5nyzjbi4ebua5nfnmcluus45tjidmh6kv5y2dea
+behaviours:
+  main:
+    args: {}
+    class_name: MarketResolutionManagerRoundBehaviour
+handlers:
+  abci:
+    args: {}
+    class_name: ABCIHandler
+  http:
+    args: {}
+    class_name: HttpHandler
+  contract_api:
+    args: {}
+    class_name: ContractApiHandler
+  ipfs:
+    args: {}
+    class_name: IpfsHandler
+  ledger_api:
+    args: {}
+    class_name: LedgerApiHandler
+  signing:
+    args: {}
+    class_name: SigningHandler
+  tendermint:
+    args: {}
+    class_name: TendermintHandler
+models:
+  abci_dialogues:
+    args: {}
+    class_name: AbciDialogues
+  benchmark_tool:
+    args:
+      log_dir: /logs
+    class_name: BenchmarkTool
+  contract_api_dialogues:
+    args: {}
+    class_name: ContractApiDialogues
+  http_dialogues:
+    args: {}
+    class_name: HttpDialogues
+  ipfs_dialogues:
+    args: {}
+    class_name: IpfsDialogues
+  ledger_api_dialogues:
+    args: {}
+    class_name: LedgerApiDialogues
+  mech_gnosis_subgraph:
+    args:
+      api_id: mech_gnosis
+      headers:
+        Content-Type: application/json
+      method: POST
+      parameters: {}
+      response_key: data:sender
+      response_type: dict
+      retries: 5
+      url: https://api.subgraph.autonolas.tech/api/proxy/marketplace-gnosis
+    class_name: MechGnosisSubgraph
+  params:
+    args:
+      watched_creator_addresses: []
+      trusted_addresses: []
+      mech_tool: resolve-market-jury-v1
+      initial_answer_bond: 10000000000000000
+      challenge_cooldown_fraction: 0.25
+      challenge_urgency_buffer: 3600
+      max_challenge_bond: 40000000000000000
+      max_escalation_rounds: 5
+      max_mech_retries: 10
+      prefetch_mech_evaluations: false
+      mech_retry_cooldown: 3600
+      omen_subgraph_max_market_age_seconds: 31536000
+      cleanup_history_depth: 1
+      cleanup_history_depth_current: null
+      drand_public_key: 868f005eb8e6e4ca0a47c8a77ceaa5309a47978a7c71bc5cce96366b5d7a569937c529eeda66c7293784a9402801af31
+      finalize_timeout: 60.0
+      genesis_config:
+        genesis_time: '2022-05-20T16:00:21.735122717Z'
+        chain_id: chain-c4daS1
+        consensus_params:
+          block:
+            max_bytes: '22020096'
+            max_gas: '-1'
+            time_iota_ms: '1000'
+          evidence:
+            max_age_num_blocks: '100000'
+            max_age_duration: '172800000000000'
+            max_bytes: '1048576'
+          validator:
+            pub_key_types:
+            - ed25519
+          version: {}
+        voting_power: '10'
+      history_check_timeout: 1205
+      init_fallback_gas: 0
+      keeper_allowed_retries: 3
+      keeper_timeout: 30.0
+      max_attempts: 10
+      max_healthcheck: 120
+      on_chain_service_id: null
+      request_retry_delay: 1.0
+      request_timeout: 10.0
+      reset_pause_duration: 1800
+      reset_tendermint_after: 2
+      retry_attempts: 400
+      retry_timeout: 3
+      round_timeout_seconds: 60.0
+      service_id: market_resolution_manager
+      service_registry_address: null
+      setup:
+        all_participants:
+        - '0x0000000000000000000000000000000000000000'
+        safe_contract_address: '0x0000000000000000000000000000000000000000'
+        consensus_threshold: null
+      share_tm_config_on_startup: false
+      sleep_time: 1
+      tendermint_check_sleep_delay: 3
+      tendermint_com_url: http://localhost:8080
+      tendermint_max_retries: 5
+      tendermint_p2p_url: localhost:26656
+      tendermint_url: http://localhost:26657
+      tx_timeout: 10.0
+      use_termination: false
+      use_slashing: false
+      slash_cooldown_hours: 3
+      slash_threshold_amount: 10000000000000000
+      light_slash_unit_amount: 5000000000000000
+      serious_slash_unit_amount: 8000000000000000
+      termination_sleep: 900
+      termination_from_block: 0
+      validate_timeout: 1205
+    class_name: MarketResolutionManagerParams
+  requests:
+    args: {}
+    class_name: Requests
+  signing_dialogues:
+    args: {}
+    class_name: SigningDialogues
+  state:
+    args: {}
+    class_name: SharedState
+  tendermint_dialogues:
+    args: {}
+    class_name: TendermintDialogues
+dependencies:
+  open-aea-test-autonomy:
+    version: ==0.21.18
+is_abstract: true

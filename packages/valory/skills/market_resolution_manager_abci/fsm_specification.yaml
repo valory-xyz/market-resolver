@@ -1,0 +1,62 @@
+alphabet_in:
+- ANSWER_TX_DONE
+- CT_REDEEM_TOKENS_TX_DONE
+- DONE
+- FPMM_REMOVE_LIQUIDITY_TX_DONE
+- FUNDS_FORWARDER_TX_DONE
+- MECH_REQUEST_DONE
+- NONE
+- NO_MAJORITY
+- REALITIO_WITHDRAW_BONDS_TX_DONE
+- ROUND_TIMEOUT
+default_start_state: ScanMarketsRound
+final_states:
+- FinishedResolutionRound
+- FinishedWithAnswerTxRound
+- FinishedWithCtRedeemTokensPostTxRound
+- FinishedWithFpmmRemoveLiquidityPostTxRound
+- FinishedWithFundsForwarderPostTxRound
+- FinishedWithMechPollRound
+- FinishedWithMechRequestRound
+- FinishedWithRealitioWithdrawBondsPostTxRound
+label: MarketResolutionManagerAbciApp
+start_states:
+- BuildAnswerTxRound
+- PostTransactionRound
+- ScanMarketsRound
+states:
+- BuildAnswerTxRound
+- EvaluateAnswersRound
+- FinishedResolutionRound
+- FinishedWithAnswerTxRound
+- FinishedWithCtRedeemTokensPostTxRound
+- FinishedWithFpmmRemoveLiquidityPostTxRound
+- FinishedWithFundsForwarderPostTxRound
+- FinishedWithMechPollRound
+- FinishedWithMechRequestRound
+- FinishedWithRealitioWithdrawBondsPostTxRound
+- PostTransactionRound
+- ScanMarketsRound
+transition_func:
+    (BuildAnswerTxRound, DONE): FinishedWithAnswerTxRound
+    (BuildAnswerTxRound, NONE): FinishedResolutionRound
+    (BuildAnswerTxRound, NO_MAJORITY): FinishedResolutionRound
+    (BuildAnswerTxRound, ROUND_TIMEOUT): FinishedResolutionRound
+    (EvaluateAnswersRound, DONE): FinishedWithMechRequestRound
+    (EvaluateAnswersRound, NONE): BuildAnswerTxRound
+    (EvaluateAnswersRound, NO_MAJORITY): FinishedResolutionRound
+    (EvaluateAnswersRound, ROUND_TIMEOUT): FinishedResolutionRound
+    (PostTransactionRound, ANSWER_TX_DONE): FinishedResolutionRound
+    (PostTransactionRound, CT_REDEEM_TOKENS_TX_DONE): FinishedWithCtRedeemTokensPostTxRound
+    (PostTransactionRound, DONE): FinishedResolutionRound
+    (PostTransactionRound, FPMM_REMOVE_LIQUIDITY_TX_DONE): FinishedWithFpmmRemoveLiquidityPostTxRound
+    (PostTransactionRound, FUNDS_FORWARDER_TX_DONE): FinishedWithFundsForwarderPostTxRound
+    (PostTransactionRound, MECH_REQUEST_DONE): FinishedWithMechPollRound
+    (PostTransactionRound, NONE): FinishedResolutionRound
+    (PostTransactionRound, NO_MAJORITY): FinishedResolutionRound
+    (PostTransactionRound, REALITIO_WITHDRAW_BONDS_TX_DONE): FinishedWithRealitioWithdrawBondsPostTxRound
+    (PostTransactionRound, ROUND_TIMEOUT): FinishedResolutionRound
+    (ScanMarketsRound, DONE): EvaluateAnswersRound
+    (ScanMarketsRound, NONE): FinishedResolutionRound
+    (ScanMarketsRound, NO_MAJORITY): ScanMarketsRound
+    (ScanMarketsRound, ROUND_TIMEOUT): ScanMarketsRound

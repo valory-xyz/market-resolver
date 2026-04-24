@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # ------------------------------------------------------------------------------
 #
-#   Copyright 2021-2026 Valory AG
+#   Copyright 2026 Valory AG
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -17,4 +17,16 @@
 #
 # ------------------------------------------------------------------------------
 
-"""This module contains the valory packages."""
+"""Conftest for market_resolution_manager_abci tests."""
+
+import os
+from pathlib import Path
+
+from hypothesis import settings  # type: ignore[import-not-found]
+
+CI = "CI"
+PACKAGE_DIR = Path(__file__).parent.parent
+
+settings.register_profile(CI, deadline=5000)
+profile_name = ("default", CI)[bool(os.getenv(CI))]
+settings.load_profile(profile_name)
