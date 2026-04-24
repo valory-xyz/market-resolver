@@ -7,7 +7,7 @@ license: Apache-2.0
 fingerprint:
   README.md: bafybeie6lb2mlmzmkycbcfma4onidhegfu4ipgpybg2av5mhfs5zx42b2m
 fingerprint_ignore_patterns: []
-agent: valory/market_resolver:0.1.0:bafybeigadedggujtymgekc66qvk3hcncuybspfc6apemwtdohhkqh5yzua
+agent: valory/market_resolver:0.1.0:bafybeicfhfrkghpkcxuaue5bdokbs4bh3y3arrlrgshe3lwd23de4r3kgm
 number_of_agents: 1
 deployment:
   agent:
@@ -222,7 +222,7 @@ cert_requests:
   save_path: .certs/acn_cosmos_9005.txt
 is_abstract: true
 ---
-public_id: valory/http_server:0.22.0:bafybeid4oqsfkqo36lryoecymjnq4whme3tgupqfq6m4l7lbr5r4yxtswu
+public_id: valory/http_server:0.22.0:bafybeihs6dufyaa5l4uorplzx3wiyna5qlq2x43tmyl3yonkl265vspdle
 type: connection
 config:
   host: ${HTTP_SERVER_HOST:str:0.0.0.0}
