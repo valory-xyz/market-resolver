@@ -19,8 +19,9 @@
 
 """This module contains the models for the market resolution manager."""
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Type
 
+from packages.valory.skills.abstract_round_abci.base import AbciApp
 from packages.valory.skills.abstract_round_abci.models import ApiSpecs, BaseParams
 from packages.valory.skills.abstract_round_abci.models import (
     BenchmarkTool as BaseBenchmarkTool,
@@ -50,7 +51,7 @@ class MechGnosisSubgraph(ApiSpecs):
 class SharedState(MechInteractSharedState, CtRedeemTokensSharedState, BaseSharedState):
     """Keep the current shared state of the skill."""
 
-    abci_app_cls = MarketResolutionManagerAbciApp
+    abci_app_cls: Type[AbciApp] = MarketResolutionManagerAbciApp  # type: ignore
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize."""
