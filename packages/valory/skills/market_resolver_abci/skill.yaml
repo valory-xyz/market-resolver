@@ -39,7 +39,7 @@ skills:
 - valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeiegqqqigg4yrme6uteb226irdpresoubwriukllx5da56pfvidwpi
 - valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeiaksjsb7yhzbhp5nyzjbi4ebua5nfnmcluus45tjidmh6kv5y2dea
 - valory/mech_interact_abci:0.1.0:bafybeicxqsip4uer3o4dnocumvwctplnurlyzsxyzyg6wr4yqwxgnicmca
-- valory/market_resolution_manager_abci:0.1.0:bafybeiftmbxogjsxdqvp7avtfr56rquau2dwoy5nuvdzojvakucxdv6jz4
+- valory/market_resolution_manager_abci:0.1.0:bafybeieia7ad2v4sookmrzks2ab6rusrgcl2zzgjqno7w52ctvrhzwbkbq
 behaviours:
   main:
     args: {}
@@ -308,7 +308,5 @@ models:
   tendermint_dialogues:
     args: {}
     class_name: TendermintDialogues
-dependencies:
-  open-aea-test-autonomy:
-    version: ==0.21.18
+dependencies: {}
 is_abstract: false

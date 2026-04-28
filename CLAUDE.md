@@ -4,33 +4,14 @@
 
 Market Resolver is an **autonomous service** built on the [Open Autonomy](https://stack.olas.network/open-autonomy/) framework. It resolves prediction markets on Gnosis Chain by answering Realitio questions, challenging incorrect answers, and recovering locked funds (bonds, conditional tokens, LP tokens).
 
-**Sibling repo:** [valory-xyz/market-creator](https://github.com/valory-xyz/market-creator) — creates the markets this service resolves. Local clone at `/home/jose/git/market-creator`.
+**Sibling repo:** [valory-xyz/market-creator](https://github.com/valory-xyz/market-creator) — creates the markets this service resolves.
 **Framework reference:** [valory-xyz/trader](https://github.com/valory-xyz/trader) (develop branch) — follow the same patterns for CI, tox, and package structure.
-
-## Plans & Domain Documentation (in market-creator repo)
-
-These files live in the market-creator repository and are the **single source of truth** — do not copy them here.
-
-### Plans (`/home/jose/git/market-creator/.claude/plans/`)
-
-- **`service_split.md`** — Architecture for splitting into market-creator + market-resolver. Contains composed FSM specs, transition mappings, and round assignments for both services.
-- **`omen_funds_recoverer.md`** — The shared `omen_funds_recoverer_abci` skill that both services compose for fund recovery (LP tokens, conditional tokens, Realitio bonds).
-- **`claim_winnings.md`** — Realitio `claimWinnings` implementation plan. Bond claiming logic used by the recovery skill.
-
-### Domain docs (`/home/jose/git/market-creator/.claude/docs/`)
-
-- **`omen_lifecycle.md`** — Full Omen prediction market lifecycle: contracts, phases, the two independent value flows (conditional tokens vs Realitio bonds), and FSM round mapping.
-- **`ct_omen_realitio.md`** — Tutorial on Conditional Tokens framework, Omen, and Realitio: how they work together, contract interactions at each stage, fund recovery mechanisms.
-
-### Local plan (`.claude/plans/`)
-
-- **`market_resolver.md`** — The resolver-specific watchdog FSM: scan, evaluate, challenge, cleanup. Round details, fraud detection strategy, configuration parameters.
 
 ## What the Service Does
 
 The service autonomously resolves Omen prediction markets on Gnosis Chain. Each period (cycle) it:
 
-1. **Recovers locked funds** (`omen_funds_recoverer_abci`) — claims bonds, redeems conditional tokens, removes liquidity from resolved markets
+1. **Recovers locked funds** — claims Realitio bonds, redeems conditional tokens, removes liquidity from resolved markets (via `omen_realitio_withdraw_bonds_abci`, `omen_ct_redeem_tokens_abci`, `omen_fpmm_remove_liquidity_abci`)
 2. **Gets pending questions** — queries Realitio for questions needing answers
 3. **Requests Mech** — delegates question evaluation to a Mech agent (AI oracle) via `mech_interact_abci`
 4. **Answers questions** — submits Mech responses as Realitio answers
@@ -40,35 +21,36 @@ The service autonomously resolves Omen prediction markets on Gnosis Chain. Each 
 
 ```text
 packages/valory/
-├── contracts/
-│   └── ... (third-party synced contracts)
-├── skills/
-│   ├── market_resolver_abci/             # Core skill: question answering & challenging FSM
-│   └── ... (third-party synced skills)
-├── agents/                               # Agent configurations
-└── services/                             # Service configurations
+├── agents/
+│   └── market_resolver/                   # Agent configuration
+├── services/
+│   └── market_resolver/                   # Service configuration
+└── skills/
+    ├── market_resolver_abci/              # Composition skill: wires sub-skills together
+    ├── market_resolution_manager_abci/    # Core resolver FSM: scan, evaluate, challenge
+    └── ...                                # Third-party synced skills
 ```
 
 ### What you own vs. what is synced
 
 Package ownership is defined in `packages/packages.json`:
 
-- **`dev`** section: project-specific packages (owned by this repo, committed to git)
-- **`third_party`** section: dependencies synced from IPFS via `autonomy packages sync --all`. Do not modify these directly — they are not committed to git.
+- **`dev`** section: project-specific packages (owned by this repo, committed to git) — the two `*_abci` skills above plus the agent and service configs.
+- **`third_party`** section: dependencies synced from IPFS via `autonomy packages sync`. Do not modify these directly — they are not committed to git (see `.gitignore`).
 
 ## Development Commands
 
 ### Prerequisites
 
 - Python 3.10–3.14
-- [Poetry](https://python-poetry.org/)
-- [tox](https://tox.wiki/)
-- [tomte](https://github.com/valory-xyz/tomte) (installed via tox deps)
+- [uv](https://docs.astral.sh/uv/) (package + venv manager — the build backend is `uv_build`)
+- [tox](https://tox.wiki/) via `tox-uv`
+- [tomte](https://github.com/valory-xyz/tomte) (installed via `pip install tomte[tox,cli]==0.6.5 tox-uv`)
 
 ### Setup
 
 ```bash
-poetry install --no-root
+uv sync --all-groups
 ```
 
 ### Syncing third-party packages
@@ -77,7 +59,7 @@ Before running tests, sync all AEA packages from IPFS:
 
 ```bash
 autonomy init --reset --author ci --remote --ipfs --ipfs-node "/dns/registry.autonolas.tech/tcp/443/https"
-autonomy packages sync --all
+autonomy packages sync
 ```
 
 This is done automatically by tox test environments.
@@ -87,9 +69,6 @@ This is done automatically by tox test environments.
 ```bash
 # Run all unit tests (Linux, Python 3.11)
 tox -e py3.11-linux
-
-# Convenience: run all unit tests in one pytest invocation with combined coverage
-tox -e unit-tests
 
 # Recreate tox virtualenv (clear cache)
 tox -e py3.11-linux -r
@@ -128,16 +107,14 @@ tox -e liccheck       # License compliance check
 ### Package integrity
 
 ```bash
-tox -e check-hash           # Verify package hashes
-tox -e check-packages       # Validate package structure
-tox -e check-abciapp-specs  # Validate FSM specifications
+tox -e check-hash               # Verify package hashes
+tox -e check-packages           # Validate package structure
+tox -e check-dependencies       # Cross-check YAML deps vs pyproject
+tox -e check-third-party-hashes # Verify third-party hashes match upstream
+tox -e check-abciapp-specs      # Validate FSM specifications
 ```
 
 ## Testing
-
-### Coverage enforcement
-
-All test environments enforce **100% statement + branch coverage** via `--cov-fail-under=100`. Coverage is configured in `.coveragerc`.
 
 ### Test conventions
 
@@ -156,7 +133,7 @@ CI workflow: `.github/workflows/common_checks.yml`
 
 - Cross-platform matrix: Ubuntu, macOS, Windows
 - Python versions: 3.10–3.14
-- Uses `tomte[tox]==0.6.2` for test orchestration
+- Uses `uv` for dependency management and `tomte[tox,cli]==0.6.5` + `tox-uv` for test orchestration
 
 ## Key Gotchas
 
@@ -170,7 +147,7 @@ The tox config sets `PYTHONPATH={env:PWD:%CD%}` for cross-platform compatibility
 
 ### Third-party packages are not committed
 
-Packages synced via `autonomy packages sync --all` are fetched from IPFS at test time. They appear in `packages/` but are in `.gitignore`. Do not commit them.
+Packages synced via `autonomy packages sync` are fetched from IPFS at test time. They appear in `packages/` but are in `.gitignore`. Do not commit them.
 
 ### liccheck and setuptools
 
@@ -192,7 +169,7 @@ FSM definitions are tightly coupled across multiple files. When modifying events
 After any FSM change, run:
 
 ```bash
-autonomy analyse fsm-specs --package packages/valory/skills/market_resolver_abci
+autonomy analyse fsm-specs --package packages/valory/skills/market_resolution_manager_abci
 autonomy analyse docstrings
 autonomy analyse handlers
 ```
@@ -204,7 +181,7 @@ autonomy analyse handlers
 - **Behaviour**: Logic executed by each agent during a round (collects data, builds transactions)
 - **Skill**: An AEA skill containing rounds, behaviours, handlers, payloads, and models
 - **Composed app**: wires sub-skills together (registration, core logic, transaction settlement, mech interaction, reset/pause, termination)
-- **`autonomy packages sync --all`**: Fetches all third-party dependencies declared in `packages.json` from IPFS
+- **`autonomy packages sync`**: Fetches all third-party dependencies declared in `packages.json` from IPFS
 
 ## Third-party Dependency Repositories
 
