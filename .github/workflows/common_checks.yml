@@ -67,11 +67,8 @@ jobs:
         run: tox -e liccheck
       - name: Check dependencies
         run: tox -e check-dependencies
-      # NOTE: check-third-party-hashes is available as a tox env but not
-      # wired into CI yet. The 3 omen_* skills + fpmm contract are
-      # consumed from market-creator, which does not have a published
-      # tag covering those packages. Re-enable once market-creator
-      # publishes a tag containing them.
+      - name: Check third-party hashes
+        run: tox -e check-third-party-hashes
       - name: Check doc links
         run: tomte check-doc-links --url-skips https://github.com/valory-xyz/market-resolver.git
       - name: Check doc IPFS hashes
