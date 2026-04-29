@@ -115,7 +115,7 @@ models:
       mech_contract_address: ${MECH_CONTRACT_ADDRESS:str:0x601024E27f1C67B28209E24272CED8A31fc8151F}
       mech_wrapped_native_token_address: ${MECH_WRAPPED_NATIVE_TOKEN_ADDRESS:str:0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d}
       irrelevant_tools: ${IRRELEVANT_TOOLS:list:[]}
-      ignored_mechs: ${IGNORED_MECHS:list:["0x33ca1e117c4254b2ee8cd7ef1621739431a37396"]}
+      ignored_mechs: ${IGNORED_MECHS:list:["0x33ca1e117c4254b2ee8cd7ef1621739431a37396","0x2ebd2237e5db798e36a2fa67afa74effb17c5ebb"]}
       penalize_mech_time_window: ${PENALIZE_MECH_TIME_WINDOW:int:1800}
       deliveries_lookback_days: ${DELIVERIES_LOOKBACK_DAYS:int:30}
       setup:

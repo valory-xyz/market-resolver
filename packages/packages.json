@@ -3,7 +3,7 @@
         "skill/valory/market_resolution_manager_abci/0.1.0": "bafybeieia7ad2v4sookmrzks2ab6rusrgcl2zzgjqno7w52ctvrhzwbkbq",
         "skill/valory/market_resolver_abci/0.1.0": "bafybeihbwxqtqdtqhmogta5dluj35qtdgtw74ls2tc3gwvko25uuchwon4",
         "agent/valory/market_resolver/0.1.0": "bafybeifl3iwdh3mc7stc76mfvjacm47rcbpabj7abd2xu4pnqntrohaigy",
-        "service/valory/market_resolver/0.1.0": "bafybeighjfx64mlozjse2v6iuqt67fq5y7ehc6dw7l7ohbuorakuuda3um"
+        "service/valory/market_resolver/0.1.0": "bafybeifywcm3jpqsrm3ekpj7x46kkpoy2vviplznv6ibbv62wtc6di2lpa"
     },
     "third_party": {
         "protocol/valory/contract_api/1.0.0": "bafybeibld2xb5m7kyluiptkamp4nrt6oeomkohz7a3yppbv2oo7qw2e4la",
