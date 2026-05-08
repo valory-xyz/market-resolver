@@ -302,6 +302,10 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         Two queries:
         1. Pending: answerFinalizedTimestamp is null (no answer yet)
         2. Finalizing: answerFinalizedTimestamp > now (answered but not yet finalized)
+
+        :param watched: lowercased list of market creator addresses to scope by.
+        :return: combined market list, or ``None`` on subgraph error.
+        :yield: HTTP requests to the Omen subgraph.
         """
         creators_str = ", ".join(f'"{c.lower()}"' for c in watched)
         now = self.last_synced_timestamp

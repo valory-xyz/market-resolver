@@ -21,7 +21,9 @@
 
 # pylint: disable=superfluous-parens,too-many-ancestors
 
-from packages.valory.skills.abstract_round_abci.models import ApiSpecs
+from packages.valory.skills.abstract_round_abci.models import (
+    ApiSpecs,
+)
 from packages.valory.skills.abstract_round_abci.models import (
     BenchmarkTool as BaseBenchmarkTool,
 )
