@@ -171,6 +171,8 @@ def _stop_leaked_patchers() -> Iterator[None]:
     and never stops it, so the patched class attribute leaks across tests. This
     autouse fixture stops every active patch after each test to keep tests
     isolated.
+
+    :yield: control back to the test before tearing down patches.
     """
     yield
     patch.stopall()
