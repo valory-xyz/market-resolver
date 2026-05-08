@@ -9,6 +9,7 @@ alphabet_in:
 - NO_MAJORITY
 - REALITIO_WITHDRAW_BONDS_TX_DONE
 - ROUND_TIMEOUT
+- SKIP
 default_start_state: ScanMarketsRound
 final_states:
 - FinishedResolutionRound
@@ -46,6 +47,7 @@ transition_func:
     (EvaluateAnswersRound, NONE): BuildAnswerTxRound
     (EvaluateAnswersRound, NO_MAJORITY): FinishedResolutionRound
     (EvaluateAnswersRound, ROUND_TIMEOUT): FinishedResolutionRound
+    (EvaluateAnswersRound, SKIP): FinishedResolutionRound
     (PostTransactionRound, ANSWER_TX_DONE): FinishedResolutionRound
     (PostTransactionRound, CT_REDEEM_TOKENS_TX_DONE): FinishedWithCtRedeemTokensPostTxRound
     (PostTransactionRound, DONE): FinishedResolutionRound

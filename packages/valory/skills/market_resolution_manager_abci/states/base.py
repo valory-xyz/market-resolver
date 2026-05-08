@@ -28,6 +28,7 @@ class Event(Enum):
     NO_MAJORITY = "no_majority"
     DONE = "done"
     NONE = "none"
+    SKIP = "skip"
     ROUND_TIMEOUT = "round_timeout"
     MECH_REQUEST_DONE = "mech_request_done"
     ANSWER_TX_DONE = "answer_tx_done"

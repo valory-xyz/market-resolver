@@ -755,6 +755,64 @@ class TestAsyncActIntegration:
         # would have been skipped under the old cache_checked logic.
         assert call_results == []
 
+    def test_cache_lookup_returns_none_skipped(self) -> None:
+        """Subgraph error (cached=None) leaves entry untouched, no crash."""
+        market = _make_market("0xMNone")
+        b = _make_behaviour()
+        patch.object(
+            b, "_fetch_pending_and_finalizing_markets", new=_make_gen([market])
+        ).start()
+        patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
+        patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
+        patch.object(b, "find_cached_valid_mech_delivery", new=_make_gen(None)).start()
+
+        with (
+            patch.object(b, "send_a2a_transaction", new=_make_gen(None)),
+            patch.object(b, "wait_until_round_end", new=_make_gen(None)),
+            patch.object(b, "set_done"),
+        ):
+            _run_async_act(b)
+
+        entry = b.questions_db.get("0xMNone")
+        assert entry is not None
+        assert entry["evaluation"] is None
+        assert entry["mech_retries"] == 0
+
+    def test_max_mech_retries_skipped(self) -> None:
+        """Market with mech_retries >= max_mech_retries is not selected."""
+        market = _make_market("0xMaxed")
+        b = _make_behaviour()
+        b.context.params.max_mech_retries = 5
+        # Subgraph reports 5 prior delivered attempts -> seeds mech_retries=5.
+        cached = {"prior_attempts": 5}
+        patch.object(
+            b, "_fetch_pending_and_finalizing_markets", new=_make_gen([market])
+        ).start()
+        patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
+        patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
+        patch.object(
+            b, "find_cached_valid_mech_delivery", new=_make_gen(cached)
+        ).start()
+
+        payload_sent = []
+
+        def capture_send(payload: Any) -> Any:
+            payload_sent.append(payload)
+            return None
+            yield  # noqa
+
+        with (
+            patch.object(b, "send_a2a_transaction", new=capture_send),
+            patch.object(b, "wait_until_round_end", new=_make_gen(None)),
+            patch.object(b, "set_done"),
+        ):
+            _run_async_act(b)
+
+        # Market exists in DB but is not selected (max retries gate).
+        assert b.questions_db.get("0xMaxed") is not None
+        assert b.questions_db["0xMaxed"]["mech_retries"] == 5
+        assert payload_sent[0].selected_market_id is None
+
     def test_bond_too_high_market_skipped(self) -> None:
         """Market with bond exceeding max_challenge_bond is skipped when prefetch=False."""
         # Bond is 32 xDAI, max is 16 xDAI

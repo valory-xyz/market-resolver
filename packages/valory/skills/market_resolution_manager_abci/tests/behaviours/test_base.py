@@ -524,18 +524,18 @@ class TestFindCachedValidMechDelivery:
         return {"title": title, "market_closing_timestamp": closing_ts}
 
     def test_missing_title_returns_empty_dict(self) -> None:
-        """Returns {} when entry has no title."""
+        """Returns prior_attempts=0 when entry has no title."""
         b = _make_behaviour()
         result = _exhaust_gen(
             b.find_cached_valid_mech_delivery("0xM", {"market_closing_timestamp": 1234})
         )
-        assert result == {}
+        assert result == {"prior_attempts": 0}
 
     def test_missing_closing_ts_returns_empty_dict(self) -> None:
-        """Returns {} when entry has no market_closing_timestamp."""
+        """Returns prior_attempts=0 when entry has no market_closing_timestamp."""
         b = _make_behaviour()
         result = _exhaust_gen(b.find_cached_valid_mech_delivery("0xM", {"title": "Q?"}))
-        assert result == {}
+        assert result == {"prior_attempts": 0}
 
     def test_no_safe_address_returns_none(self) -> None:
         """Returns None when safe_contract_address is falsy."""
@@ -555,7 +555,7 @@ class TestFindCachedValidMechDelivery:
         assert result is None
 
     def test_no_sender_data_returns_empty_dict(self) -> None:
-        """Returns {} when subgraph has no sender data."""
+        """Returns prior_attempts=0 when subgraph has no sender data."""
         b = _make_behaviour()
         with patch.object(
             b, "get_mech_gnosis_subgraph_result", new=_make_gen({"data": {}})
@@ -563,7 +563,7 @@ class TestFindCachedValidMechDelivery:
             result = _exhaust_gen(
                 b.find_cached_valid_mech_delivery("0xM", self._make_entry())
             )
-        assert result == {}
+        assert result == {"prior_attempts": 0}
 
     def test_no_matching_requests_returns_empty_dict(self) -> None:
         """Returns {} when sender has requests but none match tool/title/delivery."""
@@ -601,7 +601,8 @@ class TestFindCachedValidMechDelivery:
             result = _exhaust_gen(
                 b.find_cached_valid_mech_delivery("0xM", self._make_entry())
             )
-        assert result == {}
+        # Wrong tool -> filtered out before increment
+        assert result == {"prior_attempts": 0}
 
     def test_wrong_prompt_skipped(self) -> None:
         """Request with wrong prompt (different title) is skipped."""
@@ -639,7 +640,8 @@ class TestFindCachedValidMechDelivery:
             result = _exhaust_gen(
                 b.find_cached_valid_mech_delivery("0xM", self._make_entry())
             )
-        assert result == {}
+        # Wrong prompt -> filtered out before increment
+        assert result == {"prior_attempts": 0}
 
     def test_no_delivery_skipped(self) -> None:
         """Request with empty deliveries is skipped."""
@@ -667,7 +669,8 @@ class TestFindCachedValidMechDelivery:
             result = _exhaust_gen(
                 b.find_cached_valid_mech_delivery("0xM", self._make_entry())
             )
-        assert result == {}
+        # No delivery -> not counted as a prior attempt
+        assert result == {"prior_attempts": 0}
 
     def test_garbage_response_skipped(self) -> None:
         """Request with garbage tool response is skipped (evaluation=None)."""
@@ -695,7 +698,8 @@ class TestFindCachedValidMechDelivery:
             result = _exhaust_gen(
                 b.find_cached_valid_mech_delivery("0xM", self._make_entry())
             )
-        assert result == {}
+        # Garbage response was a delivered request -> counts as prior attempt
+        assert result == {"prior_attempts": 1}
 
     def test_undeterminable_response_skipped(self) -> None:
         """Undeterminable evaluation (answer=None) fails is_cached_evaluation_valid -> skipped."""
@@ -729,7 +733,8 @@ class TestFindCachedValidMechDelivery:
             result = _exhaust_gen(
                 b.find_cached_valid_mech_delivery("0xM", self._make_entry())
             )
-        assert result == {}
+        # Undeterminable response was delivered -> counts as prior attempt
+        assert result == {"prior_attempts": 1}
 
     def test_valid_cache_hit_returns_dict(self) -> None:
         """Returns cache-hit dict with evaluation and mech_response on success."""

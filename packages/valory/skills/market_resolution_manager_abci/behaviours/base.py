@@ -57,7 +57,7 @@ MECH_CACHE_QUERY_TEMPLATE = """
       }}
       orderBy: blockTimestamp
       orderDirection: asc
-      first: 5
+      first: 1000
     ) {{
       id
       blockTimestamp
@@ -317,15 +317,18 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
         """Look up a prior valid Mech response for this market from our Safe.
 
         Returns:
-        - ``{"evaluation": ..., "mech_response": ...}`` on cache hit.
-        - ``{}`` (empty dict) on a definitive miss (subgraph responded but
-          no matching valid request found).
+        - ``{"evaluation": ..., "mech_response": ..., "prior_attempts": N}``
+          on cache hit (N counts prior delivered tool/title-matching requests
+          including the cache-hit one).
+        - ``{"prior_attempts": N}`` on a definitive miss (subgraph responded
+          but no valid evaluation found; N is the prior-attempt count, used
+          to seed ``mech_retries`` so the count survives restarts).
         - ``None`` on subgraph error (caller should retry next cycle).
         """
         title = entry.get("title")
         closing_ts = entry.get("market_closing_timestamp")
         if not title or not closing_ts:
-            return {}
+            return {"prior_attempts": 0}
 
         safe_address = self.synchronized_data.safe_contract_address
         if not safe_address:
@@ -349,11 +352,12 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
 
         sender_data = (result.get("data") or {}).get("sender")
         if not sender_data:
-            return {}
+            return {"prior_attempts": 0}
 
         requests = sender_data.get("requests") or []
         expected_tool = self.params.mech_tool_resolve_market
 
+        prior_attempts = 0
         for req in requests:
             parsed = req.get("parsedRequest") or {}
             if parsed.get("tool") != expected_tool:
@@ -363,6 +367,7 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
             deliveries = req.get("deliveries") or []
             if not deliveries:
                 continue
+            prior_attempts += 1
             tool_response = deliveries[0].get("toolResponse")
             evaluation = parse_mech_response(tool_response)
             if evaluation is None:
@@ -379,10 +384,12 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
                     "result": tool_response,
                     "tool": parsed.get("tool"),
                 },
+                "prior_attempts": prior_attempts,
             }
 
         self.context.logger.info(
             f"Market {market_id}: subgraph returned {len(requests)} prior "
-            f"requests, none matched tool/title/delivery/validity filters."
+            f"requests, {prior_attempts} matched tool/title with delivered "
+            f"response, none had a valid evaluation."
         )
-        return {}
+        return {"prior_attempts": prior_attempts}

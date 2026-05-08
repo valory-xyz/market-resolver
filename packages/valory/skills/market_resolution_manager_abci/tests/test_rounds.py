@@ -196,8 +196,8 @@ class TestEvaluateAnswersRoundEndBlock:
         _, event = result
         assert event == Event.NONE
 
-    def test_both_none_emits_no_majority(self) -> None:
-        """When both fields are None, end_block returns NO_MAJORITY event."""
+    def test_both_none_emits_skip(self) -> None:
+        """When both fields are None, end_block emits SKIP (intentional no-op)."""
         round_ = self._make_round()
         payloads = [
             EvaluateAnswersPayload(sender=p, mech_requests=None, evaluation_result=None)
@@ -207,7 +207,7 @@ class TestEvaluateAnswersRoundEndBlock:
         result = round_.end_block()
         assert result is not None
         _, event = result
-        assert event == Event.NO_MAJORITY
+        assert event == Event.SKIP
 
     def test_threshold_not_reached_returns_none(self) -> None:
         """end_block returns None when threshold not reached yet."""

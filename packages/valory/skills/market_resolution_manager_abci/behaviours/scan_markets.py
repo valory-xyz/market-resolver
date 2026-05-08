@@ -178,20 +178,32 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             else:
                 questions_db[market_id] = self._new_entry(market, current_answerer, now)
 
-        # Step 5: Rehydrate Mech cache for entries missing evaluation.
-        # We re-query the subgraph on every scan so that late deliveries
-        # (responses that arrive after our in-process
-        # ``mech_response_round`` timed out) are still picked up.
-        # Otherwise a Mech that is slow but eventually responsive forces
-        # us to re-request the same market forever.
+        # Step 5: Rehydrate Mech cache + retry counter for entries missing
+        # evaluation. We re-query the subgraph on every scan so that:
+        # 1. Late deliveries (responses that arrive after our in-process
+        #    ``mech_response_round`` timed out) are still picked up.
+        #    Otherwise a Mech that is slow but eventually responsive forces
+        #    us to re-request the same market forever.
+        # 2. ``mech_retries`` is sourced from on-chain history (prior
+        #    delivered requests for this prompt) rather than an in-memory
+        #    counter, so the exhaustion gate below survives agent restarts.
         for market_id, entry in questions_db.items():
             if entry.get("evaluation") is None:
                 cached = yield from self.find_cached_valid_mech_delivery(
                     market_id, entry
                 )
-                if cached:
+                if cached is None:
+                    continue
+                if cached.get("evaluation") is not None:
                     entry["evaluation"] = cached["evaluation"]
                     entry["mech_response"] = cached["mech_response"]
+                # Seed retry count from on-chain history. Use max() to
+                # handle the rare in-flight case where we've requested
+                # locally but the subgraph hasn't indexed it yet.
+                entry["mech_retries"] = max(
+                    entry.get("mech_retries", 0),
+                    int(cached.get("prior_attempts", 0)),
+                )
 
         # Step 6: Classify statuses from current data
         for entry in questions_db.values():
@@ -251,6 +263,8 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             if status in (AnswerStatus.NEEDS_ANSWER, AnswerStatus.NEEDS_VERIFICATION):
                 retry_after = entry.get("retry_after", 0)
                 if retry_after and now < retry_after:
+                    continue
+                if entry.get("mech_retries", 0) >= self.params.max_mech_retries:
                     continue
             elif status == AnswerStatus.TRANSACTION_PENDING:  # pragma: no branch
                 timeout = int(entry.get("realitio_timeout", 86400))

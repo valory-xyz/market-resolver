@@ -22,6 +22,7 @@ alphabet_in:
 - RESET_AND_PAUSE_TIMEOUT
 - RESET_TIMEOUT
 - ROUND_TIMEOUT
+- SKIP
 - SKIP_REQUEST
 - SUSPICIOUS_ACTIVITY
 - V1
@@ -90,6 +91,7 @@ transition_func:
     (EvaluateAnswersRound, NONE): BuildAnswerTxRound
     (EvaluateAnswersRound, NO_MAJORITY): ResetAndPauseRound
     (EvaluateAnswersRound, ROUND_TIMEOUT): ResetAndPauseRound
+    (EvaluateAnswersRound, SKIP): ResetAndPauseRound
     (FinalizationRound, CHECK_HISTORY): CheckTransactionHistoryRound
     (FinalizationRound, CHECK_LATE_ARRIVING_MESSAGE): SynchronizeLateMessagesRound
     (FinalizationRound, DONE): ValidateTransactionRound
