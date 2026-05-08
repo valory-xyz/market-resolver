@@ -10,12 +10,12 @@ fingerprint:
   README.md: bafybeicebua5cqf3pfr34hy5mmnr6i7m7wgxlkzbto6woi5dkuv4fqbymi
   __init__.py: bafybeiedhf4rirdachml54zzde7nl3nhuwz4c5xwskrc5udfphefbrdsfu
   behaviours/__init__.py: bafybeignnrbklzekhqurn6ptli5zhzsov2qtdzr5se4xe4hqdywt2vbtvu
-  behaviours/base.py: bafybeigx24sx7kpd5i2knoetp2p235d7o4nl3bpcd2yzdb7t2pglkpfblq
-  behaviours/build_answer_tx.py: bafybeifrxowhhrmcn3j4yr45vikuj7ecbvp256gkjq7zcdhw6wvpl5j574
+  behaviours/base.py: bafybeibisrqipuvbg6w4htjw7725cgybl4nwascu5y5jadh4a5k4kmyxsu
+  behaviours/build_answer_tx.py: bafybeif4j3ughjlkexsbyfzcmouft7wb3674nhe7udj4gzn4mnn4y6np5a
   behaviours/evaluate_answers.py: bafybeidfpihakdznzoo4yuimm6h36p7l3gdlrswj2jri6w5oeiuz5aajli
   behaviours/post_transaction.py: bafybeih3sx6y2xhuc5gkoeed6skfb6zyur4xc36b2vma2hprpk4lqhgvlq
   behaviours/round_behaviour.py: bafybeiecxju6t7zsojnrhrefy4a7c75lkbveoxcayntw6heacao2qqkfdm
-  behaviours/scan_markets.py: bafybeifqsvskao36f5qoocclehhdykn4zxbhe5sbehogdpmlxf64r7ykte
+  behaviours/scan_markets.py: bafybeigzm7oevvb4esdypf6wbj5eekthapsuhwz2kw2u5obx42msmkqms4
   dialogues.py: bafybeict7mdksmjklx6wy2zplunpcfwhgxv5votxbsodidyum2phx3tv34
   fsm_specification.yaml: bafybeibibqujtoh4cp5qivd4fkguo7edjmdhggw6ihitjnzp4p2xr5vg3i
   handlers.py: bafybeigby2ymzvsoiwbgtdd4esk6xrkrafp2b22yqz5xi4ekrnqwqqoq4y
@@ -26,7 +26,7 @@ fingerprint:
   states/base.py: bafybeieywx5f6xtiu5ds5dsy4ewgjqjgkyiw537lwykmejstucch52g45i
   tests/__init__.py: bafybeidpf4le7kmwrvl6u3s4yl2mrlznnu7scha3hvcpd3s2omwo7bdwkq
   tests/behaviours/__init__.py: bafybeierpqlj4wjvfsa2acmkibioivviqudq4ulu5ifuqwcvdcfewzdgau
-  tests/behaviours/conftest.py: bafybeiab62qul2ktrqegbrtzxonsil4hw4dur5b6h5nlxbvviix55b72um
+  tests/behaviours/conftest.py: bafybeia3akipkpxmm5ig7xww2k57xisosagvtpuzkbv43j3imqfgrlqt2a
   tests/behaviours/test_base.py: bafybeibhhovs3qwn7rsvvivh4pizhtkobouex7levdms6zjgqfzqrnusze
   tests/behaviours/test_build_answer_tx.py: bafybeicxwjlb25foqgrhfroh3lz74wltaecowotbdeww4lh762ugy7bmae
   tests/behaviours/test_evaluate_answers.py: bafybeigyaitq3chjkaw7xaoprsncxw5qldjgkimhcxpmpdc5wrgk5psb7m
