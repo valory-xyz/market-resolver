@@ -89,6 +89,9 @@ def parse_mech_response(  # pylint: disable=too-many-return-statements
 
     Any other combination is garbage (e.g. API errors returning
     ``(False, False, None)``) and returns ``None`` so callers retry.
+
+    :param result: raw Mech response payload (JSON string) or ``None``.
+    :return: parsed answer dict on a recognised pattern, else ``None``.
     """
     if result is None:
         return None
@@ -142,6 +145,9 @@ def is_cached_evaluation_valid(evaluation: Optional[dict]) -> bool:
 
     Cases A (INVALID), C1 (YES), C2 (NO) have answer set and are cacheable.
     Case B (undeterminable, answer=None) and garbage (None) are not.
+
+    :param evaluation: cached parse result from ``parse_mech_response``.
+    :return: True if the evaluation carries a definitive answer.
     """
     if evaluation is None:
         return False
@@ -316,11 +322,13 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
     ) -> Generator[None, None, Optional[Dict[str, Any]]]:
         """Look up a prior valid Mech response for this market from our Safe.
 
-        Returns:
-        - ``{"evaluation": ..., "mech_response": ...}`` on cache hit.
-        - ``{}`` (empty dict) on a definitive miss (subgraph responded but
-          no matching valid request found).
-        - ``None`` on subgraph error (caller should retry next cycle).
+        :param market_id: the Realitio question id under evaluation.
+        :param entry: the watched-markets entry (``title``,
+            ``market_closing_timestamp``, etc.) used to scope the lookup.
+        :return: ``{"evaluation": ..., "mech_response": ...}`` on cache hit;
+            ``{}`` on a definitive miss (subgraph responded, no match);
+            ``None`` on subgraph error (caller should retry next cycle).
+        :yield: HTTP requests to the Realitio subgraph.
         """
         title = entry.get("title")
         closing_ts = entry.get("market_closing_timestamp")

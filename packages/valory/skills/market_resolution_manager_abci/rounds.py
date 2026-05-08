@@ -135,6 +135,8 @@ class EvaluateAnswersRound(CollectSameUntilThresholdRound):
         Routes based on which field is set:
         - mech_requests -> DONE -> FinishedWithMechRequestRound
         - evaluation_result -> NONE -> BuildAnswerTxRound
+
+        :return: ``(synchronized_data, event)`` once threshold is reached, else None.
         """
         if self.threshold_reached:
             values = dict(zip(self.selection_key, self.most_voted_payload_values))

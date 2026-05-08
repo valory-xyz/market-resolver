@@ -400,7 +400,12 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
     ) -> Generator[None, None, Optional[str]]:
         """Build a submitAnswer tx wrapped in multisend for Safe execution.
 
-        Returns the payload hash string for TxSettlement, or None on error.
+        :param question_id: 0x-prefixed Realitio question id (32 bytes).
+        :param answer: 0x-prefixed encoded answer (32 bytes).
+        :param max_previous: prior bond used to validate the new bid.
+        :param bond: bond amount (in wei) to attach to the answer.
+        :return: payload hash string for TxSettlement, or None on error.
+        :yield: ledger / contract-api requests built during tx assembly.
         """
         # Step 1: Get the Realitio submitAnswer calldata
         try:
@@ -527,6 +532,9 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
 
         tx_hash not None -> done_event -> FinishedWithAnswerTxRound -> TxSettlement
         tx_hash None -> none_event -> CleanupTrackedMarketsRound
+
+        :param tx_hash: payload hash from ``_build_submit_answer_tx``, or None.
+        :yield: payload submission to the consensus round.
         """
         self.questions_db = dict(self.questions_db)
         sender = self.context.agent_address
