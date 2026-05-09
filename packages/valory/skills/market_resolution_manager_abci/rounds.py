@@ -137,6 +137,9 @@ class EvaluateAnswersRound(CollectSameUntilThresholdRound):
         - mech_requests -> DONE -> FinishedWithMechRequestRound
         - evaluation_result -> NONE -> BuildAnswerTxRound
         - both None -> SKIP -> FinishedResolutionRound (intentional no-op)
+
+        :return: the next state and the routing event, or ``None`` while
+            consensus is still pending.
         """
         if self.threshold_reached:
             values = dict(zip(self.selection_key, self.most_voted_payload_values))

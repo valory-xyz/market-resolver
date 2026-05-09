@@ -322,14 +322,14 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
     ) -> Generator[None, None, Optional[Dict[str, Any]]]:
         """Look up a prior valid Mech response for this market from our Safe.
 
-        Returns:
-        - ``{"evaluation": ..., "mech_response": ..., "prior_attempts": N}``
-          on cache hit (N counts prior delivered tool/title-matching requests
-          including the cache-hit one).
-        - ``{"prior_attempts": N}`` on a definitive miss (subgraph responded
-          but no valid evaluation found; N is the prior-attempt count, used
-          to seed ``mech_retries`` so the count survives restarts).
-        - ``None`` on subgraph error (caller should retry next cycle).
+        :param market_id: the FPMM market id (for log output).
+        :param entry: the per-market state dict (must have ``title`` and
+            ``market_closing_timestamp``).
+        :yield: contract / subgraph requests during the lookup.
+        :return: ``{"evaluation", "mech_response", "prior_attempts"}`` on
+            cache hit; ``{"prior_attempts": N}`` on a definitive miss
+            (subgraph responded but no valid evaluation); ``None`` on
+            subgraph error (caller should retry next cycle).
         """
         title = entry.get("title")
         closing_ts = entry.get("market_closing_timestamp")
