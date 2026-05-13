@@ -64,8 +64,11 @@ MECH_CACHE_QUERY_TEMPLATE = """
       parsedRequest {{
         prompt
         tool
+        nonce
       }}
-      deliveries(first: 1) {{
+      deliveries(orderBy: blockTimestamp, orderDirection: asc) {{
+        id
+        blockTimestamp
         toolResponse
       }}
     }}
@@ -317,85 +320,41 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
             )
             return None
 
-    def find_cached_valid_mech_delivery(  # pylint: disable=too-many-locals
-        self, market_id: str, entry: Dict[str, Any]
-    ) -> Generator[None, None, Optional[Dict[str, Any]]]:
-        """Look up a prior valid Mech response for this market from our Safe.
+    def fetch_mech_requests_for_market(
+        self, entry: Dict[str, Any]
+    ) -> Generator[None, None, Optional[list]]:
+        """Fetch Mech requests + deliveries for this market from the subgraph.
 
-        :param market_id: the FPMM market id (for log output).
-        :param entry: the per-market state dict (must have ``title`` and
-            ``market_closing_timestamp``).
-        :yield: contract / subgraph requests during the lookup.
-        :return: ``{"evaluation", "mech_response", "prior_attempts"}`` on
-            cache hit; ``{"prior_attempts": N}`` on a definitive miss
-            (subgraph responded but no valid evaluation); ``None`` on
-            subgraph error (caller should retry next cycle).
+        Returns the verbatim subgraph request entries (each containing its
+        nested ``deliveries`` list), filtered to those whose ``parsedRequest``
+        matches the expected tool and the market title.
+
+        :param entry: the per-market state dict.
+        :yield: subgraph HTTP request.
+        :return: list of matching verbatim subgraph request entries, or
+            ``None`` on subgraph error.
         """
-        title = entry.get("title")
-        closing_ts = entry.get("market_closing_timestamp")
-        if not title or not closing_ts:
-            return {"prior_attempts": 0}
+        title = entry.get("title") or ""
+        closing_ts = entry.get("market_closing_timestamp") or 0
+        safe_address = self.synchronized_data.safe_contract_address or ""
 
-        safe_address = self.synchronized_data.safe_contract_address
-        if not safe_address:
-            return None
-
-        sender_id = safe_address.lower()
         query = MECH_CACHE_QUERY_TEMPLATE.format(
-            sender=sender_id,
+            sender=safe_address.lower(),
             prompt=json.dumps(title),
             block_timestamp_gt=int(closing_ts),
-        )
-
-        self.context.logger.info(
-            f"Market {market_id}: querying Mech Gnosis subgraph for prior "
-            f"responses (sender={sender_id}, closing_ts={closing_ts})."
         )
 
         result = yield from self.get_mech_gnosis_subgraph_result(query)
         if result is None:
             return None
 
-        sender_data = (result.get("data") or {}).get("sender")
-        if not sender_data:
-            return {"prior_attempts": 0}
-
-        requests = sender_data.get("requests") or []
-        expected_tool = self.params.mech_tool_resolve_market
-
-        prior_attempts = 0
-        for req in requests:
-            parsed = req.get("parsedRequest") or {}
-            if parsed.get("tool") != expected_tool:
-                continue
-            if parsed.get("prompt") != title:
-                continue
-            deliveries = req.get("deliveries") or []
-            if not deliveries:
-                continue
-            prior_attempts += 1
-            tool_response = deliveries[0].get("toolResponse")
-            evaluation = parse_mech_response(tool_response)
-            if evaluation is None:
-                continue
-            if not is_cached_evaluation_valid(evaluation):
-                continue
-
-            return {
-                "evaluation": evaluation,
-                "mech_response": {
-                    "source": "subgraph",
-                    "subgraph_request_id": req.get("id"),
-                    "block_timestamp": int(req.get("blockTimestamp", 0)),
-                    "result": tool_response,
-                    "tool": parsed.get("tool"),
-                },
-                "prior_attempts": prior_attempts,
-            }
-
-        self.context.logger.info(
-            f"Market {market_id}: subgraph returned {len(requests)} prior "
-            f"requests, {prior_attempts} matched tool/title with delivered "
-            f"response, none had a valid evaluation."
+        all_requests = (
+            ((result.get("data") or {}).get("sender") or {}).get("requests") or []
         )
-        return {"prior_attempts": prior_attempts}
+        expected_tool = self.params.mech_tool_resolve_market
+        return [
+            req
+            for req in all_requests
+            if (req.get("parsedRequest") or {}).get("tool") == expected_tool
+            and (req.get("parsedRequest") or {}).get("prompt") == title
+        ]

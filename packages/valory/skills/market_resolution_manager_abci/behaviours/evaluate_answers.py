@@ -107,9 +107,15 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
 
         mech_requests_json = json.dumps([asdict(mech_request)], sort_keys=True)
 
-        # Increment retry counter
+        # Increment retry counter immediately (local fact: we just fired a
+        # request). scan_markets later does
+        # ``mech_retries = max(mech_retries, len(mech_requests_from_subgraph))``
+        # to converge once the subgraph indexes this request.
         entry["mech_retries"] = retries + 1
-        entry["mech_request"] = asdict(mech_request)
+        # ``pending_nonce`` lets build_answer_tx match the in-process
+        # MechInteract delivery (``SynchronizedData.mech_responses``) back to
+        # this market before the subgraph has indexed the new request.
+        entry["pending_nonce"] = nonce
         questions_db[market_id] = entry
         self.questions_db = questions_db
 

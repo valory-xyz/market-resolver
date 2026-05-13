@@ -97,7 +97,13 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
         # Check if we have fresh Mech responses (from MechInteract).
         # Skip if the evaluation was already populated by the subgraph
         # cache path -- MechInteract didn't run in that case.
-        expected_nonce = (entry.get("mech_request") or {}).get("nonce")
+        #
+        # ``pending_nonce`` is set by evaluate_answers when it fires a Mech
+        # request; the in-process MechInteract delivery is matched by nonce.
+        # The next scan_markets cycle will re-source ``mech_requests`` from
+        # the subgraph once it indexes this delivery, so we only need to
+        # populate ``evaluation`` here.
+        expected_nonce = entry.get("pending_nonce")
         if entry.get("evaluation") is None and expected_nonce:
             mech_responses = self.synchronized_data.mech_responses
         else:
@@ -119,15 +125,8 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
                         )
                     else:
                         entry["evaluation"] = evaluation
-                        entry["mech_response"] = {
-                            "source": "mech_interact",
-                            "nonce": resp.nonce,
-                            "result": resp.result,
-                            "error": resp.error,
-                            "requestId": resp.requestId,
-                        }
                     break
-            # Save DB with mech response data
+            # Save DB with evaluation if matched
             questions_db[market_id] = entry
             self.questions_db = questions_db
 

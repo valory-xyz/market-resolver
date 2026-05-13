@@ -24,6 +24,8 @@ from typing import Any, Dict, Generator, List, Optional
 
 from packages.valory.skills.market_resolution_manager_abci.behaviours.base import (
     MarketResolutionManagerBaseBehaviour,
+    is_cached_evaluation_valid,
+    parse_mech_response,
 )
 from packages.valory.skills.market_resolution_manager_abci.payloads import (
     ScanMarketsPayload,
@@ -178,32 +180,30 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             else:
                 questions_db[market_id] = self._new_entry(market, current_answerer, now)
 
-        # Step 5: Rehydrate Mech cache + retry counter for entries missing
-        # evaluation. We re-query the subgraph on every scan so that:
+        # Step 5: Refresh mech_requests cache from the Mech Gnosis subgraph.
+        # We re-query every scan so that:
         # 1. Late deliveries (responses that arrive after our in-process
         #    ``mech_response_round`` timed out) are still picked up.
         #    Otherwise a Mech that is slow but eventually responsive forces
         #    us to re-request the same market forever.
-        # 2. ``mech_retries`` is sourced from on-chain history (prior
-        #    delivered requests for this prompt) rather than an in-memory
-        #    counter, so the exhaustion gate below survives agent restarts.
-        for market_id, entry in questions_db.items():
+        # 2. ``mech_retries`` converges to ``len(mech_requests)`` once the
+        #    subgraph catches up, so the exhaustion gate survives restarts.
+        #    The ``max()`` below guarantees the counter is monotonic: a brief
+        #    subgraph-indexing-lag right after ``evaluate_answers`` fires
+        #    a request can never lower the count back below the local value.
+        for _, entry in questions_db.items():
+            requests = yield from self.fetch_mech_requests_for_market(entry)
+            if requests is None:
+                continue
+            entry["mech_requests"] = requests
             if entry.get("evaluation") is None:
-                cached = yield from self.find_cached_valid_mech_delivery(
-                    market_id, entry
-                )
-                if cached is None:
-                    continue
-                if cached.get("evaluation") is not None:
-                    entry["evaluation"] = cached["evaluation"]
-                    entry["mech_response"] = cached["mech_response"]
-                # Seed retry count from on-chain history. Use max() to
-                # handle the rare in-flight case where we've requested
-                # locally but the subgraph hasn't indexed it yet.
-                entry["mech_retries"] = max(
-                    entry.get("mech_retries", 0),
-                    int(cached.get("prior_attempts", 0)),
-                )
+                evaluation = self._earliest_valid_evaluation(requests)
+                if evaluation is not None:
+                    entry["evaluation"] = evaluation
+            entry["mech_retries"] = max(
+                int(entry.get("mech_retries", 0)),
+                len(requests),
+            )
 
         # Step 6: Classify statuses from current data
         for entry in questions_db.values():
@@ -223,9 +223,10 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             else:
                 # No evaluation, or undeterminable (answer=None).
                 # Clear stale undeterminable evaluations so a fresh Mech
-                # request is made once retry_after expires.
+                # request is made once retry_after expires. ``mech_requests``
+                # is sourced from the subgraph each scan; do not mutate it
+                # here.
                 entry["evaluation"] = None
-                entry["mech_response"] = None
                 entry["status"] = AnswerStatus.NEEDS_VERIFICATION
 
         # Step 7: Select actionable market
@@ -391,6 +392,28 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         return answerers
 
     @staticmethod
+    def _earliest_valid_evaluation(
+        mech_requests: List[Dict[str, Any]],
+    ) -> Optional[Dict[str, Any]]:
+        """Return the earliest valid evaluation across the subgraph entries.
+
+        ``mech_requests`` is assumed already ordered ``blockTimestamp asc``.
+        Per request we only inspect ``deliveries[0]`` -- multi-delivery is a
+        rare subgraph edge case and we always treat the first as canonical.
+        """
+        for req in mech_requests:
+            deliveries = req.get("deliveries") or []
+            if not deliveries:
+                continue
+            evaluation = parse_mech_response(deliveries[0].get("toolResponse"))
+            if evaluation is None:
+                continue
+            if not is_cached_evaluation_valid(evaluation):
+                continue
+            return evaluation
+        return None
+
+    @staticmethod
     def _new_entry(
         market: Dict[str, Any],
         answerer: str,
@@ -409,8 +432,8 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             "last_answer_timestamp": market.get("currentAnswerTimestamp"),
             "market_closing_timestamp": int(market.get("openingTimestamp", 0)),
             "realitio_timeout": int(market.get("timeout", 86400)),
-            "mech_request": None,
-            "mech_response": None,
+            "mech_requests": [],
+            "pending_nonce": None,
             "evaluation": None,
             "pending_tx": None,
             "mech_retries": 0,
