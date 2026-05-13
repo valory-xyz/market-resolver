@@ -50,12 +50,12 @@ protocols:
 - valory/contract_api:1.0.0:bafybeibld2xb5m7kyluiptkamp4nrt6oeomkohz7a3yppbv2oo7qw2e4la
 skills:
 - valory/abstract_round_abci:0.1.0:bafybeidpod4inivvvgzenx46whshq4mzmxgwsxinv6ibdvyemkstam2yz4
-- valory/mech_interact_abci:0.1.0:bafybeiburftv5nj5427qyue2f5sx56fpfskalnplwoow2ixqbvgio3kfky
+- valory/mech_interact_abci:0.1.0:bafybeihds6vqk3gsevtsdsowz56jdnbbhc6gnswwd25opm6rrj32dhsmou
 - valory/transaction_settlement_abci:0.1.0:bafybeigiojqgbi54jhree3sqrzaudbmjxb7y2ete74bbliryi3t7ztwi5q
 - valory/funds_forwarder_abci:0.1.0:bafybeihinrqecswpwjmba4dtpvvepmz7uqzkgmywanbdl4pahki3crdg3m
-- valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeib6tc36wxjr3xbcotrgv3tvqq54bwedbak64dudz45ei3xakfxeb4
-- valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeig33nweqe6fogfktt7g5b7lnfjnylejqrdfwse63wrrnsudvdvihm
-- valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeiabugho5b62pnr6uudeierj77ha3k2izouz5uhvwcckjalk5fayra
+- valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeifqvjl42y6zjb5diabfu76kedyrkvravszjav6gdsmihqrdrk75yq
+- valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeibn7gla57eakwfal4lvyj7prqnjwfycbsecwobkzx7z777kbghapy
+- valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeig34ypstbynxjwayyjtn3qmnr4vrxgaxoqyvpgm5lff7i2ksrgm4m
 behaviours:
   main:
     args: {}
