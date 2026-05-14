@@ -30,6 +30,7 @@ from packages.valory.contracts.realitio.contract import RealitioContract
 from packages.valory.protocols.contract_api import ContractApiMessage
 from packages.valory.skills.market_resolution_manager_abci.behaviours.base import (
     MarketResolutionManagerBaseBehaviour,
+    jury_error_discriminator,
     parse_mech_response,
 )
 from packages.valory.skills.market_resolution_manager_abci.payloads import (
@@ -119,10 +120,23 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
                     # Parse the Mech result
                     evaluation = parse_mech_response(resp.result)
                     if evaluation is None:
-                        self.context.logger.warning(
-                            f"Could not parse Mech result as JSON: "
-                            f"{(resp.result or '')[:200]}"
-                        )
+                        # Distinguish "valid JSON, off-contract shape" (e.g.
+                        # jury's all_voters_failed / judge_unparseable /
+                        # malformed_verdict discriminators) from "couldn't
+                        # parse at all" -- operators chasing stuck markets
+                        # need to tell API outage from parser failure.
+                        discriminator = jury_error_discriminator(resp.result)
+                        if discriminator is not None:
+                            self.context.logger.warning(
+                                f"Market {market_id}: Mech jury reported "
+                                f"error='{discriminator}' (treating as "
+                                f"garbage, will retry)."
+                            )
+                        else:
+                            self.context.logger.warning(
+                                f"Could not parse Mech result as JSON: "
+                                f"{(resp.result or '')[:200]}"
+                            )
                     else:
                         entry["evaluation"] = evaluation
                     break

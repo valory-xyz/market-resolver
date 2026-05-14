@@ -32,6 +32,7 @@ from packages.valory.skills.market_resolution_manager_abci.behaviours.base impor
     ANSWER_NO,
     ANSWER_YES,
     is_cached_evaluation_valid,
+    jury_error_discriminator,
     parse_mech_response,
     to_content,
 )
@@ -160,6 +161,59 @@ class TestParseMechResponse:
         result = parse_mech_response(json.dumps({}))
         assert result is None
 
+    def test_garbage_jury_all_voters_failed_payload(self) -> None:
+        """``all_voters_failed`` error payload from the jury -> garbage (None).
+
+        Cross-repo contract: when every voter in resolve-market-jury-v1
+        errors out (e.g. HTTP 402 quota), the jury emits ``(None, None,
+        None) + error="all_voters_failed"``. The parser must NOT treat
+        this as INVALID -- ``is_valid`` is ``None``, not ``False``.
+        """
+        result = parse_mech_response(
+            json.dumps(
+                {
+                    "is_valid": None,
+                    "is_determinable": None,
+                    "has_occurred": None,
+                    "error": "all_voters_failed",
+                    "judge_reasoning": "All voters failed.",
+                    "n_voters": 4,
+                    "n_successful": 0,
+                    "n_decided": 0,
+                    "agreement_ratio": 0.0,
+                }
+            )
+        )
+        assert result is None
+
+    def test_garbage_jury_judge_unparseable_payload(self) -> None:
+        """``judge_unparseable`` discriminator -> garbage (None)."""
+        result = parse_mech_response(
+            json.dumps(
+                {
+                    "is_valid": None,
+                    "is_determinable": None,
+                    "has_occurred": None,
+                    "error": "judge_unparseable",
+                }
+            )
+        )
+        assert result is None
+
+    def test_garbage_jury_malformed_verdict_payload(self) -> None:
+        """``malformed_verdict`` discriminator -> garbage (None)."""
+        result = parse_mech_response(
+            json.dumps(
+                {
+                    "is_valid": None,
+                    "is_determinable": None,
+                    "has_occurred": None,
+                    "error": "malformed_verdict",
+                }
+            )
+        )
+        assert result is None
+
     def test_agreement_ratio_defaults_to_zero(self) -> None:
         """agreement_ratio defaults to 0.0 when absent."""
         result = parse_mech_response(
@@ -222,6 +276,75 @@ class TestParseMechResponse:
             )
         )
         assert result is None
+
+
+# ---------------------------------------------------------------------------
+# jury_error_discriminator
+# ---------------------------------------------------------------------------
+
+
+class TestJuryErrorDiscriminator:
+    """Tests for ``jury_error_discriminator``.
+
+    Operator-facing observability: when the jury emits an off-contract
+    payload, the ``error`` field tells the operator API outage from a
+    genuine parser failure. The helper extracts it for logging.
+    """
+
+    def test_none_input(self) -> None:
+        """``None`` payload returns ``None``."""
+        assert jury_error_discriminator(None) is None
+
+    def test_non_json(self) -> None:
+        """Non-JSON garbage returns ``None`` (handled by upstream warning)."""
+        assert jury_error_discriminator("not json") is None
+
+    def test_non_dict_json(self) -> None:
+        """Top-level non-dict JSON returns ``None``."""
+        assert jury_error_discriminator(json.dumps([1, 2, 3])) is None
+        assert jury_error_discriminator(json.dumps("scalar")) is None
+
+    def test_dict_without_error_field(self) -> None:
+        """A normal verdict (no ``error``) returns ``None``."""
+        result = jury_error_discriminator(
+            json.dumps(
+                {"is_valid": True, "is_determinable": True, "has_occurred": True}
+            )
+        )
+        assert result is None
+
+    def test_all_voters_failed(self) -> None:
+        """The jury's ``all_voters_failed`` discriminator surfaces."""
+        result = jury_error_discriminator(
+            json.dumps(
+                {
+                    "is_valid": None,
+                    "is_determinable": None,
+                    "has_occurred": None,
+                    "error": "all_voters_failed",
+                }
+            )
+        )
+        assert result == "all_voters_failed"
+
+    def test_judge_unparseable(self) -> None:
+        """The jury's ``judge_unparseable`` discriminator surfaces."""
+        result = jury_error_discriminator(json.dumps({"error": "judge_unparseable"}))
+        assert result == "judge_unparseable"
+
+    def test_malformed_verdict(self) -> None:
+        """The jury's ``malformed_verdict`` discriminator surfaces."""
+        result = jury_error_discriminator(json.dumps({"error": "malformed_verdict"}))
+        assert result == "malformed_verdict"
+
+    def test_empty_string_error_is_ignored(self) -> None:
+        """An empty-string ``error`` field is treated as no error."""
+        assert jury_error_discriminator(json.dumps({"error": ""})) is None
+
+    def test_non_string_error_is_ignored(self) -> None:
+        """A non-string ``error`` field is treated as no error."""
+        assert jury_error_discriminator(json.dumps({"error": 42})) is None
+        assert jury_error_discriminator(json.dumps({"error": None})) is None
 
 
 # ---------------------------------------------------------------------------
@@ -536,18 +659,14 @@ class TestFetchMechRequestsForMarket:
         """Returns empty result when entry has no title."""
         b = _make_behaviour()
         result = _exhaust_gen(
-            b.fetch_mech_requests_for_market(
-                "0xM", {"market_closing_timestamp": 1234}
-            )
+            b.fetch_mech_requests_for_market("0xM", {"market_closing_timestamp": 1234})
         )
         assert result == self.EMPTY_RESULT
 
     def test_missing_closing_ts_returns_empty_dict(self) -> None:
         """Returns empty result when entry has no market_closing_timestamp."""
         b = _make_behaviour()
-        result = _exhaust_gen(
-            b.fetch_mech_requests_for_market("0xM", {"title": "Q?"})
-        )
+        result = _exhaust_gen(b.fetch_mech_requests_for_market("0xM", {"title": "Q?"}))
         assert result == self.EMPTY_RESULT
 
     def test_no_safe_address_returns_none(self) -> None:

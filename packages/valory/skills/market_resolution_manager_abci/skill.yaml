@@ -10,8 +10,8 @@ fingerprint:
   README.md: bafybeicebua5cqf3pfr34hy5mmnr6i7m7wgxlkzbto6woi5dkuv4fqbymi
   __init__.py: bafybeiedhf4rirdachml54zzde7nl3nhuwz4c5xwskrc5udfphefbrdsfu
   behaviours/__init__.py: bafybeignnrbklzekhqurn6ptli5zhzsov2qtdzr5se4xe4hqdywt2vbtvu
-  behaviours/base.py: bafybeidv57yvidc4dnorricfvzmdulpk24c4p5pb3wvbu7qce7oiabj2oy
-  behaviours/build_answer_tx.py: bafybeiayvfttrlo6lkwu3noxyys7nx3773zsrouyueod65n75n2n4sqrrm
+  behaviours/base.py: bafybeig4he3y5rwz2tsi53fmfsb5s25ldo5l36ha4amt5vllnysppfndku
+  behaviours/build_answer_tx.py: bafybeidv7zsaxwm7c34p2zr3li4kbnh7bjvh6torlss76zjthsoaywwv6e
   behaviours/evaluate_answers.py: bafybeidaljtlkhjxnhsy72jljwuonxrld4bccw5xezteuushxu54a3ooly
   behaviours/post_transaction.py: bafybeih3sx6y2xhuc5gkoeed6skfb6zyur4xc36b2vma2hprpk4lqhgvlq
   behaviours/round_behaviour.py: bafybeiecxju6t7zsojnrhrefy4a7c75lkbveoxcayntw6heacao2qqkfdm
@@ -27,8 +27,8 @@ fingerprint:
   tests/__init__.py: bafybeidpf4le7kmwrvl6u3s4yl2mrlznnu7scha3hvcpd3s2omwo7bdwkq
   tests/behaviours/__init__.py: bafybeierpqlj4wjvfsa2acmkibioivviqudq4ulu5ifuqwcvdcfewzdgau
   tests/behaviours/conftest.py: bafybeia3akipkpxmm5ig7xww2k57xisosagvtpuzkbv43j3imqfgrlqt2a
-  tests/behaviours/test_base.py: bafybeiejw6f75ga3sf4jrrvyzo5l55warx25gbh73z7cqqa2zon3umo2wu
-  tests/behaviours/test_build_answer_tx.py: bafybeicxwjlb25foqgrhfroh3lz74wltaecowotbdeww4lh762ugy7bmae
+  tests/behaviours/test_base.py: bafybeiep3pq6flfhvvwapvsvgttknipzvvolklhiyu6oysdaiz7nwruk2e
+  tests/behaviours/test_build_answer_tx.py: bafybeibnlnbrxvbcs6khbbyfgqn3xnmeyeekyroagonyyat7u5r3ugzc74
   tests/behaviours/test_evaluate_answers.py: bafybeigyaitq3chjkaw7xaoprsncxw5qldjgkimhcxpmpdc5wrgk5psb7m
   tests/behaviours/test_post_transaction.py: bafybeibihvgozgvlrfyrkpq7gg3hpvzp5h7g633oggqnu5auqtnfyakbcy
   tests/behaviours/test_round_behaviour.py: bafybeifcvxp5vlshg4xbego4frjsahvvvmjebj5s27l5ba7eyijsxry7ka

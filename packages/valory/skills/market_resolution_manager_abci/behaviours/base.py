@@ -143,6 +143,35 @@ def parse_mech_response(  # pylint: disable=too-many-return-statements
     return None
 
 
+def jury_error_discriminator(result: Optional[str]) -> Optional[str]:
+    """Return the jury's ``error`` discriminator if the payload reports one.
+
+    The resolve-market-jury-v1 Mech tool emits a top-level ``error`` field
+    on its off-contract / failure paths (``all_voters_failed``,
+    ``judge_unparseable``, ``malformed_verdict``) alongside the
+    ``(None, None, None)`` verdict tuple. ``parse_mech_response`` correctly
+    routes these to the garbage path, but the discriminator itself is
+    operationally valuable -- it lets the operator distinguish an API
+    outage from a genuine parser failure. Returns ``None`` for non-JSON
+    payloads, JSON without an ``error`` field, or non-dict JSON.
+
+    :param result: raw Mech response payload (JSON string) or ``None``.
+    :return: the ``error`` string if present, else ``None``.
+    """
+    if result is None:
+        return None
+    try:
+        data = json.loads(result)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    err = data.get("error")
+    if isinstance(err, str) and err:
+        return err
+    return None
+
+
 def is_cached_evaluation_valid(evaluation: Optional[dict]) -> bool:
     """Return True if a cached evaluation has a definitive answer.
 
@@ -348,9 +377,9 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
         if result is None:
             return None
 
-        all_requests = (
-            ((result.get("data") or {}).get("sender") or {}).get("requests") or []
-        )
+        all_requests = ((result.get("data") or {}).get("sender") or {}).get(
+            "requests"
+        ) or []
         expected_tool = self.params.mech_tool_resolve_market
         return [
             req
