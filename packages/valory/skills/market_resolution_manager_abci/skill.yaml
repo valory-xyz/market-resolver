@@ -15,7 +15,7 @@ fingerprint:
   behaviours/evaluate_answers.py: bafybeidaljtlkhjxnhsy72jljwuonxrld4bccw5xezteuushxu54a3ooly
   behaviours/post_transaction.py: bafybeih3sx6y2xhuc5gkoeed6skfb6zyur4xc36b2vma2hprpk4lqhgvlq
   behaviours/round_behaviour.py: bafybeiecxju6t7zsojnrhrefy4a7c75lkbveoxcayntw6heacao2qqkfdm
-  behaviours/scan_markets.py: bafybeieagp2jkt42jlculhrk6m4g76hh2vfmp6qcvq4bdjzwzmnnjz7vxq
+  behaviours/scan_markets.py: bafybeifad2jdfvt3vqxd3mtar5zkn4exayo7mwbuyncn7pwuwkksv2oowi
   dialogues.py: bafybeict7mdksmjklx6wy2zplunpcfwhgxv5votxbsodidyum2phx3tv34
   fsm_specification.yaml: bafybeibibqujtoh4cp5qivd4fkguo7edjmdhggw6ihitjnzp4p2xr5vg3i
   handlers.py: bafybeigby2ymzvsoiwbgtdd4esk6xrkrafp2b22yqz5xi4ekrnqwqqoq4y
@@ -27,7 +27,7 @@ fingerprint:
   tests/__init__.py: bafybeidpf4le7kmwrvl6u3s4yl2mrlznnu7scha3hvcpd3s2omwo7bdwkq
   tests/behaviours/__init__.py: bafybeierpqlj4wjvfsa2acmkibioivviqudq4ulu5ifuqwcvdcfewzdgau
   tests/behaviours/conftest.py: bafybeia3akipkpxmm5ig7xww2k57xisosagvtpuzkbv43j3imqfgrlqt2a
-  tests/behaviours/test_base.py: bafybeiep3pq6flfhvvwapvsvgttknipzvvolklhiyu6oysdaiz7nwruk2e
+  tests/behaviours/test_base.py: bafybeifclnu4heaziacmrifa3dawodrr6pbjnal3yyu55fmwfhnpyvenma
   tests/behaviours/test_build_answer_tx.py: bafybeibnlnbrxvbcs6khbbyfgqn3xnmeyeekyroagonyyat7u5r3ugzc74
   tests/behaviours/test_evaluate_answers.py: bafybeigyaitq3chjkaw7xaoprsncxw5qldjgkimhcxpmpdc5wrgk5psb7m
   tests/behaviours/test_post_transaction.py: bafybeibihvgozgvlrfyrkpq7gg3hpvzp5h7g633oggqnu5auqtnfyakbcy

@@ -23,7 +23,7 @@
 # pylint: disable=unsubscriptable-object,unsupported-membership-test
 
 import json
-from typing import Any
+from typing import Any, Dict
 from unittest.mock import MagicMock, PropertyMock, patch
 
 from packages.valory.protocols.ledger_api import LedgerApiMessage
@@ -648,7 +648,7 @@ class TestFetchMechRequestsForMarket:
     directly.
     """
 
-    EMPTY_RESULT = {"mech_requests": [], "earliest_evaluation": None}
+    EMPTY_RESULT: Dict[str, Any] = {"mech_requests": [], "earliest_evaluation": None}
 
     def _make_entry(
         self, title: str = "Will X happen?", closing_ts: int = 1_700_000_000
@@ -659,31 +659,27 @@ class TestFetchMechRequestsForMarket:
         """Returns empty result when entry has no title."""
         b = _make_behaviour()
         result = _exhaust_gen(
-            b.fetch_mech_requests_for_market("0xM", {"market_closing_timestamp": 1234})
+            b.fetch_mech_requests_for_market({"market_closing_timestamp": 1234})
         )
         assert result == self.EMPTY_RESULT
 
     def test_missing_closing_ts_returns_empty_dict(self) -> None:
         """Returns empty result when entry has no market_closing_timestamp."""
         b = _make_behaviour()
-        result = _exhaust_gen(b.fetch_mech_requests_for_market("0xM", {"title": "Q?"}))
+        result = _exhaust_gen(b.fetch_mech_requests_for_market({"title": "Q?"}))
         assert result == self.EMPTY_RESULT
 
     def test_no_safe_address_returns_none(self) -> None:
         """Returns None when safe_contract_address is falsy."""
         b = _make_behaviour(synced_data=_make_synced_data(safe_address=""))
-        result = _exhaust_gen(
-            b.fetch_mech_requests_for_market("0xM", self._make_entry())
-        )
+        result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
         assert result is None
 
     def test_subgraph_error_returns_none(self) -> None:
         """Returns None when subgraph call fails."""
         b = _make_behaviour()
         with patch.object(b, "get_mech_gnosis_subgraph_result", new=_make_gen(None)):
-            result = _exhaust_gen(
-                b.fetch_mech_requests_for_market("0xM", self._make_entry())
-            )
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
         assert result is None
 
     def test_no_sender_data_returns_empty_dict(self) -> None:
@@ -692,9 +688,7 @@ class TestFetchMechRequestsForMarket:
         with patch.object(
             b, "get_mech_gnosis_subgraph_result", new=_make_gen({"data": {}})
         ):
-            result = _exhaust_gen(
-                b.fetch_mech_requests_for_market("0xM", self._make_entry())
-            )
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
         assert result == self.EMPTY_RESULT
 
     def test_no_matching_requests_returns_empty_dict(self) -> None:
@@ -730,9 +724,7 @@ class TestFetchMechRequestsForMarket:
         with patch.object(
             b, "get_mech_gnosis_subgraph_result", new=_make_gen(subgraph_data)
         ):
-            result = _exhaust_gen(
-                b.fetch_mech_requests_for_market("0xM", self._make_entry())
-            )
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
         # Wrong tool -> filtered out -> empty list
         assert result == self.EMPTY_RESULT
 
@@ -769,16 +761,16 @@ class TestFetchMechRequestsForMarket:
         with patch.object(
             b, "get_mech_gnosis_subgraph_result", new=_make_gen(subgraph_data)
         ):
-            result = _exhaust_gen(
-                b.fetch_mech_requests_for_market("0xM", self._make_entry())
-            )
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
         # Wrong prompt -> filtered out -> empty list
         assert result == self.EMPTY_RESULT
 
     def test_no_delivery_skipped(self) -> None:
-        """Request with empty deliveries is still kept in mech_requests
-        (so len() reflects on-chain request count for retry-gate); no
-        evaluation can be derived from it."""
+        """Request with empty deliveries is still kept in mech_requests.
+
+        ``len()`` reflects on-chain request count for the retry-gate; no
+        evaluation can be derived from an empty deliveries list.
+        """
         b = _make_behaviour()
         request_entry = {
             "id": "req1",
@@ -793,17 +785,14 @@ class TestFetchMechRequestsForMarket:
         with patch.object(
             b, "get_mech_gnosis_subgraph_result", new=_make_gen(subgraph_data)
         ):
-            result = _exhaust_gen(
-                b.fetch_mech_requests_for_market("0xM", self._make_entry())
-            )
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
         assert result == {
             "mech_requests": [request_entry],
             "earliest_evaluation": None,
         }
 
     def test_garbage_response_skipped(self) -> None:
-        """Garbage tool response is kept in mech_requests but yields no
-        evaluation."""
+        """Garbage tool response is kept in mech_requests, yields no evaluation."""
         b = _make_behaviour()
         request_entry = {
             "id": "req1",
@@ -818,17 +807,19 @@ class TestFetchMechRequestsForMarket:
         with patch.object(
             b, "get_mech_gnosis_subgraph_result", new=_make_gen(subgraph_data)
         ):
-            result = _exhaust_gen(
-                b.fetch_mech_requests_for_market("0xM", self._make_entry())
-            )
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
         assert result == {
             "mech_requests": [request_entry],
             "earliest_evaluation": None,
         }
 
     def test_undeterminable_response_skipped(self) -> None:
-        """Undeterminable evaluation (answer=None) fails
-        is_cached_evaluation_valid -> request kept, no evaluation."""
+        """Undeterminable evaluation -> request kept, no evaluation derived.
+
+        ``answer=None`` fails ``is_cached_evaluation_valid``, so the
+        request entry is retained for retry-count purposes but
+        ``earliest_evaluation`` stays ``None``.
+        """
         b = _make_behaviour()
         request_entry = {
             "id": "req1",
@@ -849,9 +840,7 @@ class TestFetchMechRequestsForMarket:
         with patch.object(
             b, "get_mech_gnosis_subgraph_result", new=_make_gen(subgraph_data)
         ):
-            result = _exhaust_gen(
-                b.fetch_mech_requests_for_market("0xM", self._make_entry())
-            )
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
         assert result == {
             "mech_requests": [request_entry],
             "earliest_evaluation": None,
@@ -876,9 +865,7 @@ class TestFetchMechRequestsForMarket:
         with patch.object(
             b, "get_mech_gnosis_subgraph_result", new=_make_gen(subgraph_data)
         ):
-            result = _exhaust_gen(
-                b.fetch_mech_requests_for_market("0xM", self._make_entry())
-            )
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
 
         assert isinstance(result, dict)
         assert result["mech_requests"] == [request_entry]

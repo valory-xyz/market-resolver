@@ -395,12 +395,7 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
     def _earliest_valid_evaluation(
         mech_requests: List[Dict[str, Any]],
     ) -> Optional[Dict[str, Any]]:
-        """Return the earliest valid evaluation across the subgraph entries.
-
-        ``mech_requests`` is assumed already ordered ``blockTimestamp asc``.
-        Per request we only inspect ``deliveries[0]`` -- multi-delivery is a
-        rare subgraph edge case and we always treat the first as canonical.
-        """
+        """Earliest valid evaluation across requests (assumes timestamp-asc)."""
         for req in mech_requests:
             deliveries = req.get("deliveries") or []
             if not deliveries:
