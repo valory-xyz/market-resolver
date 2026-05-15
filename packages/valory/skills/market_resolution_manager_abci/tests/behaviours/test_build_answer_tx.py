@@ -216,6 +216,9 @@ class TestMechResponseProcessing:
         entry = _make_entry(
             mech_request={"nonce": "nonce-123", "tool": "t", "prompt": "Q"},
         )
+        # Production reads ``pending_nonce`` (not ``mech_request['nonce']``)
+        # to match incoming Mech responses -- see build_answer_tx.py:107.
+        entry["pending_nonce"] = "nonce-123"
         b = _make_behaviour(
             questions_db={"0xM": entry},
             mech_responses=[mech_resp],
@@ -241,6 +244,7 @@ class TestMechResponseProcessing:
         entry = _make_entry(
             mech_request={"nonce": "nonce-x", "tool": "t", "prompt": "Q"},
         )
+        entry["pending_nonce"] = "nonce-x"
         b = _make_behaviour(
             questions_db={"0xM": entry},
             mech_responses=[mech_resp],
