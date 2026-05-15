@@ -395,17 +395,18 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
     def _earliest_valid_evaluation(
         mech_requests: List[Dict[str, Any]],
     ) -> Optional[Dict[str, Any]]:
-        """Earliest valid evaluation across requests (assumes timestamp-asc)."""
+        """Earliest valid evaluation across requests + their deliveries."""
+        # ``base.py:69`` fetches deliveries unbounded by design; iterate
+        # ALL deliveries per request so a Mech-internal retry whose first
+        # delivery is garbage but a later one is valid still resolves.
         for req in mech_requests:
-            deliveries = req.get("deliveries") or []
-            if not deliveries:
-                continue
-            evaluation = parse_mech_response(deliveries[0].get("toolResponse"))
-            if evaluation is None:
-                continue
-            if not is_cached_evaluation_valid(evaluation):
-                continue
-            return evaluation
+            for delivery in req.get("deliveries") or []:
+                evaluation = parse_mech_response(delivery.get("toolResponse"))
+                if evaluation is None:
+                    continue
+                if not is_cached_evaluation_valid(evaluation):
+                    continue
+                return evaluation
         return None
 
     @staticmethod

@@ -23,7 +23,7 @@
 # pylint: disable=unsubscriptable-object,unsupported-membership-test
 
 import json
-from typing import Any, Dict
+from typing import Any, Dict, List
 from unittest.mock import MagicMock, PropertyMock, patch
 
 from packages.valory.protocols.ledger_api import LedgerApiMessage
@@ -815,5 +815,103 @@ class TestFetchMechRequestsForMarket:
         assert result == [request_entry]
         # Verify the caller can derive YES from this list via the helper.
         evaluation = ScanMarketsBehaviour._earliest_valid_evaluation(result)
+        assert evaluation is not None
+        assert evaluation["answer"] == ANSWER_YES
+
+
+# ---------------------------------------------------------------------------
+# ScanMarketsBehaviour._earliest_valid_evaluation -- helper unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestEarliestValidEvaluation:
+    """Tests for ``_earliest_valid_evaluation``.
+
+    Behaviour-independent unit tests for the static helper that derives
+    the first usable evaluation from a list of subgraph request entries.
+    """
+
+    @staticmethod
+    def _valid_yes_response() -> str:
+        return json.dumps(
+            {"is_valid": True, "is_determinable": True, "has_occurred": True}
+        )
+
+    @staticmethod
+    def _undeterminable_response() -> str:
+        return json.dumps({"is_valid": True, "is_determinable": False})
+
+    def test_empty_list_returns_none(self) -> None:
+        """No requests -> None."""
+        assert ScanMarketsBehaviour._earliest_valid_evaluation([]) is None
+
+    def test_request_with_no_deliveries_returns_none(self) -> None:
+        """Requests present but none have deliveries -> None."""
+        reqs: List[Dict[str, Any]] = [{"deliveries": []}, {"deliveries": []}]
+        assert ScanMarketsBehaviour._earliest_valid_evaluation(reqs) is None
+
+    def test_garbage_only_delivery_returns_none(self) -> None:
+        """A single unparseable delivery -> None (caller retries)."""
+        reqs = [{"deliveries": [{"toolResponse": "not json"}]}]
+        assert ScanMarketsBehaviour._earliest_valid_evaluation(reqs) is None
+
+    def test_undeterminable_only_delivery_returns_none(self) -> None:
+        """A single Case B (undeterminable) delivery -> None."""
+        reqs = [{"deliveries": [{"toolResponse": self._undeterminable_response()}]}]
+        assert ScanMarketsBehaviour._earliest_valid_evaluation(reqs) is None
+
+    def test_valid_single_delivery_returns_evaluation(self) -> None:
+        """A single valid YES delivery is returned."""
+        reqs = [{"deliveries": [{"toolResponse": self._valid_yes_response()}]}]
+        evaluation = ScanMarketsBehaviour._earliest_valid_evaluation(reqs)
+        assert evaluation is not None
+        assert evaluation["answer"] == ANSWER_YES
+
+    def test_multi_delivery_skips_garbage_and_returns_later_valid(self) -> None:
+        """Regression for #3248049101: a request with [garbage, valid] deliveries.
+
+        Production used to read only ``deliveries[0]`` -- if the first
+        delivery is unparseable garbage (e.g. Mech-internal retry), the
+        valid second delivery is missed and the market stays stuck. The
+        helper now iterates ALL deliveries per request.
+        """
+        reqs = [
+            {
+                "deliveries": [
+                    {"toolResponse": "not json"},
+                    {"toolResponse": self._valid_yes_response()},
+                ]
+            }
+        ]
+        evaluation = ScanMarketsBehaviour._earliest_valid_evaluation(reqs)
+        assert evaluation is not None
+        assert evaluation["answer"] == ANSWER_YES
+
+    def test_first_valid_across_multiple_requests_wins(self) -> None:
+        """When multiple requests have valid deliveries, take the earliest."""
+        reqs = [
+            # Earlier request -- one undeterminable + one valid YES
+            {
+                "deliveries": [
+                    {"toolResponse": self._undeterminable_response()},
+                    {"toolResponse": self._valid_yes_response()},
+                ]
+            },
+            # Later request -- valid NO (not reached, earlier wins)
+            {
+                "deliveries": [
+                    {
+                        "toolResponse": json.dumps(
+                            {
+                                "is_valid": True,
+                                "is_determinable": True,
+                                "has_occurred": False,
+                            }
+                        )
+                    }
+                ]
+            },
+        ]
+        evaluation = ScanMarketsBehaviour._earliest_valid_evaluation(reqs)
         assert evaluation is not None
         assert evaluation["answer"] == ANSWER_YES
