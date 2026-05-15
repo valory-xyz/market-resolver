@@ -266,8 +266,15 @@ class TestEvaluateAnswersBehaviour:
 
         assert b.questions_db["0xM"]["mech_retries"] == 3
 
-    def test_mech_request_stores_mech_request_in_db(self) -> None:
-        """Mech request metadata is stored in DB entry."""
+    def test_mech_request_stores_pending_nonce_in_db(self) -> None:
+        """The fired Mech request's nonce is stored on the DB entry.
+
+        Refactor: ``evaluate_answers`` no longer persists the full
+        ``mech_request`` dict (tool / prompt / nonce) -- only the nonce
+        via ``entry['pending_nonce']``. The canonical source for tool +
+        prompt is now the subgraph re-fetch in ``scan_markets`` (see
+        ``fetch_mech_requests_for_market`` -> ``mech_requests``).
+        """
         entry = _base_entry()
         b = _make_behaviour(
             questions_db={"0xM": entry},
@@ -281,5 +288,9 @@ class TestEvaluateAnswersBehaviour:
         ):
             _run_async_act(b)
 
-        assert b.questions_db["0xM"]["mech_request"] is not None
-        assert b.questions_db["0xM"]["mech_request"]["prompt"] == "Will X?"
+        assert b.questions_db["0xM"]["pending_nonce"] is not None
+        # The nonce is a UUID4 string at production (see
+        # evaluate_answers.py:96-118). We only assert it's a non-empty
+        # string -- the value itself is irrelevant to this test.
+        assert isinstance(b.questions_db["0xM"]["pending_nonce"], str)
+        assert b.questions_db["0xM"]["pending_nonce"] != ""

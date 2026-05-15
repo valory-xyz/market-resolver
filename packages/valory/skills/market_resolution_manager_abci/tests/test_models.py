@@ -125,7 +125,7 @@ class TestMarketResolutionManagerParams:
         assert params.max_challenge_bond == 16 * 10**18
         assert params.max_mech_retries == 10
         assert params.prefetch_mech_evaluations is False
-        assert params.mech_retry_cooldown == 3600
+        assert params.mech_retry_cooldown == 14400
         assert params.omen_subgraph_max_market_age_seconds == 365 * 86400
         assert params.mech_interact_round_timeout_seconds == 1200
 

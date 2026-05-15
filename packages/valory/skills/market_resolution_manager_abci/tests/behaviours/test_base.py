@@ -23,7 +23,7 @@
 # pylint: disable=unsubscriptable-object,unsupported-membership-test
 
 import json
-from typing import Any
+from typing import Any, Dict, List
 from unittest.mock import MagicMock, PropertyMock, patch
 
 from packages.valory.protocols.ledger_api import LedgerApiMessage
@@ -32,6 +32,7 @@ from packages.valory.skills.market_resolution_manager_abci.behaviours.base impor
     ANSWER_NO,
     ANSWER_YES,
     is_cached_evaluation_valid,
+    jury_error_discriminator,
     parse_mech_response,
     to_content,
 )
@@ -160,6 +161,59 @@ class TestParseMechResponse:
         result = parse_mech_response(json.dumps({}))
         assert result is None
 
+    def test_garbage_jury_all_voters_failed_payload(self) -> None:
+        """``all_voters_failed`` error payload from the jury -> garbage (None).
+
+        Cross-repo contract: when every voter in resolve-market-jury-v1
+        errors out (e.g. HTTP 402 quota), the jury emits ``(None, None,
+        None) + error="all_voters_failed"``. The parser must NOT treat
+        this as INVALID -- ``is_valid`` is ``None``, not ``False``.
+        """
+        result = parse_mech_response(
+            json.dumps(
+                {
+                    "is_valid": None,
+                    "is_determinable": None,
+                    "has_occurred": None,
+                    "error": "all_voters_failed",
+                    "judge_reasoning": "All voters failed.",
+                    "n_voters": 4,
+                    "n_successful": 0,
+                    "n_decided": 0,
+                    "agreement_ratio": 0.0,
+                }
+            )
+        )
+        assert result is None
+
+    def test_garbage_jury_judge_unparseable_payload(self) -> None:
+        """``judge_unparseable`` discriminator -> garbage (None)."""
+        result = parse_mech_response(
+            json.dumps(
+                {
+                    "is_valid": None,
+                    "is_determinable": None,
+                    "has_occurred": None,
+                    "error": "judge_unparseable",
+                }
+            )
+        )
+        assert result is None
+
+    def test_garbage_jury_malformed_verdict_payload(self) -> None:
+        """``malformed_verdict`` discriminator -> garbage (None)."""
+        result = parse_mech_response(
+            json.dumps(
+                {
+                    "is_valid": None,
+                    "is_determinable": None,
+                    "has_occurred": None,
+                    "error": "malformed_verdict",
+                }
+            )
+        )
+        assert result is None
+
     def test_agreement_ratio_defaults_to_zero(self) -> None:
         """agreement_ratio defaults to 0.0 when absent."""
         result = parse_mech_response(
@@ -222,6 +276,75 @@ class TestParseMechResponse:
             )
         )
         assert result is None
+
+
+# ---------------------------------------------------------------------------
+# jury_error_discriminator
+# ---------------------------------------------------------------------------
+
+
+class TestJuryErrorDiscriminator:
+    """Tests for ``jury_error_discriminator``.
+
+    Operator-facing observability: when the jury emits an off-contract
+    payload, the ``error`` field tells the operator API outage from a
+    genuine parser failure. The helper extracts it for logging.
+    """
+
+    def test_none_input(self) -> None:
+        """``None`` payload returns ``None``."""
+        assert jury_error_discriminator(None) is None
+
+    def test_non_json(self) -> None:
+        """Non-JSON garbage returns ``None`` (handled by upstream warning)."""
+        assert jury_error_discriminator("not json") is None
+
+    def test_non_dict_json(self) -> None:
+        """Top-level non-dict JSON returns ``None``."""
+        assert jury_error_discriminator(json.dumps([1, 2, 3])) is None
+        assert jury_error_discriminator(json.dumps("scalar")) is None
+
+    def test_dict_without_error_field(self) -> None:
+        """A normal verdict (no ``error``) returns ``None``."""
+        result = jury_error_discriminator(
+            json.dumps(
+                {"is_valid": True, "is_determinable": True, "has_occurred": True}
+            )
+        )
+        assert result is None
+
+    def test_all_voters_failed(self) -> None:
+        """The jury's ``all_voters_failed`` discriminator surfaces."""
+        result = jury_error_discriminator(
+            json.dumps(
+                {
+                    "is_valid": None,
+                    "is_determinable": None,
+                    "has_occurred": None,
+                    "error": "all_voters_failed",
+                }
+            )
+        )
+        assert result == "all_voters_failed"
+
+    def test_judge_unparseable(self) -> None:
+        """The jury's ``judge_unparseable`` discriminator surfaces."""
+        result = jury_error_discriminator(json.dumps({"error": "judge_unparseable"}))
+        assert result == "judge_unparseable"
+
+    def test_malformed_verdict(self) -> None:
+        """The jury's ``malformed_verdict`` discriminator surfaces."""
+        result = jury_error_discriminator(json.dumps({"error": "malformed_verdict"}))
+        assert result == "malformed_verdict"
+
+    def test_empty_string_error_is_ignored(self) -> None:
+        """An empty-string ``error`` field is treated as no error."""
+        assert jury_error_discriminator(json.dumps({"error": ""})) is None
+
+    def test_non_string_error_is_ignored(self) -> None:
+        """A non-string ``error`` field is treated as no error."""
+        assert jury_error_discriminator(json.dumps({"error": 42})) is None
+        assert jury_error_discriminator(json.dumps({"error": None})) is None
 
 
 # ---------------------------------------------------------------------------
@@ -515,71 +638,60 @@ class TestGetRealitioSubgraphResult:
         assert result is None
 
 
-class TestFindCachedValidMechDelivery:
-    """Tests for find_cached_valid_mech_delivery."""
+class TestFetchMechRequestsForMarket:
+    """Tests for ``fetch_mech_requests_for_market``.
+
+    Returns the raw filtered list of subgraph request entries (matching
+    tool + title for the Safe), or ``None`` on subgraph error. The
+    earliest valid evaluation is derived separately by
+    ``ScanMarketsBehaviour._earliest_valid_evaluation`` -- not by this
+    function.
+    """
 
     def _make_entry(
         self, title: str = "Will X happen?", closing_ts: int = 1_700_000_000
-    ) -> dict:
+    ) -> Dict[str, Any]:
         return {"title": title, "market_closing_timestamp": closing_ts}
 
-    def test_missing_title_returns_empty_dict(self) -> None:
-        """Returns {} when entry has no title."""
-        b = _make_behaviour()
-        result = _exhaust_gen(
-            b.find_cached_valid_mech_delivery("0xM", {"market_closing_timestamp": 1234})
-        )
-        assert result == {}
-
-    def test_missing_closing_ts_returns_empty_dict(self) -> None:
-        """Returns {} when entry has no market_closing_timestamp."""
-        b = _make_behaviour()
-        result = _exhaust_gen(b.find_cached_valid_mech_delivery("0xM", {"title": "Q?"}))
-        assert result == {}
-
-    def test_no_safe_address_returns_none(self) -> None:
-        """Returns None when safe_contract_address is falsy."""
-        b = _make_behaviour(synced_data=_make_synced_data(safe_address=""))
-        result = _exhaust_gen(
-            b.find_cached_valid_mech_delivery("0xM", self._make_entry())
-        )
-        assert result is None
+    def _make_request_entry(
+        self,
+        deliveries: Any = None,
+        tool: str = "resolve-market-jury-v1",
+        prompt: str = "Will X happen?",
+        req_id: str = "req1",
+    ) -> Dict[str, Any]:
+        return {
+            "id": req_id,
+            "blockTimestamp": "1700001000",
+            "parsedRequest": {"tool": tool, "prompt": prompt},
+            "deliveries": deliveries if deliveries is not None else [],
+        }
 
     def test_subgraph_error_returns_none(self) -> None:
-        """Returns None when subgraph call fails."""
+        """Returns ``None`` when subgraph call fails."""
         b = _make_behaviour()
         with patch.object(b, "get_mech_gnosis_subgraph_result", new=_make_gen(None)):
-            result = _exhaust_gen(
-                b.find_cached_valid_mech_delivery("0xM", self._make_entry())
-            )
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
         assert result is None
 
-    def test_no_sender_data_returns_empty_dict(self) -> None:
-        """Returns {} when subgraph has no sender data."""
+    def test_no_sender_data_returns_empty_list(self) -> None:
+        """Empty sender block in subgraph response -> empty list (no error)."""
         b = _make_behaviour()
         with patch.object(
             b, "get_mech_gnosis_subgraph_result", new=_make_gen({"data": {}})
         ):
-            result = _exhaust_gen(
-                b.find_cached_valid_mech_delivery("0xM", self._make_entry())
-            )
-        assert result == {}
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+        assert result == []
 
-    def test_no_matching_requests_returns_empty_dict(self) -> None:
-        """Returns {} when sender has requests but none match tool/title/delivery."""
+    def test_wrong_tool_filtered_out(self) -> None:
+        """Request with a non-matching tool is filtered out of the list."""
         b = _make_behaviour()
         subgraph_data = {
             "data": {
                 "sender": {
                     "requests": [
-                        {
-                            "id": "req1",
-                            "blockTimestamp": "1700001000",
-                            "parsedRequest": {
-                                "tool": "wrong-tool",
-                                "prompt": "Will X happen?",
-                            },
-                            "deliveries": [
+                        self._make_request_entry(
+                            deliveries=[
                                 {
                                     "toolResponse": json.dumps(
                                         {
@@ -590,7 +702,8 @@ class TestFindCachedValidMechDelivery:
                                     )
                                 }
                             ],
-                        }
+                            tool="wrong-tool",
+                        )
                     ]
                 }
             }
@@ -598,172 +711,207 @@ class TestFindCachedValidMechDelivery:
         with patch.object(
             b, "get_mech_gnosis_subgraph_result", new=_make_gen(subgraph_data)
         ):
-            result = _exhaust_gen(
-                b.find_cached_valid_mech_delivery("0xM", self._make_entry())
-            )
-        assert result == {}
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+        assert result == []
 
-    def test_wrong_prompt_skipped(self) -> None:
-        """Request with wrong prompt (different title) is skipped."""
+    def test_wrong_prompt_filtered_out(self) -> None:
+        """Request with a non-matching prompt is filtered out of the list."""
         b = _make_behaviour()
-        subgraph_data = {
-            "data": {
-                "sender": {
-                    "requests": [
+        request_entry = self._make_request_entry(
+            deliveries=[
+                {
+                    "toolResponse": json.dumps(
                         {
-                            "id": "req1",
-                            "blockTimestamp": "1700001000",
-                            "parsedRequest": {
-                                "tool": "resolve-market-jury-v1",
-                                "prompt": "Different question?",
-                            },
-                            "deliveries": [
-                                {
-                                    "toolResponse": json.dumps(
-                                        {
-                                            "is_valid": True,
-                                            "is_determinable": True,
-                                            "has_occurred": True,
-                                        }
-                                    )
-                                }
-                            ],
+                            "is_valid": True,
+                            "is_determinable": True,
+                            "has_occurred": True,
                         }
-                    ]
+                    )
                 }
-            }
-        }
+            ],
+            prompt="Different question?",
+        )
+        subgraph_data = {"data": {"sender": {"requests": [request_entry]}}}
         with patch.object(
             b, "get_mech_gnosis_subgraph_result", new=_make_gen(subgraph_data)
         ):
-            result = _exhaust_gen(
-                b.find_cached_valid_mech_delivery("0xM", self._make_entry())
-            )
-        assert result == {}
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+        assert result == []
 
-    def test_no_delivery_skipped(self) -> None:
-        """Request with empty deliveries is skipped."""
+    def test_no_deliveries_kept_in_list(self) -> None:
+        """A request with empty ``deliveries`` is still kept in the list.
+
+        Production uses ``len(mech_requests)`` to drive the retry-counter
+        gate, so unanswered requests must contribute even if no
+        evaluation can be derived from them.
+        """
         b = _make_behaviour()
-        subgraph_data = {
-            "data": {
-                "sender": {
-                    "requests": [
-                        {
-                            "id": "req1",
-                            "blockTimestamp": "1700001000",
-                            "parsedRequest": {
-                                "tool": "resolve-market-jury-v1",
-                                "prompt": "Will X happen?",
-                            },
-                            "deliveries": [],
-                        }
-                    ]
-                }
-            }
-        }
+        request_entry = self._make_request_entry(deliveries=[])
+        subgraph_data = {"data": {"sender": {"requests": [request_entry]}}}
         with patch.object(
             b, "get_mech_gnosis_subgraph_result", new=_make_gen(subgraph_data)
         ):
-            result = _exhaust_gen(
-                b.find_cached_valid_mech_delivery("0xM", self._make_entry())
-            )
-        assert result == {}
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+        assert result == [request_entry]
 
-    def test_garbage_response_skipped(self) -> None:
-        """Request with garbage tool response is skipped (evaluation=None)."""
+    def test_garbage_response_kept_in_list(self) -> None:
+        """A request with an unparseable ``toolResponse`` is still kept."""
         b = _make_behaviour()
-        subgraph_data = {
-            "data": {
-                "sender": {
-                    "requests": [
-                        {
-                            "id": "req1",
-                            "blockTimestamp": "1700001000",
-                            "parsedRequest": {
-                                "tool": "resolve-market-jury-v1",
-                                "prompt": "Will X happen?",
-                            },
-                            "deliveries": [{"toolResponse": "invalid json {{"}],
-                        }
-                    ]
-                }
-            }
-        }
+        request_entry = self._make_request_entry(
+            deliveries=[{"toolResponse": "invalid json {{"}]
+        )
+        subgraph_data = {"data": {"sender": {"requests": [request_entry]}}}
         with patch.object(
             b, "get_mech_gnosis_subgraph_result", new=_make_gen(subgraph_data)
         ):
-            result = _exhaust_gen(
-                b.find_cached_valid_mech_delivery("0xM", self._make_entry())
-            )
-        assert result == {}
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+        assert result == [request_entry]
 
-    def test_undeterminable_response_skipped(self) -> None:
-        """Undeterminable evaluation (answer=None) fails is_cached_evaluation_valid -> skipped."""
+    def test_undeterminable_response_kept_in_list(self) -> None:
+        """A request whose verdict is undeterminable is still kept.
+
+        ``answer=None`` (Case B) fails ``is_cached_evaluation_valid`` so
+        no evaluation is derived, but the entry is retained for
+        retry-count purposes.
+        """
         b = _make_behaviour()
-        subgraph_data = {
-            "data": {
-                "sender": {
-                    "requests": [
-                        {
-                            "id": "req1",
-                            "blockTimestamp": "1700001000",
-                            "parsedRequest": {
-                                "tool": "resolve-market-jury-v1",
-                                "prompt": "Will X happen?",
-                            },
-                            "deliveries": [
-                                {
-                                    "toolResponse": json.dumps(
-                                        {"is_valid": True, "is_determinable": False}
-                                    )
-                                }
-                            ],
-                        }
-                    ]
+        request_entry = self._make_request_entry(
+            deliveries=[
+                {
+                    "toolResponse": json.dumps(
+                        {"is_valid": True, "is_determinable": False}
+                    )
                 }
-            }
-        }
+            ]
+        )
+        subgraph_data = {"data": {"sender": {"requests": [request_entry]}}}
         with patch.object(
             b, "get_mech_gnosis_subgraph_result", new=_make_gen(subgraph_data)
         ):
-            result = _exhaust_gen(
-                b.find_cached_valid_mech_delivery("0xM", self._make_entry())
-            )
-        assert result == {}
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+        assert result == [request_entry]
 
-    def test_valid_cache_hit_returns_dict(self) -> None:
-        """Returns cache-hit dict with evaluation and mech_response on success."""
+    def test_valid_cache_hit_returns_request_in_list(self) -> None:
+        """A request with a valid YES verdict is returned in the list verbatim.
+
+        The verdict-extraction is the caller's responsibility (via
+        ``_earliest_valid_evaluation`` in scan_markets); this function
+        only filters + returns the raw request entries.
+        """
         b = _make_behaviour()
         tool_response = json.dumps(
             {"is_valid": True, "is_determinable": True, "has_occurred": True}
         )
-        subgraph_data = {
-            "data": {
-                "sender": {
-                    "requests": [
-                        {
-                            "id": "req-abc",
-                            "blockTimestamp": "1700001000",
-                            "parsedRequest": {
-                                "tool": "resolve-market-jury-v1",
-                                "prompt": "Will X happen?",
-                            },
-                            "deliveries": [{"toolResponse": tool_response}],
-                        }
-                    ]
-                }
-            }
-        }
+        request_entry = self._make_request_entry(
+            deliveries=[{"toolResponse": tool_response}], req_id="req-abc"
+        )
+        subgraph_data = {"data": {"sender": {"requests": [request_entry]}}}
         with patch.object(
             b, "get_mech_gnosis_subgraph_result", new=_make_gen(subgraph_data)
         ):
-            result = _exhaust_gen(
-                b.find_cached_valid_mech_delivery("0xM", self._make_entry())
-            )
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
 
-        assert isinstance(result, dict)
-        assert "evaluation" in result
-        assert "mech_response" in result
-        assert result["evaluation"]["answer"] == ANSWER_YES
-        assert result["mech_response"]["source"] == "subgraph"
-        assert result["mech_response"]["subgraph_request_id"] == "req-abc"
+        assert isinstance(result, list)
+        assert result == [request_entry]
+        # Verify the caller can derive YES from this list via the helper.
+        evaluation = ScanMarketsBehaviour._earliest_valid_evaluation(result)
+        assert evaluation is not None
+        assert evaluation["answer"] == ANSWER_YES
+
+
+# ---------------------------------------------------------------------------
+# ScanMarketsBehaviour._earliest_valid_evaluation -- helper unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestEarliestValidEvaluation:
+    """Tests for ``_earliest_valid_evaluation``.
+
+    Behaviour-independent unit tests for the static helper that derives
+    the first usable evaluation from a list of subgraph request entries.
+    """
+
+    @staticmethod
+    def _valid_yes_response() -> str:
+        return json.dumps(
+            {"is_valid": True, "is_determinable": True, "has_occurred": True}
+        )
+
+    @staticmethod
+    def _undeterminable_response() -> str:
+        return json.dumps({"is_valid": True, "is_determinable": False})
+
+    def test_empty_list_returns_none(self) -> None:
+        """No requests -> None."""
+        assert ScanMarketsBehaviour._earliest_valid_evaluation([]) is None
+
+    def test_request_with_no_deliveries_returns_none(self) -> None:
+        """Requests present but none have deliveries -> None."""
+        reqs: List[Dict[str, Any]] = [{"deliveries": []}, {"deliveries": []}]
+        assert ScanMarketsBehaviour._earliest_valid_evaluation(reqs) is None
+
+    def test_garbage_only_delivery_returns_none(self) -> None:
+        """A single unparseable delivery -> None (caller retries)."""
+        reqs = [{"deliveries": [{"toolResponse": "not json"}]}]
+        assert ScanMarketsBehaviour._earliest_valid_evaluation(reqs) is None
+
+    def test_undeterminable_only_delivery_returns_none(self) -> None:
+        """A single Case B (undeterminable) delivery -> None."""
+        reqs = [{"deliveries": [{"toolResponse": self._undeterminable_response()}]}]
+        assert ScanMarketsBehaviour._earliest_valid_evaluation(reqs) is None
+
+    def test_valid_single_delivery_returns_evaluation(self) -> None:
+        """A single valid YES delivery is returned."""
+        reqs = [{"deliveries": [{"toolResponse": self._valid_yes_response()}]}]
+        evaluation = ScanMarketsBehaviour._earliest_valid_evaluation(reqs)
+        assert evaluation is not None
+        assert evaluation["answer"] == ANSWER_YES
+
+    def test_multi_delivery_skips_garbage_and_returns_later_valid(self) -> None:
+        """Regression for #3248049101: a request with [garbage, valid] deliveries.
+
+        Production used to read only ``deliveries[0]`` -- if the first
+        delivery is unparseable garbage (e.g. Mech-internal retry), the
+        valid second delivery is missed and the market stays stuck. The
+        helper now iterates ALL deliveries per request.
+        """
+        reqs = [
+            {
+                "deliveries": [
+                    {"toolResponse": "not json"},
+                    {"toolResponse": self._valid_yes_response()},
+                ]
+            }
+        ]
+        evaluation = ScanMarketsBehaviour._earliest_valid_evaluation(reqs)
+        assert evaluation is not None
+        assert evaluation["answer"] == ANSWER_YES
+
+    def test_first_valid_across_multiple_requests_wins(self) -> None:
+        """When multiple requests have valid deliveries, take the earliest."""
+        reqs = [
+            # Earlier request -- one undeterminable + one valid YES
+            {
+                "deliveries": [
+                    {"toolResponse": self._undeterminable_response()},
+                    {"toolResponse": self._valid_yes_response()},
+                ]
+            },
+            # Later request -- valid NO (not reached, earlier wins)
+            {
+                "deliveries": [
+                    {
+                        "toolResponse": json.dumps(
+                            {
+                                "is_valid": True,
+                                "is_determinable": True,
+                                "has_occurred": False,
+                            }
+                        )
+                    }
+                ]
+            },
+        ]
+        evaluation = ScanMarketsBehaviour._earliest_valid_evaluation(reqs)
+        assert evaluation is not None
+        assert evaluation["answer"] == ANSWER_YES

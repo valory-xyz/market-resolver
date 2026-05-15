@@ -7,7 +7,7 @@ license: Apache-2.0
 fingerprint:
   README.md: bafybeie6lb2mlmzmkycbcfma4onidhegfu4ipgpybg2av5mhfs5zx42b2m
 fingerprint_ignore_patterns: []
-agent: valory/market_resolver:0.1.0:bafybeiewfdlg6dnkv4rmpsounyw5yr6gwou3njehj6jnbwminv44hqhml4
+agent: valory/market_resolver:0.1.0:bafybeigbdf7swzc74ivs7ouu3bvpqrt7kqozrjogytflaayvswfltrriu4
 number_of_agents: 1
 deployment:
   agent:
@@ -97,6 +97,7 @@ models:
       ct_redeem_tokens_min_payout: ${CT_REDEEM_TOKENS_MIN_PAYOUT:int:1}
       realitio_withdraw_bonds_batch_size: ${REALITIO_WITHDRAW_BONDS_BATCH_SIZE:int:10}
       min_realitio_withdraw_balance: ${MIN_REALITIO_WITHDRAW_BALANCE:int:1000000000000000000}
+      event_filtering_batch_size: ${EVENT_FILTERING_BATCH_SIZE:int:1000}
       watched_creator_addresses: ${WATCHED_CREATOR_ADDRESSES:list:[]}
       trusted_addresses: ${TRUSTED_ADDRESSES:list:[]}
       mech_tool_resolve_market: ${MECH_TOOL_RESOLVE_MARKET:str:resolve-market-jury-v1}
@@ -106,7 +107,7 @@ models:
       max_challenge_bond: ${MAX_CHALLENGE_BOND:int:40000000000000000}
       max_mech_retries: ${MAX_MECH_RETRIES:int:10}
       prefetch_mech_evaluations: ${PREFETCH_MECH_EVALUATIONS:bool:true}
-      mech_retry_cooldown: ${MECH_RETRY_COOLDOWN:int:3600}
+      mech_retry_cooldown: ${MECH_RETRY_COOLDOWN:int:14400}
       omen_subgraph_max_market_age_seconds: ${OMEN_SUBGRAPH_MAX_MARKET_AGE_SECONDS:int:31536000}
       mech_interact_round_timeout_seconds: ${MECH_INTERACT_ROUND_TIMEOUT_SECONDS:int:1200}
       mech_interaction_sleep_time: ${MECH_INTERACTION_SLEEP_TIME:int:10}

@@ -115,7 +115,7 @@ class EvaluateAnswersRound(CollectSameUntilThresholdRound):
     Custom end_block to handle two "data present" paths:
     - mech_requests set -> DONE -> FinishedWithMechRequestRound (needs Mech)
     - evaluation_result set -> NONE -> BuildAnswerTxRound (has data, skip Mech)
-    - both None -> NO_MAJORITY fallback
+    - both None -> SKIP fallback (intentional no-op, not a consensus failure)
     """
 
     payload_class = EvaluateAnswersPayload
@@ -123,6 +123,7 @@ class EvaluateAnswersRound(CollectSameUntilThresholdRound):
     done_event = Event.DONE
     none_event = Event.NONE
     no_majority_event = Event.NO_MAJORITY
+    skip_event = Event.SKIP
     collection_key = "participant_to_evaluate"
     selection_key = (
         get_name(SynchronizedData.mech_requests),
@@ -135,8 +136,10 @@ class EvaluateAnswersRound(CollectSameUntilThresholdRound):
         Routes based on which field is set:
         - mech_requests -> DONE -> FinishedWithMechRequestRound
         - evaluation_result -> NONE -> BuildAnswerTxRound
+        - both None -> SKIP -> FinishedResolutionRound (intentional no-op)
 
-        :return: ``(synchronized_data, event)`` once threshold is reached, else None.
+        :return: the next state and the routing event, or ``None`` while
+            consensus is still pending.
         """
         if self.threshold_reached:
             values = dict(zip(self.selection_key, self.most_voted_payload_values))
@@ -149,7 +152,7 @@ class EvaluateAnswersRound(CollectSameUntilThresholdRound):
                 return synchronized_data, self.done_event
             if values.get("evaluation_result") is not None:
                 return synchronized_data, self.none_event
-            return self.synchronized_data, self.no_majority_event
+            return self.synchronized_data, self.skip_event
         if not self.is_majority_possible(
             self.collection, self.synchronized_data.nb_participants
         ):
@@ -279,6 +282,7 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
             - done: 4.
             - none: 2.
             - no majority: 7.
+            - skip: 7.
             - round timeout: 7.
         2. BuildAnswerTxRound
             - done: 6.
@@ -328,6 +332,7 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
             Event.DONE: FinishedWithMechRequestRound,
             Event.NONE: BuildAnswerTxRound,
             Event.NO_MAJORITY: FinishedResolutionRound,
+            Event.SKIP: FinishedResolutionRound,
             Event.ROUND_TIMEOUT: FinishedResolutionRound,
         },
         BuildAnswerTxRound: {

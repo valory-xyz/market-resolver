@@ -57,15 +57,18 @@ MECH_CACHE_QUERY_TEMPLATE = """
       }}
       orderBy: blockTimestamp
       orderDirection: asc
-      first: 5
+      first: 1000
     ) {{
       id
       blockTimestamp
       parsedRequest {{
         prompt
         tool
+        nonce
       }}
-      deliveries(first: 1) {{
+      deliveries(orderBy: blockTimestamp, orderDirection: asc) {{
+        id
+        blockTimestamp
         toolResponse
       }}
     }}
@@ -137,6 +140,35 @@ def parse_mech_response(  # pylint: disable=too-many-return-statements
         return _make(ANSWER_NO)
 
     # Anything else (e.g. is_determinable=True but has_occurred=None)
+    return None
+
+
+def jury_error_discriminator(result: Optional[str]) -> Optional[str]:
+    """Return the jury's ``error`` discriminator if the payload reports one.
+
+    The resolve-market-jury-v1 Mech tool emits a top-level ``error`` field
+    on its off-contract / failure paths (``all_voters_failed``,
+    ``judge_unparseable``, ``malformed_verdict``) alongside the
+    ``(None, None, None)`` verdict tuple. ``parse_mech_response`` correctly
+    routes these to the garbage path, but the discriminator itself is
+    operationally valuable -- it lets the operator distinguish an API
+    outage from a genuine parser failure. Returns ``None`` for non-JSON
+    payloads, JSON without an ``error`` field, or non-dict JSON.
+
+    :param result: raw Mech response payload (JSON string) or ``None``.
+    :return: the ``error`` string if present, else ``None``.
+    """
+    if result is None:
+        return None
+    try:
+        data = json.loads(result)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    err = data.get("error")
+    if isinstance(err, str) and err:
+        return err
     return None
 
 
@@ -317,80 +349,41 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
             )
             return None
 
-    def find_cached_valid_mech_delivery(  # pylint: disable=too-many-locals
-        self, market_id: str, entry: Dict[str, Any]
-    ) -> Generator[None, None, Optional[Dict[str, Any]]]:
-        """Look up a prior valid Mech response for this market from our Safe.
+    def fetch_mech_requests_for_market(
+        self, entry: Dict[str, Any]
+    ) -> Generator[None, None, Optional[list]]:
+        """Fetch Mech requests + deliveries for this market from the subgraph.
 
-        :param market_id: the Realitio question id under evaluation.
-        :param entry: the watched-markets entry (``title``,
-            ``market_closing_timestamp``, etc.) used to scope the lookup.
-        :return: ``{"evaluation": ..., "mech_response": ...}`` on cache hit;
-            ``{}`` on a definitive miss (subgraph responded, no match);
-            ``None`` on subgraph error (caller should retry next cycle).
-        :yield: HTTP requests to the Realitio subgraph.
+        Returns the verbatim subgraph request entries (each containing its
+        nested ``deliveries`` list), filtered to those whose ``parsedRequest``
+        matches the expected tool and the market title.
+
+        :param entry: the per-market state dict.
+        :yield: subgraph HTTP request.
+        :return: list of matching verbatim subgraph request entries, or
+            ``None`` on subgraph error.
         """
-        title = entry.get("title")
-        closing_ts = entry.get("market_closing_timestamp")
-        if not title or not closing_ts:
-            return {}
+        title = entry.get("title") or ""
+        closing_ts = entry.get("market_closing_timestamp") or 0
+        safe_address = self.synchronized_data.safe_contract_address or ""
 
-        safe_address = self.synchronized_data.safe_contract_address
-        if not safe_address:
-            return None
-
-        sender_id = safe_address.lower()
         query = MECH_CACHE_QUERY_TEMPLATE.format(
-            sender=sender_id,
+            sender=safe_address.lower(),
             prompt=json.dumps(title),
             block_timestamp_gt=int(closing_ts),
-        )
-
-        self.context.logger.info(
-            f"Market {market_id}: querying Mech Gnosis subgraph for prior "
-            f"responses (sender={sender_id}, closing_ts={closing_ts})."
         )
 
         result = yield from self.get_mech_gnosis_subgraph_result(query)
         if result is None:
             return None
 
-        sender_data = (result.get("data") or {}).get("sender")
-        if not sender_data:
-            return {}
-
-        requests = sender_data.get("requests") or []
+        all_requests = ((result.get("data") or {}).get("sender") or {}).get(
+            "requests"
+        ) or []
         expected_tool = self.params.mech_tool_resolve_market
-
-        for req in requests:
-            parsed = req.get("parsedRequest") or {}
-            if parsed.get("tool") != expected_tool:
-                continue
-            if parsed.get("prompt") != title:
-                continue
-            deliveries = req.get("deliveries") or []
-            if not deliveries:
-                continue
-            tool_response = deliveries[0].get("toolResponse")
-            evaluation = parse_mech_response(tool_response)
-            if evaluation is None:
-                continue
-            if not is_cached_evaluation_valid(evaluation):
-                continue
-
-            return {
-                "evaluation": evaluation,
-                "mech_response": {
-                    "source": "subgraph",
-                    "subgraph_request_id": req.get("id"),
-                    "block_timestamp": int(req.get("blockTimestamp", 0)),
-                    "result": tool_response,
-                    "tool": parsed.get("tool"),
-                },
-            }
-
-        self.context.logger.info(
-            f"Market {market_id}: subgraph returned {len(requests)} prior "
-            f"requests, none matched tool/title/delivery/validity filters."
-        )
-        return {}
+        return [
+            req
+            for req in all_requests
+            if (req.get("parsedRequest") or {}).get("tool") == expected_tool
+            and (req.get("parsedRequest") or {}).get("prompt") == title
+        ]

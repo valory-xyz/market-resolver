@@ -96,8 +96,12 @@ class MarketResolutionManagerParams(  # pylint: disable=too-many-instance-attrib
             "prefetch_mech_evaluations", False
         )
         # Minimum cooldown between Mech retries for the same market,
-        # applied to both undeterminable and garbage/unparseable responses.
-        self.mech_retry_cooldown: int = kwargs.pop("mech_retry_cooldown", 3600)  # 1h
+        # applied to garbage/unparseable responses (error discriminators
+        # like ``all_voters_failed`` / ``judge_api_error``). Default 4h:
+        # long enough for a transient OpenRouter credit lapse or API
+        # outage to clear before burning the next retry, but short enough
+        # that ``max_mech_retries=10`` still spans <2 days total.
+        self.mech_retry_cooldown: int = kwargs.pop("mech_retry_cooldown", 14400)  # 4h
         self.omen_subgraph_max_market_age_seconds: int = kwargs.pop(
             "omen_subgraph_max_market_age_seconds",
             365 * 86400,  # 1 year

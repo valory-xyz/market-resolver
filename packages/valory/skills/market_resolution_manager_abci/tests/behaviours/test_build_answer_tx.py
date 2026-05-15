@@ -216,6 +216,9 @@ class TestMechResponseProcessing:
         entry = _make_entry(
             mech_request={"nonce": "nonce-123", "tool": "t", "prompt": "Q"},
         )
+        # Production reads ``pending_nonce`` (not ``mech_request['nonce']``)
+        # to match incoming Mech responses -- see build_answer_tx.py:107.
+        entry["pending_nonce"] = "nonce-123"
         b = _make_behaviour(
             questions_db={"0xM": entry},
             mech_responses=[mech_resp],
@@ -241,6 +244,7 @@ class TestMechResponseProcessing:
         entry = _make_entry(
             mech_request={"nonce": "nonce-x", "tool": "t", "prompt": "Q"},
         )
+        entry["pending_nonce"] = "nonce-x"
         b = _make_behaviour(
             questions_db={"0xM": entry},
             mech_responses=[mech_resp],
@@ -264,6 +268,66 @@ class TestMechResponseProcessing:
         entry_after = b.questions_db["0xM"]
         assert entry_after["retry_after"] == NOW + 3600
         assert payload_sent[0].tx_hash is None
+
+    def test_jury_error_discriminator_logged_distinctly(self) -> None:
+        """A jury error-discriminator payload logs the discriminator, not 'could not parse'.
+
+        The jury's ``all_voters_failed`` payload is *valid* JSON (so the
+        old "Could not parse as JSON" warning was misleading); the new
+        log path surfaces the discriminator so operators can tell an API
+        outage from a real parser failure. Behaviour-wise this still
+        routes through the garbage path (retry cooldown applied).
+        """
+        import json as _json
+
+        jury_payload = _json.dumps(
+            {
+                "is_valid": None,
+                "is_determinable": None,
+                "has_occurred": None,
+                "error": "all_voters_failed",
+                "judge_reasoning": "All voters failed.",
+            }
+        )
+        mech_resp = _make_mech_response(nonce="nonce-y", result=jury_payload)
+        entry = _make_entry(
+            mech_request={"nonce": "nonce-y", "tool": "t", "prompt": "Q"},
+        )
+        # The garbage path in build_answer_tx checks ``pending_nonce`` (not
+        # ``mech_request["nonce"]``) to decide whether to apply a retry
+        # cooldown -- see behaviours/build_answer_tx.py:107.
+        entry["pending_nonce"] = "nonce-y"
+        b = _make_behaviour(
+            questions_db={"0xM": entry},
+            mech_responses=[mech_resp],
+        )
+        b.context.params.mech_retry_cooldown = 3600
+
+        payload_sent = []
+
+        def capture_send(payload: Any) -> Any:
+            payload_sent.append(payload)
+            return None
+            yield  # noqa
+
+        with (
+            patch.object(b, "send_a2a_transaction", new=capture_send),
+            patch.object(b, "wait_until_round_end", new=_make_gen(None)),
+            patch.object(b, "set_done"),
+        ):
+            _run_async_act(b)
+
+        # Behaviour unchanged: still garbage path -> retry cooldown.
+        entry_after = b.questions_db["0xM"]
+        assert entry_after["retry_after"] == NOW + 3600
+        assert payload_sent[0].tx_hash is None
+
+        # Log surface: at least one warning names the discriminator and
+        # NO warning mentions "Could not parse as JSON" for this payload
+        # (it was valid JSON, just off-contract).
+        warnings = [str(c.args) for c in b.context.logger.warning.call_args_list]
+        assert any("all_voters_failed" in w for w in warnings), warnings
+        assert not any("Could not parse Mech result as JSON" in w for w in warnings)
 
     def test_no_mech_response_with_nonce_logs_no_evaluation(self) -> None:
         """Mech request nonce set but no matching response -> no tx, no cooldown."""

@@ -63,8 +63,8 @@ prerelease = "allow"
 # resolution skills + fpmm contract.
 upstream_pins = [
     "valory-xyz/mech-interact@v0.30.0",
-    "valory-xyz/trader@v0.35.5",
-    "valory-xyz/market-creator@v0.11.9",
+    "valory-xyz/trader@v0.37.0",
+    "valory-xyz/market-creator@v0.11.10",
 ]
 # Content-based gitleaks allowlist — preferred over `gitleaks_extra_paths`
 # so the scanner still inspects skill source for genuine secrets (private

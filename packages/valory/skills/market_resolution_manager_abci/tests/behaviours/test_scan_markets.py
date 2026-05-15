@@ -24,6 +24,7 @@
 # pylint: disable=too-few-public-methods,too-many-public-methods
 # pylint: disable=use-implicit-booleaness-not-comparison,not-an-iterable
 
+import json
 from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock, PropertyMock, patch
 
@@ -255,10 +256,16 @@ class TestNewEntry:
         assert entry["last_answerer"] == "0xAnswerer"
         assert entry["realitio_timeout"] == 172800
         assert entry["evaluation"] is None
-        assert entry["mech_response"] is None
+        assert entry["mech_requests"] == []
+        assert entry["pending_nonce"] is None
         assert entry["pending_tx"] is None
         assert entry["mech_retries"] == 0
         assert entry["status"] is None
+        # Refactor: ``mech_request`` / ``mech_response`` were dropped --
+        # the per-market Mech state is now sourced from the subgraph
+        # via ``mech_requests`` (list of subgraph request entries).
+        assert "mech_request" not in entry
+        assert "mech_response" not in entry
 
     def test_default_timeout_when_absent(self) -> None:
         """_new_entry uses 86400 as default timeout."""
@@ -403,7 +410,7 @@ class TestAsyncActIntegration:
             behaviour, "get_native_balance", new=_make_gen(10 * 10**18)
         ).start()
         patch.object(
-            behaviour, "find_cached_valid_mech_delivery", new=_make_gen({})
+            behaviour, "fetch_mech_requests_for_market", new=_make_gen([])
         ).start()
 
     def test_subgraph_error_sends_none_payload(self) -> None:
@@ -475,7 +482,7 @@ class TestAsyncActIntegration:
             new=_make_gen({"0xQuestion1": trusted.lower()}),
         ).start()
         patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
-        patch.object(b, "find_cached_valid_mech_delivery", new=_make_gen({})).start()
+        patch.object(b, "fetch_mech_requests_for_market", new=_make_gen([])).start()
 
         with (
             patch.object(b, "send_a2a_transaction", new=_make_gen(None)),
@@ -505,7 +512,7 @@ class TestAsyncActIntegration:
             new=_make_gen({"0xQuestion1": SAFE_ADDRESS.lower()}),
         ).start()
         patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
-        patch.object(b, "find_cached_valid_mech_delivery", new=_make_gen({})).start()
+        patch.object(b, "fetch_mech_requests_for_market", new=_make_gen([])).start()
 
         with (
             patch.object(b, "send_a2a_transaction", new=_make_gen(None)),
@@ -553,7 +560,7 @@ class TestAsyncActIntegration:
             new=_make_gen({"0xQuestion1": "0xother"}),
         ).start()
         patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
-        patch.object(b, "find_cached_valid_mech_delivery", new=_make_gen({})).start()
+        patch.object(b, "fetch_mech_requests_for_market", new=_make_gen([])).start()
 
         with (
             patch.object(b, "send_a2a_transaction", new=_make_gen(None)),
@@ -598,7 +605,7 @@ class TestAsyncActIntegration:
         ).start()
         patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
         patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
-        patch.object(b, "find_cached_valid_mech_delivery", new=_make_gen({})).start()
+        patch.object(b, "fetch_mech_requests_for_market", new=_make_gen([])).start()
 
         with (
             patch.object(b, "send_a2a_transaction", new=_make_gen(None)),
@@ -622,7 +629,7 @@ class TestAsyncActIntegration:
         ).start()
         patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
         patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
-        patch.object(b, "find_cached_valid_mech_delivery", new=_make_gen({})).start()
+        patch.object(b, "fetch_mech_requests_for_market", new=_make_gen([])).start()
 
         with (
             patch.object(b, "send_a2a_transaction", new=_make_gen(None)),
@@ -664,7 +671,7 @@ class TestAsyncActIntegration:
         ).start()
         patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
         patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
-        patch.object(b, "find_cached_valid_mech_delivery", new=_make_gen({})).start()
+        patch.object(b, "fetch_mech_requests_for_market", new=_make_gen([])).start()
 
         with (
             patch.object(b, "send_a2a_transaction", new=_make_gen(None)),
@@ -677,11 +684,29 @@ class TestAsyncActIntegration:
         assert "0xFresh" in b.questions_db
 
     def test_cache_rehydration_on_hit(self) -> None:
-        """find_cached_valid_mech_delivery result is stored in entry on cache hit."""
+        """Valid Mech delivery from the subgraph populates ``entry['evaluation']``."""
         market = _make_market("0xM7", current_answer=ANSWER_YES)
-        cache_hit = {
-            "evaluation": {"answer": ANSWER_YES, "is_valid": True},
-            "mech_response": {"source": "subgraph"},
+        # The subgraph returns one request with a valid YES delivery.
+        # scan_markets._earliest_valid_evaluation derives the evaluation
+        # from the raw request list.
+        request_entry = {
+            "id": "req-cache-hit",
+            "blockTimestamp": "1700001000",
+            "parsedRequest": {
+                "tool": "resolve-market-jury-v1",
+                "prompt": "Will X happen?",
+            },
+            "deliveries": [
+                {
+                    "toolResponse": json.dumps(
+                        {
+                            "is_valid": True,
+                            "is_determinable": True,
+                            "has_occurred": True,
+                        }
+                    )
+                }
+            ],
         }
         b = _make_behaviour()
         patch.object(
@@ -690,7 +715,7 @@ class TestAsyncActIntegration:
         patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
         patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
         patch.object(
-            b, "find_cached_valid_mech_delivery", new=_make_gen(cache_hit)
+            b, "fetch_mech_requests_for_market", new=_make_gen([request_entry])
         ).start()
 
         with (
@@ -720,24 +745,34 @@ class TestAsyncActIntegration:
         patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
         patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
 
-        # First scan: subgraph miss ({}). Second scan: subgraph hit.
-        cached_hit = {
-            "evaluation": {
-                "answer": ANSWER_YES,
-                "is_valid": True,
-                "is_determinable": True,
-                "has_occurred": True,
-                "agrees_with_on_chain": None,
+        # First scan: subgraph miss (empty list). Second scan: subgraph hit
+        # with a valid YES delivery.
+        late_request = {
+            "id": "req-late",
+            "blockTimestamp": "1700001000",
+            "parsedRequest": {
+                "tool": "resolve-market-jury-v1",
+                "prompt": "Will X happen?",
             },
-            "mech_response": {"source": "subgraph", "result": "..."},
+            "deliveries": [
+                {
+                    "toolResponse": json.dumps(
+                        {
+                            "is_valid": True,
+                            "is_determinable": True,
+                            "has_occurred": True,
+                        }
+                    )
+                }
+            ],
         }
-        call_results: List[Any] = [{}, cached_hit]
+        call_results: List[Any] = [[], [late_request]]
 
         def cache_lookup(*args: Any, **kwargs: Any) -> Any:
             return call_results.pop(0)
             yield  # noqa
 
-        patch.object(b, "find_cached_valid_mech_delivery", new=cache_lookup).start()
+        patch.object(b, "fetch_mech_requests_for_market", new=cache_lookup).start()
 
         with (
             patch.object(b, "send_a2a_transaction", new=_make_gen(None)),
@@ -754,6 +789,78 @@ class TestAsyncActIntegration:
         # Both scans consulted the subgraph -- the second one is what
         # would have been skipped under the old cache_checked logic.
         assert call_results == []
+
+    def test_cache_lookup_returns_none_skipped(self) -> None:
+        """Subgraph error (cached=None) leaves entry untouched, no crash."""
+        market = _make_market("0xMNone")
+        b = _make_behaviour()
+        patch.object(
+            b, "_fetch_pending_and_finalizing_markets", new=_make_gen([market])
+        ).start()
+        patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
+        patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
+        patch.object(b, "fetch_mech_requests_for_market", new=_make_gen(None)).start()
+
+        with (
+            patch.object(b, "send_a2a_transaction", new=_make_gen(None)),
+            patch.object(b, "wait_until_round_end", new=_make_gen(None)),
+            patch.object(b, "set_done"),
+        ):
+            _run_async_act(b)
+
+        entry = b.questions_db.get("0xMNone")
+        assert entry is not None
+        assert entry["evaluation"] is None
+        assert entry["mech_retries"] == 0
+
+    def test_max_mech_retries_skipped(self) -> None:
+        """Market with mech_retries >= max_mech_retries is not selected."""
+        market = _make_market("0xMaxed")
+        b = _make_behaviour()
+        b.context.params.max_mech_retries = 5
+        # Subgraph returns 5 prior Mech requests -> seeds mech_retries=5
+        # via ``max(mech_retries, len(mech_requests))`` in scan_markets.
+        # Deliveries are empty so no evaluation is derived; the retry-gate
+        # is what we exercise here.
+        prior_requests = [
+            {
+                "id": f"req-prior-{i}",
+                "blockTimestamp": str(1700000000 + i),
+                "parsedRequest": {
+                    "tool": "resolve-market-jury-v1",
+                    "prompt": "Will X happen?",
+                },
+                "deliveries": [],
+            }
+            for i in range(5)
+        ]
+        patch.object(
+            b, "_fetch_pending_and_finalizing_markets", new=_make_gen([market])
+        ).start()
+        patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
+        patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
+        patch.object(
+            b, "fetch_mech_requests_for_market", new=_make_gen(prior_requests)
+        ).start()
+
+        payload_sent = []
+
+        def capture_send(payload: Any) -> Any:
+            payload_sent.append(payload)
+            return None
+            yield  # noqa
+
+        with (
+            patch.object(b, "send_a2a_transaction", new=capture_send),
+            patch.object(b, "wait_until_round_end", new=_make_gen(None)),
+            patch.object(b, "set_done"),
+        ):
+            _run_async_act(b)
+
+        # Market exists in DB but is not selected (max retries gate).
+        assert b.questions_db.get("0xMaxed") is not None
+        assert b.questions_db["0xMaxed"]["mech_retries"] == 5
+        assert payload_sent[0].selected_market_id is None
 
     def test_bond_too_high_market_skipped(self) -> None:
         """Market with bond exceeding max_challenge_bond is skipped when prefetch=False."""
@@ -773,7 +880,7 @@ class TestAsyncActIntegration:
         ).start()
         patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
         patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
-        patch.object(b, "find_cached_valid_mech_delivery", new=_make_gen({})).start()
+        patch.object(b, "fetch_mech_requests_for_market", new=_make_gen([])).start()
 
         payload_sent = []
 
@@ -810,7 +917,7 @@ class TestAsyncActIntegration:
         ).start()
         patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
         patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
-        patch.object(b, "find_cached_valid_mech_delivery", new=_make_gen({})).start()
+        patch.object(b, "fetch_mech_requests_for_market", new=_make_gen([])).start()
 
         payload_sent = []
 
@@ -842,7 +949,7 @@ class TestAsyncActIntegration:
         patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
         # Balance is 0 -- can't afford the initial bond
         patch.object(b, "get_native_balance", new=_make_gen(0)).start()
-        patch.object(b, "find_cached_valid_mech_delivery", new=_make_gen({})).start()
+        patch.object(b, "fetch_mech_requests_for_market", new=_make_gen([])).start()
 
         payload_sent = []
 
@@ -872,7 +979,7 @@ class TestAsyncActIntegration:
         ).start()
         patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
         patch.object(b, "get_native_balance", new=_make_gen(None)).start()
-        patch.object(b, "find_cached_valid_mech_delivery", new=_make_gen({})).start()
+        patch.object(b, "fetch_mech_requests_for_market", new=_make_gen([])).start()
 
         payload_sent = []
 
@@ -920,7 +1027,7 @@ class TestAsyncActIntegration:
         ).start()
         patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
         patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
-        patch.object(b, "find_cached_valid_mech_delivery", new=_make_gen({})).start()
+        patch.object(b, "fetch_mech_requests_for_market", new=_make_gen([])).start()
 
         payload_sent = []
 
@@ -973,7 +1080,7 @@ class TestAsyncActIntegration:
         ).start()
         patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
         patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
-        patch.object(b, "find_cached_valid_mech_delivery", new=_make_gen({})).start()
+        patch.object(b, "fetch_mech_requests_for_market", new=_make_gen([])).start()
 
         payload_sent = []
 
@@ -1032,7 +1139,7 @@ class TestAsyncActIntegration:
         ).start()
         patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
         patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
-        patch.object(b, "find_cached_valid_mech_delivery", new=_make_gen({})).start()
+        patch.object(b, "fetch_mech_requests_for_market", new=_make_gen([])).start()
 
         payload_sent = []
 
@@ -1092,7 +1199,7 @@ class TestAsyncActIntegration:
         ).start()
         patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
         patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
-        patch.object(b, "find_cached_valid_mech_delivery", new=_make_gen({})).start()
+        patch.object(b, "fetch_mech_requests_for_market", new=_make_gen([])).start()
 
         payload_sent = []
 
@@ -1144,7 +1251,7 @@ class TestAsyncActIntegration:
         ).start()
         patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
         patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
-        patch.object(b, "find_cached_valid_mech_delivery", new=_make_gen({})).start()
+        patch.object(b, "fetch_mech_requests_for_market", new=_make_gen([])).start()
 
         with (
             patch.object(b, "send_a2a_transaction", new=_make_gen(None)),
@@ -1166,7 +1273,7 @@ class TestAsyncActIntegration:
         ).start()
         patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
         patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
-        patch.object(b, "find_cached_valid_mech_delivery", new=_make_gen({})).start()
+        patch.object(b, "fetch_mech_requests_for_market", new=_make_gen([])).start()
 
         payload_sent = []
 

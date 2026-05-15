@@ -30,6 +30,7 @@ from packages.valory.contracts.realitio.contract import RealitioContract
 from packages.valory.protocols.contract_api import ContractApiMessage
 from packages.valory.skills.market_resolution_manager_abci.behaviours.base import (
     MarketResolutionManagerBaseBehaviour,
+    jury_error_discriminator,
     parse_mech_response,
 )
 from packages.valory.skills.market_resolution_manager_abci.payloads import (
@@ -97,7 +98,13 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
         # Check if we have fresh Mech responses (from MechInteract).
         # Skip if the evaluation was already populated by the subgraph
         # cache path -- MechInteract didn't run in that case.
-        expected_nonce = (entry.get("mech_request") or {}).get("nonce")
+        #
+        # ``pending_nonce`` is set by evaluate_answers when it fires a Mech
+        # request; the in-process MechInteract delivery is matched by nonce.
+        # The next scan_markets cycle will re-source ``mech_requests`` from
+        # the subgraph once it indexes this delivery, so we only need to
+        # populate ``evaluation`` here.
+        expected_nonce = entry.get("pending_nonce")
         if entry.get("evaluation") is None and expected_nonce:
             mech_responses = self.synchronized_data.mech_responses
         else:
@@ -113,21 +120,27 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
                     # Parse the Mech result
                     evaluation = parse_mech_response(resp.result)
                     if evaluation is None:
-                        self.context.logger.warning(
-                            f"Could not parse Mech result as JSON: "
-                            f"{(resp.result or '')[:200]}"
-                        )
+                        # Distinguish "valid JSON, off-contract shape" (e.g.
+                        # jury's all_voters_failed / judge_unparseable /
+                        # malformed_verdict discriminators) from "couldn't
+                        # parse at all" -- operators chasing stuck markets
+                        # need to tell API outage from parser failure.
+                        discriminator = jury_error_discriminator(resp.result)
+                        if discriminator is not None:
+                            self.context.logger.warning(
+                                f"Market {market_id}: Mech jury reported "
+                                f"error='{discriminator}' (treating as "
+                                f"garbage, will retry)."
+                            )
+                        else:
+                            self.context.logger.warning(
+                                f"Could not parse Mech result as JSON: "
+                                f"{(resp.result or '')[:200]}"
+                            )
                     else:
                         entry["evaluation"] = evaluation
-                        entry["mech_response"] = {
-                            "source": "mech_interact",
-                            "nonce": resp.nonce,
-                            "result": resp.result,
-                            "error": resp.error,
-                            "requestId": resp.requestId,
-                        }
                     break
-            # Save DB with mech response data
+            # Save DB with evaluation if matched
             questions_db[market_id] = entry
             self.questions_db = questions_db
 
