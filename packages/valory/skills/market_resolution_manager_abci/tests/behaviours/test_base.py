@@ -31,6 +31,7 @@ from packages.valory.skills.market_resolution_manager_abci.behaviours.base impor
     ANSWER_INVALID,
     ANSWER_NO,
     ANSWER_YES,
+    MECH_CACHE_QUERY_TEMPLATE,
     is_cached_evaluation_valid,
     jury_error_discriminator,
     parse_mech_response,
@@ -548,19 +549,30 @@ class TestGetOmenSubgraphResult:
 
 
 class TestGetMechGnosisSubgraphResult:
-    """Tests for get_mech_gnosis_subgraph_result."""
+    """Tests for get_mech_gnosis_subgraph_result.
 
-    def test_success(self) -> None:
-        """Returns parsed JSON on 200 response."""
+    The helper now delegates to ``ApiSpecs.process_response`` so the
+    configured ``response_key`` (``data:requests``) is walked by the
+    framework. These tests stub ``process_response`` per case to assert
+    that its return value is propagated and that the wrapping error
+    paths still short-circuit.
+    """
+
+    def test_success_returns_processed_value(self) -> None:
+        """Returns whatever ``process_response`` returns on 200 response."""
         b = _make_behaviour()
         mock_resp = MagicMock()
         mock_resp.status_code = 200
-        mock_resp.body = json.dumps({"data": {"sender": {}}}).encode()
+        mock_resp.body = json.dumps({"data": {"requests": [{"id": "r1"}]}}).encode()
+        b.context.mech_gnosis_subgraph.process_response.return_value = [{"id": "r1"}]
 
         with patch.object(b, "get_http_response", new=_make_gen(mock_resp)):
             result = _exhaust_gen(b.get_mech_gnosis_subgraph_result("{ q }"))
 
-        assert result is not None
+        assert result == [{"id": "r1"}]
+        b.context.mech_gnosis_subgraph.process_response.assert_called_once_with(
+            mock_resp
+        )
 
     def test_none_response_returns_none(self) -> None:
         """Returns None when HTTP response is None."""
@@ -568,6 +580,7 @@ class TestGetMechGnosisSubgraphResult:
         with patch.object(b, "get_http_response", new=_make_gen(None)):
             result = _exhaust_gen(b.get_mech_gnosis_subgraph_result("{ q }"))
         assert result is None
+        b.context.mech_gnosis_subgraph.process_response.assert_not_called()
 
     def test_non_200_returns_none(self) -> None:
         """Returns None on non-200 status."""
@@ -579,13 +592,15 @@ class TestGetMechGnosisSubgraphResult:
             result = _exhaust_gen(b.get_mech_gnosis_subgraph_result("{ q }"))
 
         assert result is None
+        b.context.mech_gnosis_subgraph.process_response.assert_not_called()
 
-    def test_200_with_non_json_body_returns_none(self) -> None:
-        """200 OK with non-JSON body returns None, no crash."""
+    def test_process_response_returns_none_propagates(self) -> None:
+        """If ``process_response`` returns None (e.g. bad path), caller gets None."""
         b = _make_behaviour()
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.body = b"<html>rate limited</html>"
+        b.context.mech_gnosis_subgraph.process_response.return_value = None
 
         with patch.object(b, "get_http_response", new=_make_gen(mock_resp)):
             result = _exhaust_gen(b.get_mech_gnosis_subgraph_result("{ q }"))
@@ -674,42 +689,34 @@ class TestFetchMechRequestsForMarket:
             result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
         assert result is None
 
-    def test_no_sender_data_returns_empty_list(self) -> None:
-        """Empty sender block in subgraph response -> empty list (no error)."""
+    def test_empty_list_returns_empty_list(self) -> None:
+        """Empty list from subgraph helper -> empty list (no error)."""
         b = _make_behaviour()
-        with patch.object(
-            b, "get_mech_gnosis_subgraph_result", new=_make_gen({"data": {}})
-        ):
+        with patch.object(b, "get_mech_gnosis_subgraph_result", new=_make_gen([])):
             result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
         assert result == []
 
     def test_wrong_tool_filtered_out(self) -> None:
         """Request with a non-matching tool is filtered out of the list."""
         b = _make_behaviour()
-        subgraph_data = {
-            "data": {
-                "sender": {
-                    "requests": [
-                        self._make_request_entry(
-                            deliveries=[
-                                {
-                                    "toolResponse": json.dumps(
-                                        {
-                                            "is_valid": True,
-                                            "is_determinable": True,
-                                            "has_occurred": True,
-                                        }
-                                    )
-                                }
-                            ],
-                            tool="wrong-tool",
+        requests = [
+            self._make_request_entry(
+                deliveries=[
+                    {
+                        "toolResponse": json.dumps(
+                            {
+                                "is_valid": True,
+                                "is_determinable": True,
+                                "has_occurred": True,
+                            }
                         )
-                    ]
-                }
-            }
-        }
+                    }
+                ],
+                tool="wrong-tool",
+            )
+        ]
         with patch.object(
-            b, "get_mech_gnosis_subgraph_result", new=_make_gen(subgraph_data)
+            b, "get_mech_gnosis_subgraph_result", new=_make_gen(requests)
         ):
             result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
         assert result == []
@@ -731,9 +738,8 @@ class TestFetchMechRequestsForMarket:
             ],
             prompt="Different question?",
         )
-        subgraph_data = {"data": {"sender": {"requests": [request_entry]}}}
         with patch.object(
-            b, "get_mech_gnosis_subgraph_result", new=_make_gen(subgraph_data)
+            b, "get_mech_gnosis_subgraph_result", new=_make_gen([request_entry])
         ):
             result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
         assert result == []
@@ -747,9 +753,8 @@ class TestFetchMechRequestsForMarket:
         """
         b = _make_behaviour()
         request_entry = self._make_request_entry(deliveries=[])
-        subgraph_data = {"data": {"sender": {"requests": [request_entry]}}}
         with patch.object(
-            b, "get_mech_gnosis_subgraph_result", new=_make_gen(subgraph_data)
+            b, "get_mech_gnosis_subgraph_result", new=_make_gen([request_entry])
         ):
             result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
         assert result == [request_entry]
@@ -760,9 +765,8 @@ class TestFetchMechRequestsForMarket:
         request_entry = self._make_request_entry(
             deliveries=[{"toolResponse": "invalid json {{"}]
         )
-        subgraph_data = {"data": {"sender": {"requests": [request_entry]}}}
         with patch.object(
-            b, "get_mech_gnosis_subgraph_result", new=_make_gen(subgraph_data)
+            b, "get_mech_gnosis_subgraph_result", new=_make_gen([request_entry])
         ):
             result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
         assert result == [request_entry]
@@ -784,9 +788,8 @@ class TestFetchMechRequestsForMarket:
                 }
             ]
         )
-        subgraph_data = {"data": {"sender": {"requests": [request_entry]}}}
         with patch.object(
-            b, "get_mech_gnosis_subgraph_result", new=_make_gen(subgraph_data)
+            b, "get_mech_gnosis_subgraph_result", new=_make_gen([request_entry])
         ):
             result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
         assert result == [request_entry]
@@ -805,9 +808,8 @@ class TestFetchMechRequestsForMarket:
         request_entry = self._make_request_entry(
             deliveries=[{"toolResponse": tool_response}], req_id="req-abc"
         )
-        subgraph_data = {"data": {"sender": {"requests": [request_entry]}}}
         with patch.object(
-            b, "get_mech_gnosis_subgraph_result", new=_make_gen(subgraph_data)
+            b, "get_mech_gnosis_subgraph_result", new=_make_gen([request_entry])
         ):
             result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
 
@@ -817,6 +819,54 @@ class TestFetchMechRequestsForMarket:
         evaluation = ScanMarketsBehaviour._earliest_valid_evaluation(result)
         assert evaluation is not None
         assert evaluation["answer"] == ANSWER_YES
+
+    def test_helper_returns_list_directly_no_data_walk(self) -> None:
+        """Regression: helper returns the list directly (no ``data`` wrapper).
+
+        After switching to ``ApiSpecs.process_response``, the configured
+        ``response_key: data:requests`` is walked by the framework, so
+        ``get_mech_gnosis_subgraph_result`` hands a list back -- not
+        a ``{"data": {"requests": [...]}}`` wrapper. This test pins
+        that contract so a regression to manual ``data.sender.requests``
+        walking would fail loudly.
+        """
+        b = _make_behaviour()
+        request_entry = self._make_request_entry(req_id="req-top-level")
+        with patch.object(
+            b, "get_mech_gnosis_subgraph_result", new=_make_gen([request_entry])
+        ):
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+        assert result is not None
+        assert len(result) == 1
+        assert result[0]["id"] == "req-top-level"
+
+    def test_query_renders_top_level_request_with_tool_filter(self) -> None:
+        """The rendered query uses top-level ``requests(where:`` with tool.
+
+        Pins two invariants:
+
+        - ``parsedRequest { nonce }`` is NOT selected. ``nonce`` is not a
+          field on ``ParsedRequest`` in the marketplace-gnosis subgraph,
+          and selecting it makes the whole query error with ``data:
+          null`` -- which previously masqueraded as "zero matching
+          requests" and silently disabled the retry-budget gate.
+        - The query uses top-level ``requests(where:`` rather than the
+          older ``sender(id) { requests(where:) }`` traversal. Both
+          shapes return the same rows on this subgraph, but the
+          top-level form is the canonical pattern used by watchdog and
+          trader and is what the ``response_key: data:requests`` config
+          walks.
+        """
+        rendered = MECH_CACHE_QUERY_TEMPLATE.format(
+            sender="0xabc",
+            prompt=json.dumps("Will X?"),
+            tool="resolve-market-jury-v1",
+            block_timestamp_gt=123,
+        )
+        assert "requests(" in rendered
+        assert "sender(id:" not in rendered
+        assert "nonce" not in rendered
+        assert 'tool: "resolve-market-jury-v1"' in rendered
 
 
 # ---------------------------------------------------------------------------

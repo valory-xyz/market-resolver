@@ -10,7 +10,7 @@ fingerprint:
   README.md: bafybeicebua5cqf3pfr34hy5mmnr6i7m7wgxlkzbto6woi5dkuv4fqbymi
   __init__.py: bafybeiedhf4rirdachml54zzde7nl3nhuwz4c5xwskrc5udfphefbrdsfu
   behaviours/__init__.py: bafybeignnrbklzekhqurn6ptli5zhzsov2qtdzr5se4xe4hqdywt2vbtvu
-  behaviours/base.py: bafybeig4he3y5rwz2tsi53fmfsb5s25ldo5l36ha4amt5vllnysppfndku
+  behaviours/base.py: bafybeigqnt2pho6dn7lc25jovnjotflxualgcndxgt5ycnoy44hnz42pv4
   behaviours/build_answer_tx.py: bafybeidv7zsaxwm7c34p2zr3li4kbnh7bjvh6torlss76zjthsoaywwv6e
   behaviours/evaluate_answers.py: bafybeidaljtlkhjxnhsy72jljwuonxrld4bccw5xezteuushxu54a3ooly
   behaviours/post_transaction.py: bafybeih3sx6y2xhuc5gkoeed6skfb6zyur4xc36b2vma2hprpk4lqhgvlq
@@ -27,7 +27,7 @@ fingerprint:
   tests/__init__.py: bafybeidpf4le7kmwrvl6u3s4yl2mrlznnu7scha3hvcpd3s2omwo7bdwkq
   tests/behaviours/__init__.py: bafybeierpqlj4wjvfsa2acmkibioivviqudq4ulu5ifuqwcvdcfewzdgau
   tests/behaviours/conftest.py: bafybeia3akipkpxmm5ig7xww2k57xisosagvtpuzkbv43j3imqfgrlqt2a
-  tests/behaviours/test_base.py: bafybeic3unjfx36vwawi4hardldjgurwuptj3crsh5zr5ouqyrwlkmclba
+  tests/behaviours/test_base.py: bafybeicflkdrirbaxhscja5ylv5zi3dyewxfktzeog7zmti3c7aanqg6nm
   tests/behaviours/test_build_answer_tx.py: bafybeihyhv4wkzipaeqvqg4a4zyfyrpil6l3c4lxbwxahejtzfzwqssnme
   tests/behaviours/test_evaluate_answers.py: bafybeicwqdc2q7navj5bxhanj3z75i576g4fvp7bo2732e6wjkeev3kxle
   tests/behaviours/test_post_transaction.py: bafybeibihvgozgvlrfyrkpq7gg3hpvzp5h7g633oggqnu5auqtnfyakbcy
@@ -109,8 +109,8 @@ models:
         Content-Type: application/json
       method: POST
       parameters: {}
-      response_key: data:sender
-      response_type: dict
+      response_key: data:requests
+      response_type: list
       retries: 5
       url: https://api.subgraph.autonolas.tech/api/proxy/marketplace-gnosis
     class_name: MechGnosisSubgraph
