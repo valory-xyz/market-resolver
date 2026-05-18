@@ -28,6 +28,8 @@ import json
 from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock, PropertyMock, patch
 
+import pytest
+
 from packages.valory.skills.market_resolution_manager_abci.behaviours.base import (
     ANSWER_NO,
     ANSWER_YES,
@@ -862,6 +864,80 @@ class TestAsyncActIntegration:
         assert b.questions_db["0xMaxed"]["mech_retries"] == 5
         assert payload_sent[0].selected_market_id is None
 
+    @pytest.mark.parametrize("subgraph_returns", [None, []])
+    def test_mech_retries_monotonic_when_subgraph_empty(
+        self, subgraph_returns: Any
+    ) -> None:
+        """Regression on retry-counter monotonicity.
+
+        ``mech_retries`` must NOT collapse to 0 when the subgraph helper
+        returns ``None`` or ``[]``. The original retry-budget bug shipped
+        because ``mech_retries = max(prior, len(requests))`` silently
+        degraded to 0 when the broken cache query returned an empty list
+        (the ``nonce`` field error masquerading as zero results). The fix
+        preserves the prior counter -- this test pins that contract.
+
+        Seeds the DB with ``mech_retries=3``, makes the subgraph helper
+        return ``None`` / ``[]``, then asserts the counter is unchanged
+        after a full scan.
+
+        :param subgraph_returns: the value ``fetch_mech_requests_for_market``
+            is mocked to return (``None`` or empty list).
+        """
+        market_id = "0xMonotonic"
+        market = _make_market(market_id)
+        seeded_db: Dict[str, Any] = {
+            market_id: {
+                "status": None,
+                "market_id": market_id,
+                "title": "Will X happen?",
+                "question_id": "0xQ",
+                "detected_at": NOW - 1000,
+                "on_chain_answer": None,
+                "on_chain_bond": None,
+                "last_answerer": "",
+                "last_answer_timestamp": None,
+                "market_closing_timestamp": NOW - 500,
+                "realitio_timeout": 86400,
+                "mech_requests": [],
+                "pending_nonce": None,
+                "evaluation": None,
+                "pending_tx": None,
+                "mech_retries": 3,
+            }
+        }
+        b = _make_behaviour(questions_db=seeded_db)
+        b.context.params.max_mech_retries = 10
+        patch.object(
+            b, "_fetch_pending_and_finalizing_markets", new=_make_gen([market])
+        ).start()
+        patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
+        patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
+        patch.object(
+            b,
+            "fetch_mech_requests_for_market",
+            new=_make_gen(subgraph_returns),
+        ).start()
+
+        payload_sent = []
+
+        def capture_send(payload: Any) -> Any:
+            payload_sent.append(payload)
+            return None
+            yield  # noqa
+
+        with (
+            patch.object(b, "send_a2a_transaction", new=capture_send),
+            patch.object(b, "wait_until_round_end", new=_make_gen(None)),
+            patch.object(b, "set_done"),
+        ):
+            _run_async_act(b)
+
+        # Counter must be preserved (max of prior=3 and the empty/None
+        # subgraph result). A regression to the buggy behaviour would
+        # collapse this to 0 and let the market be re-selected indefinitely.
+        assert b.questions_db[market_id]["mech_retries"] == 3
+
     def test_bond_too_high_market_skipped(self) -> None:
         """Market with bond exceeding max_challenge_bond is skipped when prefetch=False."""
         # Bond is 32 xDAI, max is 16 xDAI
@@ -874,7 +950,6 @@ class TestAsyncActIntegration:
         )
         b = _make_behaviour()
         b.context.params.max_challenge_bond = 16 * 10**18
-        b.context.params.prefetch_mech_evaluations = False
         patch.object(
             b, "_fetch_pending_and_finalizing_markets", new=_make_gen([market])
         ).start()
@@ -900,49 +975,11 @@ class TestAsyncActIntegration:
         assert len(payload_sent) == 1
         assert payload_sent[0].selected_market_id is None
 
-    def test_prefetch_bypasses_bond_gate(self) -> None:
-        """When prefetch_mech_evaluations=True, bond gate is bypassed in scan."""
-        huge_bond = str(32 * 10**18)
-        market = _make_market(
-            "0xMBigPrefetch",
-            current_answer=ANSWER_NO,
-            current_answer_bond=huge_bond,
-            current_answer_timestamp=str(NOW - 1000),
-        )
-        b = _make_behaviour()
-        b.context.params.max_challenge_bond = 16 * 10**18
-        b.context.params.prefetch_mech_evaluations = True  # bypass bond gate
-        patch.object(
-            b, "_fetch_pending_and_finalizing_markets", new=_make_gen([market])
-        ).start()
-        patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
-        patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
-        patch.object(b, "fetch_mech_requests_for_market", new=_make_gen([])).start()
-
-        payload_sent = []
-
-        def capture_send(payload: Any) -> Any:
-            payload_sent.append(payload)
-            return None
-            yield  # noqa
-
-        with (
-            patch.object(b, "send_a2a_transaction", new=capture_send),
-            patch.object(b, "wait_until_round_end", new=_make_gen(None)),
-            patch.object(b, "set_done"),
-        ):
-            _run_async_act(b)
-
-        # With prefetch=True, the market passes bond gate in scan -> selected
-        assert len(payload_sent) == 1
-        assert payload_sent[0].selected_market_id == "0xMBigPrefetch"
-
     def test_safe_balance_too_low_market_skipped(self) -> None:
         """Market skipped when safe balance < required bond."""
         market = _make_market("0xMLowBal", current_answer=None)
         b = _make_behaviour()
         b.context.params.initial_answer_bond = 10**18
-        b.context.params.prefetch_mech_evaluations = False
         patch.object(
             b, "_fetch_pending_and_finalizing_markets", new=_make_gen([market])
         ).start()
@@ -973,7 +1010,6 @@ class TestAsyncActIntegration:
         market = _make_market("0xMNoBal", current_answer=None)
         b = _make_behaviour()
         b.context.params.initial_answer_bond = 10**18
-        b.context.params.prefetch_mech_evaluations = False
         patch.object(
             b, "_fetch_pending_and_finalizing_markets", new=_make_gen([market])
         ).start()

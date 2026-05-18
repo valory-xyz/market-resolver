@@ -92,9 +92,6 @@ class MarketResolutionManagerParams(  # pylint: disable=too-many-instance-attrib
             "max_challenge_bond", 16000000000000000000  # 16 xDAI
         )
         self.max_mech_retries: int = kwargs.pop("max_mech_retries", 10)
-        self.prefetch_mech_evaluations: bool = kwargs.pop(
-            "prefetch_mech_evaluations", False
-        )
         # Minimum cooldown between Mech retries for the same market,
         # applied to garbage/unparseable responses (error discriminators
         # like ``all_voters_failed`` / ``judge_api_error``). Default 4h:

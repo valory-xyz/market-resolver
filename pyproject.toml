@@ -50,6 +50,7 @@ Repository = "https://github.com/valory-xyz/market-resolver"
 [dependency-groups]
 dev = [
     "tomte[cli, tests] @ git+https://github.com/valory-xyz/tomte.git@0819eea387c622cc53b398a2d3ea86e94a55cf82",
+    "pip>=24.0",
 ]
 
 [tool.uv]

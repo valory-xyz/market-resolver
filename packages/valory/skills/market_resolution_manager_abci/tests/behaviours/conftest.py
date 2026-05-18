@@ -51,7 +51,6 @@ def _make_context(questions_db: Any = None) -> MagicMock:
     context.params.challenge_urgency_buffer = 3600
     context.params.max_mech_retries = 10
     context.params.mech_retry_cooldown = 3600
-    context.params.prefetch_mech_evaluations = False
     context.params.omen_subgraph_max_market_age_seconds = 365 * 86400
     context.params.trusted_addresses = []
     context.params.watched_creator_addresses = ["0xCreator"]

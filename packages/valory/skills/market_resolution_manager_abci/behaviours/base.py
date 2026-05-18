@@ -21,7 +21,7 @@
 
 import json
 from abc import ABC
-from typing import Any, Dict, Generator, Optional, cast
+from typing import Any, Dict, Generator, List, Optional, cast
 
 from packages.valory.protocols.ledger_api import LedgerApiMessage
 from packages.valory.skills.abstract_round_abci.behaviours import BaseBehaviour
@@ -47,30 +47,42 @@ ANSWER_INVALID = "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 # NOTE: the Mech Marketplace Gnosis subgraph stores the market question in
 # ``parsedRequest.prompt``, NOT in ``parsedRequest.questionTitle`` (which is
 # always empty for our requests). We filter on ``prompt`` accordingly.
+#
+# ``parsedRequest`` has no ``nonce`` field on this subgraph. Selecting it
+# makes the whole query error with ``data: null`` -- a previous version of
+# this template did exactly that, which silently disabled the retry-budget
+# gate (the extractor walked ``data.sender.requests`` against ``null`` and
+# got ``[]``, so ``len(requests) == 0`` every cycle no matter how many
+# requests had really been fired). Keep the projection to ``prompt`` and
+# ``tool`` only.
+#
+# Top-level ``requests`` (with ``sender:`` in the ``where`` clause) is
+# equivalent to ``sender(id) { requests(...) }`` on this subgraph -- both
+# return the same rows -- but the top-level form matches the pattern used
+# by watchdog and trader, and is what the framework's ``response_key:
+# data:requests`` walks.
 MECH_CACHE_QUERY_TEMPLATE = """
 {{
-  sender(id: "{sender}") {{
-    requests(
-      where: {{
-        parsedRequest_: {{ prompt: {prompt} }}
-        blockTimestamp_gt: "{block_timestamp_gt}"
-      }}
-      orderBy: blockTimestamp
-      orderDirection: asc
-      first: 1000
-    ) {{
+  requests(
+    where: {{
+      sender: "{sender}"
+      parsedRequest_: {{ prompt: {prompt} }}
+      blockTimestamp_gt: "{block_timestamp_gt}"
+    }}
+    orderBy: blockTimestamp
+    orderDirection: asc
+    first: 1000
+  ) {{
+    id
+    blockTimestamp
+    parsedRequest {{
+      prompt
+      tool
+    }}
+    deliveries(orderBy: blockTimestamp, orderDirection: asc) {{
       id
       blockTimestamp
-      parsedRequest {{
-        prompt
-        tool
-        nonce
-      }}
-      deliveries(orderBy: blockTimestamp, orderDirection: asc) {{
-        id
-        blockTimestamp
-        toolResponse
-      }}
+      toolResponse
     }}
   }}
 }}
@@ -280,16 +292,17 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
     def get_mech_gnosis_subgraph_result(
         self,
         query: str,
-    ) -> Generator[None, None, Optional[Dict[str, Any]]]:
+    ) -> Generator[None, None, Optional[List[Dict[str, Any]]]]:
         """Query the Mech Marketplace Gnosis subgraph.
 
         :param query: the GraphQL query string.
         :yield: None
-        :return: the parsed JSON response, or None on error.
+        :return: the parsed + key-walked response, or None on error.
         """
+        subgraph = self.context.mech_gnosis_subgraph
         response = yield from self.get_http_response(
             content=to_content(query),
-            **self.context.mech_gnosis_subgraph.get_spec(),
+            **subgraph.get_spec(),
         )
 
         if response is None:
@@ -305,13 +318,7 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
             )
             return None
 
-        try:
-            return json.loads(response.body.decode())
-        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-            self.context.logger.error(
-                f"Mech Gnosis subgraph returned 200 with non-JSON body: {exc}"
-            )
-            return None
+        return subgraph.process_response(response)
 
     def get_realitio_subgraph_result(
         self,
@@ -367,20 +374,17 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
         closing_ts = entry.get("market_closing_timestamp") or 0
         safe_address = self.synchronized_data.safe_contract_address or ""
 
+        expected_tool = self.params.mech_tool_resolve_market
         query = MECH_CACHE_QUERY_TEMPLATE.format(
             sender=safe_address.lower(),
             prompt=json.dumps(title),
             block_timestamp_gt=int(closing_ts),
         )
 
-        result = yield from self.get_mech_gnosis_subgraph_result(query)
-        if result is None:
+        all_requests = yield from self.get_mech_gnosis_subgraph_result(query)
+        if all_requests is None:
             return None
 
-        all_requests = ((result.get("data") or {}).get("sender") or {}).get(
-            "requests"
-        ) or []
-        expected_tool = self.params.mech_tool_resolve_market
         return [
             req
             for req in all_requests
