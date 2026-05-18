@@ -874,7 +874,6 @@ class TestAsyncActIntegration:
         )
         b = _make_behaviour()
         b.context.params.max_challenge_bond = 16 * 10**18
-        b.context.params.prefetch_mech_evaluations = False
         patch.object(
             b, "_fetch_pending_and_finalizing_markets", new=_make_gen([market])
         ).start()
@@ -900,49 +899,11 @@ class TestAsyncActIntegration:
         assert len(payload_sent) == 1
         assert payload_sent[0].selected_market_id is None
 
-    def test_prefetch_bypasses_bond_gate(self) -> None:
-        """When prefetch_mech_evaluations=True, bond gate is bypassed in scan."""
-        huge_bond = str(32 * 10**18)
-        market = _make_market(
-            "0xMBigPrefetch",
-            current_answer=ANSWER_NO,
-            current_answer_bond=huge_bond,
-            current_answer_timestamp=str(NOW - 1000),
-        )
-        b = _make_behaviour()
-        b.context.params.max_challenge_bond = 16 * 10**18
-        b.context.params.prefetch_mech_evaluations = True  # bypass bond gate
-        patch.object(
-            b, "_fetch_pending_and_finalizing_markets", new=_make_gen([market])
-        ).start()
-        patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
-        patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
-        patch.object(b, "fetch_mech_requests_for_market", new=_make_gen([])).start()
-
-        payload_sent = []
-
-        def capture_send(payload: Any) -> Any:
-            payload_sent.append(payload)
-            return None
-            yield  # noqa
-
-        with (
-            patch.object(b, "send_a2a_transaction", new=capture_send),
-            patch.object(b, "wait_until_round_end", new=_make_gen(None)),
-            patch.object(b, "set_done"),
-        ):
-            _run_async_act(b)
-
-        # With prefetch=True, the market passes bond gate in scan -> selected
-        assert len(payload_sent) == 1
-        assert payload_sent[0].selected_market_id == "0xMBigPrefetch"
-
     def test_safe_balance_too_low_market_skipped(self) -> None:
         """Market skipped when safe balance < required bond."""
         market = _make_market("0xMLowBal", current_answer=None)
         b = _make_behaviour()
         b.context.params.initial_answer_bond = 10**18
-        b.context.params.prefetch_mech_evaluations = False
         patch.object(
             b, "_fetch_pending_and_finalizing_markets", new=_make_gen([market])
         ).start()
@@ -973,7 +934,6 @@ class TestAsyncActIntegration:
         market = _make_market("0xMNoBal", current_answer=None)
         b = _make_behaviour()
         b.context.params.initial_answer_bond = 10**18
-        b.context.params.prefetch_mech_evaluations = False
         patch.object(
             b, "_fetch_pending_and_finalizing_markets", new=_make_gen([market])
         ).start()

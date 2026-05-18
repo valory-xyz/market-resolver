@@ -15,28 +15,28 @@ fingerprint:
   behaviours/evaluate_answers.py: bafybeidaljtlkhjxnhsy72jljwuonxrld4bccw5xezteuushxu54a3ooly
   behaviours/post_transaction.py: bafybeih3sx6y2xhuc5gkoeed6skfb6zyur4xc36b2vma2hprpk4lqhgvlq
   behaviours/round_behaviour.py: bafybeiecxju6t7zsojnrhrefy4a7c75lkbveoxcayntw6heacao2qqkfdm
-  behaviours/scan_markets.py: bafybeib5atrdgznn6gzvdxbxasihf5kcemxgx2oxmrksgbhxsas2pznym4
+  behaviours/scan_markets.py: bafybeifihkqshz6wirch4lis2xtswtfcsazgwtdfjgxtizurhpzn7xc4b4
   dialogues.py: bafybeict7mdksmjklx6wy2zplunpcfwhgxv5votxbsodidyum2phx3tv34
   fsm_specification.yaml: bafybeibibqujtoh4cp5qivd4fkguo7edjmdhggw6ihitjnzp4p2xr5vg3i
   handlers.py: bafybeigby2ymzvsoiwbgtdd4esk6xrkrafp2b22yqz5xi4ekrnqwqqoq4y
-  models.py: bafybeicdgmtxfnoyd3axzbicy25buzm72jo4w6ojv3tg4ct6yinbrxjeei
+  models.py: bafybeib7budbxam5wiykqduwa2rkiuev3g6qlwlekuqnlpzrzecyek2rk4
   payloads.py: bafybeih6zkrc5mnkpifctn4cg3myqr3qrdw5v42hg7ldfbuzw7gjbgeoja
   rounds.py: bafybeihfhcmmatxx5ztgao2ft7jfh2su5bbp2b7ua3qxb4luvwltbvdqby
   states/__init__.py: bafybeiho5s4sehwxmgtp4ddgntnkxhjks5cflihdtag7zqy6btjrhzcyti
   states/base.py: bafybeieywx5f6xtiu5ds5dsy4ewgjqjgkyiw537lwykmejstucch52g45i
   tests/__init__.py: bafybeidpf4le7kmwrvl6u3s4yl2mrlznnu7scha3hvcpd3s2omwo7bdwkq
   tests/behaviours/__init__.py: bafybeierpqlj4wjvfsa2acmkibioivviqudq4ulu5ifuqwcvdcfewzdgau
-  tests/behaviours/conftest.py: bafybeia3akipkpxmm5ig7xww2k57xisosagvtpuzkbv43j3imqfgrlqt2a
+  tests/behaviours/conftest.py: bafybeifjneftj5czv37bfy2snbcy4mzxsnrz6mcohjokw4u3c3tniasaqe
   tests/behaviours/test_base.py: bafybeicflkdrirbaxhscja5ylv5zi3dyewxfktzeog7zmti3c7aanqg6nm
   tests/behaviours/test_build_answer_tx.py: bafybeihyhv4wkzipaeqvqg4a4zyfyrpil6l3c4lxbwxahejtzfzwqssnme
   tests/behaviours/test_evaluate_answers.py: bafybeicwqdc2q7navj5bxhanj3z75i576g4fvp7bo2732e6wjkeev3kxle
   tests/behaviours/test_post_transaction.py: bafybeibihvgozgvlrfyrkpq7gg3hpvzp5h7g633oggqnu5auqtnfyakbcy
   tests/behaviours/test_round_behaviour.py: bafybeifcvxp5vlshg4xbego4frjsahvvvmjebj5s27l5ba7eyijsxry7ka
-  tests/behaviours/test_scan_markets.py: bafybeih6x4dayknrtze643sfftotyot7gomgfprxdp5qgzngscpysiegkm
+  tests/behaviours/test_scan_markets.py: bafybeibosclmqco2j5zaum3kiy2k7rwx6zqtsieyiygoxefhs32c2ta6aa
   tests/conftest.py: bafybeiaemzro7plaeklgfk5kvsw62kzgf5uym4e4xqcxwfwzqfcpnct4eq
   tests/test_dialogues.py: bafybeiaue4klz37jrmqlu46xj442v3mazx3fqmuay7thbakeyfy4ohrac4
   tests/test_handlers.py: bafybeib66usugomzo47zrgo635ewzjikixorkuelk5tdgdbckzx4dwfpia
-  tests/test_models.py: bafybeicdn7n7ylkbyv6bwtb7tqnscqqle3jfq24cheihuddp66yuckyc4i
+  tests/test_models.py: bafybeifqqdw3bpwaux6bj4l7u3igx5pt23dgms6onwoxkq42yuenhoxy3e
   tests/test_payloads.py: bafybeiakjhvniimjyynaeq3n3udkdnjcvm4tuzafyrirsvwjgwwqkxb5j4
   tests/test_rounds.py: bafybeicyvamo4xohu6zsrnbawe4secam6c7pirftapfwpqobmutfmjk45i
 fingerprint_ignore_patterns: []
@@ -125,7 +125,6 @@ models:
       max_challenge_bond: 40000000000000000
       max_escalation_rounds: 5
       max_mech_retries: 10
-      prefetch_mech_evaluations: false
       mech_retry_cooldown: 14400
       omen_subgraph_max_market_age_seconds: 31536000
       cleanup_history_depth: 1
