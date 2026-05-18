@@ -21,7 +21,7 @@
 
 import json
 from abc import ABC
-from typing import Any, Dict, Generator, Optional, cast
+from typing import Any, Dict, Generator, List, Optional, cast
 
 from packages.valory.protocols.ledger_api import LedgerApiMessage
 from packages.valory.skills.abstract_round_abci.behaviours import BaseBehaviour
@@ -66,7 +66,7 @@ MECH_CACHE_QUERY_TEMPLATE = """
   requests(
     where: {{
       sender: "{sender}"
-      parsedRequest_: {{ prompt: {prompt}, tool: "{tool}" }}
+      parsedRequest_: {{ prompt: {prompt} }}
       blockTimestamp_gt: "{block_timestamp_gt}"
     }}
     orderBy: blockTimestamp
@@ -292,7 +292,7 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
     def get_mech_gnosis_subgraph_result(
         self,
         query: str,
-    ) -> Generator[None, None, Optional[Any]]:
+    ) -> Generator[None, None, Optional[List[Dict[str, Any]]]]:
         """Query the Mech Marketplace Gnosis subgraph.
 
         :param query: the GraphQL query string.
@@ -378,7 +378,6 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
         query = MECH_CACHE_QUERY_TEMPLATE.format(
             sender=safe_address.lower(),
             prompt=json.dumps(title),
-            tool=expected_tool,
             block_timestamp_gt=int(closing_ts),
         )
 

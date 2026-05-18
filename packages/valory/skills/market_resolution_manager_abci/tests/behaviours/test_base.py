@@ -840,8 +840,8 @@ class TestFetchMechRequestsForMarket:
         assert len(result) == 1
         assert result[0]["id"] == "req-top-level"
 
-    def test_query_renders_top_level_request_with_tool_filter(self) -> None:
-        """The rendered query uses top-level ``requests(where:`` with tool.
+    def test_query_renders_top_level_request_form(self) -> None:
+        """The rendered query uses top-level ``requests(where:``.
 
         Pins two invariants:
 
@@ -851,22 +851,26 @@ class TestFetchMechRequestsForMarket:
           null`` -- which previously masqueraded as "zero matching
           requests" and silently disabled the retry-budget gate.
         - The query uses top-level ``requests(where:`` rather than the
-          older ``sender(id) { requests(where:) }`` traversal. Both
-          shapes return the same rows on this subgraph, but the
+          older ``sender(id) { requests(where:) }`` traversal. The
           top-level form is the canonical pattern used by watchdog and
           trader and is what the ``response_key: data:requests`` config
           walks.
+
+        Tool filtering is intentionally NOT in the where-clause -- the
+        Python post-filter at ``fetch_mech_requests_for_market`` is the
+        authoritative tool check, so a where-clause filter would only
+        duplicate it and create a coupling risk if the tool slug ever
+        gets renamed.
         """
         rendered = MECH_CACHE_QUERY_TEMPLATE.format(
             sender="0xabc",
             prompt=json.dumps("Will X?"),
-            tool="resolve-market-jury-v1",
             block_timestamp_gt=123,
         )
         assert "requests(" in rendered
         assert "sender(id:" not in rendered
         assert "nonce" not in rendered
-        assert 'tool: "resolve-market-jury-v1"' in rendered
+        assert "tool:" not in rendered
 
 
 # ---------------------------------------------------------------------------
