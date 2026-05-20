@@ -40,7 +40,7 @@ protocols:
 skills:
 - valory/abstract_abci:0.1.0:bafybeib5qjkpfsxjcur4asube6kctmy2xsrg2hzcele2tmvsstula4lt54
 - valory/abstract_round_abci:0.1.0:bafybeibvbfkmkqjidukhkzzz7nd33gna64hjhcn3blon5xcleilbt63zn4
-- valory/market_resolver_abci:0.1.0:bafybeie2tcskzblk5p2uk6c6gxcd52xhviunkqjragcv4whsx2mewfi3zu
+- valory/market_resolver_abci:0.1.0:bafybeifoexaqkgvimzzufu5ho7n3nkumbizgboli5onvep6yg35lw6ujwe
 - valory/registration_abci:0.1.0:bafybeihkfla7hppssqk2dojuxjuy233jrilablud4avtazagt2javcihya
 - valory/reset_pause_abci:0.1.0:bafybeiakhczviqep47o5txatkdbzui6bk5o554cnspdkauapvmdykk2tkm
 - valory/termination_abci:0.1.0:bafybeibduc7hdi3xu7ahpumgew6es33jcadbrbipboyc7sbuyzds45fmve
@@ -231,7 +231,6 @@ models:
       mech_marketplace_config: ${dict:{"mech_marketplace_address":"0x735FAAb1c4Ec41128c367AFb5c3baC73509f70bB","priority_mech_address":"0x601024E27f1C67B28209E24272CED8A31fc8151F","priority_mech_staking_instance_address":"0x998dEFafD094817EF329f6dc79c703f1CF18bC90","priority_mech_service_id":2198,"requester_staking_instance_address":"0xeF44Fb0842DDeF59D37f85D61A1eF492bbA6135d","use_dynamic_mech_selection":false,"response_timeout":300}}
       mech_contract_address: ${str:0x601024E27f1C67B28209E24272CED8A31fc8151F}
       mech_wrapped_native_token_address: ${str:0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d}
-      irrelevant_tools: ${list:[]}
       ignored_mechs: ${list:[]}
       valid_mechs: ${list:["0x601024e27f1c67b28209e24272ced8a31fc8151f"]}
       valid_tools: ${list:["resolve-market-jury-v1"]}

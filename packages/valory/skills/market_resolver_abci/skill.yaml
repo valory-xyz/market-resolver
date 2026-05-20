@@ -192,7 +192,6 @@ models:
         use_dynamic_mech_selection: false
       mech_contract_address: '0x601024E27f1C67B28209E24272CED8A31fc8151F'
       mech_wrapped_native_token_address: '0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d'
-      irrelevant_tools: []
       ignored_mechs: []
       valid_mechs:
       - '0x601024e27f1c67b28209e24272ced8a31fc8151f'
