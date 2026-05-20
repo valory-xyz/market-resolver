@@ -59,14 +59,13 @@ prerelease = "allow"
 
 [tool.tomte]
 # Third-party packages on disk are synced from open-autonomy + open-aea
-# upstreams (auto-prepended) plus mech-interact / trader for the contract
-# wrappers and mech_interact_abci skill, market-creator for the omen_*
-# resolution skills + fpmm contract, and genai for the llm protocol +
-# openai connection inherited via market-creator.
+# upstreams (auto-prepended) plus mech-interact for the mech_interact_abci
+# skill, omen-protocol for the Realitio / FPMM contract wrappers and the
+# omen_* resolution skills, and genai for the llm protocol + openai
+# connection.
 upstream_pins = [
     "valory-xyz/mech-interact@v0.32.0",
-    "valory-xyz/trader@v0.38.4",
-    "valory-xyz/market-creator@v0.12.0",
+    "valory-xyz/omen-protocol@v0.1.0",
     "valory-xyz/genai@v7.2.0",
 ]
 # Content-based gitleaks allowlist — preferred over `gitleaks_extra_paths`
