@@ -28,18 +28,18 @@ contracts: []
 protocols:
 - valory/http:1.0.0:bafybeidxkp3vga7t6x2pbt2tpkgyaxa5bgpdgryao54py7w3yxyzr7neoy
 skills:
-- valory/abstract_round_abci:0.1.0:bafybeidpod4inivvvgzenx46whshq4mzmxgwsxinv6ibdvyemkstam2yz4
-- valory/registration_abci:0.1.0:bafybeietlh4pq5wjsb6srpsqehcq3gwsod5c6gs4jdiwpzkgrwyxhbbbvq
-- valory/reset_pause_abci:0.1.0:bafybeifdzwzz5byan3ytsi46n4n2svtqme6475hk5z77sopymyzqszcpoa
-- valory/termination_abci:0.1.0:bafybeiadbtzcvzkwbrosshlsubilj7mwzdqfni6dr75wsd3vawhslpwqeu
-- valory/transaction_settlement_abci:0.1.0:bafybeigiojqgbi54jhree3sqrzaudbmjxb7y2ete74bbliryi3t7ztwi5q
-- valory/identify_service_owner_abci:0.1.0:bafybeiaqjoocj56smwuntvcekbbxpb6au2x7rixmbypbjezojyvio67g3q
-- valory/funds_forwarder_abci:0.1.0:bafybeihinrqecswpwjmba4dtpvvepmz7uqzkgmywanbdl4pahki3crdg3m
-- valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeifqvjl42y6zjb5diabfu76kedyrkvravszjav6gdsmihqrdrk75yq
-- valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeibn7gla57eakwfal4lvyj7prqnjwfycbsecwobkzx7z777kbghapy
-- valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeig34ypstbynxjwayyjtn3qmnr4vrxgaxoqyvpgm5lff7i2ksrgm4m
-- valory/mech_interact_abci:0.1.0:bafybeiburftv5nj5427qyue2f5sx56fpfskalnplwoow2ixqbvgio3kfky
-- valory/market_resolution_manager_abci:0.1.0:bafybeibwwjzvyzf2qlffngfmc2i46rou6xwcvaiv62xeqk4io62epibhre
+- valory/abstract_round_abci:0.1.0:bafybeibvbfkmkqjidukhkzzz7nd33gna64hjhcn3blon5xcleilbt63zn4
+- valory/registration_abci:0.1.0:bafybeihkfla7hppssqk2dojuxjuy233jrilablud4avtazagt2javcihya
+- valory/reset_pause_abci:0.1.0:bafybeiakhczviqep47o5txatkdbzui6bk5o554cnspdkauapvmdykk2tkm
+- valory/termination_abci:0.1.0:bafybeibduc7hdi3xu7ahpumgew6es33jcadbrbipboyc7sbuyzds45fmve
+- valory/transaction_settlement_abci:0.1.0:bafybeiceijjjlvbq2tnadeqdrm7nka7gqgwzvmlgjuzbacgnkljry5h72a
+- valory/identify_service_owner_abci:0.1.0:bafybeif3gx5r2dfv43cljmmtgie73yfad7wwhrutusljhcgtx4kutcndpa
+- valory/funds_forwarder_abci:0.1.0:bafybeicwc7pz7cwy6leqzsh47labscds5cwpnpfa3naejhf6xh5vyxq37q
+- valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeiaejs4ol2jti2wqsjcrtqkkiiquyr7jdvi3uyfw2nztnxybnf4m54
+- valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeidvphcps6qfx6odrgtslims2olvszdxngmjuyery5bg5djimawfhe
+- valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeieiiouhfaky3lvy6bquvtb4doj6n55xlkng6dt7dahvjblti3mnu4
+- valory/mech_interact_abci:0.1.0:bafybeiexvtbft2iupqojaeodfr6cdn3kmhzbrqa4exeb7vhjs2m7j43hfm
+- valory/market_resolution_manager_abci:0.1.0:bafybeiflmxozzpcdpo53a6e55ricdmb4px44d7yqj3o7qejhpz7qjjgala
 behaviours:
   main:
     args: {}
@@ -192,8 +192,11 @@ models:
         use_dynamic_mech_selection: false
       mech_contract_address: '0x601024E27f1C67B28209E24272CED8A31fc8151F'
       mech_wrapped_native_token_address: '0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d'
-      irrelevant_tools: []
       ignored_mechs: []
+      valid_mechs:
+      - '0x601024e27f1c67b28209e24272ced8a31fc8151f'
+      valid_tools:
+      - resolve-market-jury-v1
       penalize_mech_time_window: 1800
       deliveries_lookback_days: 30
     class_name: Params
