@@ -194,6 +194,10 @@ models:
       mech_wrapped_native_token_address: '0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d'
       irrelevant_tools: []
       ignored_mechs: []
+      valid_mechs:
+      - '0x601024e27f1c67b28209e24272ced8a31fc8151f'
+      valid_tools:
+      - resolve-market-jury-v1
       penalize_mech_time_window: 1800
       deliveries_lookback_days: 30
     class_name: Params

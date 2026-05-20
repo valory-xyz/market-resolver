@@ -7,7 +7,7 @@ license: Apache-2.0
 fingerprint:
   README.md: bafybeie6lb2mlmzmkycbcfma4onidhegfu4ipgpybg2av5mhfs5zx42b2m
 fingerprint_ignore_patterns: []
-agent: valory/market_resolver:0.1.0:bafybeihc44cigfoakk4pjkerek7istvtyd5x4gbi6f6hopytc3vl7l77ue
+agent: valory/market_resolver:0.1.0:bafybeiexumhhpjvy2hbdbf23ppsl6h4ibdy6l46yifjwm5yhfifzqi62tq
 number_of_agents: 1
 deployment:
   agent:
@@ -116,6 +116,8 @@ models:
       mech_wrapped_native_token_address: ${MECH_WRAPPED_NATIVE_TOKEN_ADDRESS:str:0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d}
       irrelevant_tools: ${IRRELEVANT_TOOLS:list:[]}
       ignored_mechs: ${IGNORED_MECHS:list:["0x33ca1e117c4254b2ee8cd7ef1621739431a37396","0x2ebd2237e5db798e36a2fa67afa74effb17c5ebb"]}
+      valid_mechs: ${VALID_MECHS:list:["0x601024e27f1c67b28209e24272ced8a31fc8151f"]}
+      valid_tools: ${VALID_TOOLS:list:["resolve-market-jury-v1"]}
       penalize_mech_time_window: ${PENALIZE_MECH_TIME_WINDOW:int:1800}
       deliveries_lookback_days: ${DELIVERIES_LOOKBACK_DAYS:int:30}
       setup:
