@@ -190,7 +190,7 @@ autonomy analyse handlers
 | [open-autonomy](https://github.com/valory-xyz/open-autonomy) | Core framework: abstract_round_abci, registration, transaction_settlement, reset_pause, termination |
 | [open-aea](https://github.com/valory-xyz/open-aea) | AEA framework: protocols, connections, base contracts (gnosis_safe, multisend, service_registry) |
 | [mech-interact](https://github.com/valory-xyz/mech-interact) | mech_interact_abci skill, mech/mech_mm/ierc1155 contracts |
-| [trader](https://github.com/valory-xyz/trader) | realitio, realitio_proxy, conditional_tokens contracts |
+| [omen-protocol](https://github.com/valory-xyz/omen-protocol) | realitio, realitio_proxy, conditional_tokens, fpmm contracts; omen_ct_redeem_tokens_abci, omen_fpmm_remove_liquidity_abci, omen_realitio_withdraw_bonds_abci skills |
 
 ## Commit Conventions
 
