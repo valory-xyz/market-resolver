@@ -83,11 +83,6 @@ logging_config:
       - logfile
       - console
       propagate: true
-  root:
-    handlers:
-    - logfile
-    - console
-    level: INFO
 skill_exception_policy: stop_and_exit
 connection_exception_policy: just_log
 dependencies:
