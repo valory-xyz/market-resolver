@@ -137,9 +137,9 @@ models:
   params:
     args:
       setup:
-        all_participants: ${ALL_PARTICIPANTS:list:["0x0000000000000000000000000000000000000000"]}
-        safe_contract_address: ${SAFE_CONTRACT_ADDRESS:str:0x0000000000000000000000000000000000000000}
-        consensus_threshold: ${CONSENSUS_THRESHOLD:int:null}
+        all_participants: ${list:["0x0000000000000000000000000000000000000000"]}
+        safe_contract_address: ${str:0x0000000000000000000000000000000000000000}
+        consensus_threshold: ${int:null}
       cleanup_history_depth: ${CLEANUP_HISTORY_DEPTH:int:1}
       cleanup_history_depth_current: ${CLEANUP_HISTORY_DEPTH_CURRENT:int:null}
       finalize_timeout: ${FINALIZE_TIMEOUT:float:60.0}
