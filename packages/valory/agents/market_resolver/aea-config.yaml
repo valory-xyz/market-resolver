@@ -40,7 +40,7 @@ protocols:
 skills:
 - valory/abstract_abci:0.1.0:bafybeie5et43th2nta76cd3kpm3fmurd7oyzk3qxim76octvt56m6r2poi
 - valory/abstract_round_abci:0.1.0:bafybeicioxhbhnsoqyqvkeevd7df7r2vubbiglyf7ucps2el73objazjsq
-- valory/market_resolver_abci:0.1.0:bafybeidda6bqqp463i77r43p3h7jws6ia3pdk7xqbheceezuhn7tyixfxu
+- valory/market_resolver_abci:0.1.0:bafybeief5rn6l6afbaib3rsbnyajng54b3kjyt2tpol3335muhezidtzmm
 - valory/registration_abci:0.1.0:bafybeihjhbn5seffyu5cwugvm26fkamp3svhggmtzh577daijgl2ksxs3e
 - valory/reset_pause_abci:0.1.0:bafybeihc4ruh25s7wuunfy2b3k2n4eypyhvtry3usgom44wsymagbcr3ki
 - valory/termination_abci:0.1.0:bafybeibnnzry5kknci3z46gcjgutv4jid3ir6xn6a5adq3tx6v2e25augq
@@ -51,7 +51,7 @@ skills:
 - valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeibuldgtifqjst4oeremvl6huzvdnq36opgwv2wupsnplf4er5frpm
 - valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeicj3pgdx7q5chbms3pxrb6pcv7lbqhkigwnmjuo54p63ub7mkqe5i
 - valory/mech_interact_abci:0.1.0:bafybeidnmszufszq3ro4ebgrqzmhqgctrsc6sykeanfsbvotghvt2cgfsy
-- valory/market_resolution_manager_abci:0.1.0:bafybeidmktfp3d2aisyafbeg3miutew2ugd7rt3zyt7zloslbaf44wuyfe
+- valory/market_resolution_manager_abci:0.1.0:bafybeicbebe2bxk52yjong6jze47su2c4bwlcskozosmik2hbx6mj3hs7u
 default_ledger: ethereum
 required_ledgers:
 - ethereum

@@ -201,7 +201,7 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
                 if evaluation is not None:
                     entry["evaluation"] = evaluation
             entry["mech_retries"] = max(
-                int(entry.get("mech_retries", 0)),
+                int(entry.get("mech_retries") or 0),
                 len(requests),
             )
 
@@ -449,20 +449,29 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         ``(1, inf)`` and Python's stable sort keeps the dict-iteration order
         intact, causing the first-inserted (oldest-by-opening) market to win
         every cycle and concentrating retries on a small front of the queue.
-        Priority (``challenges < unanswered``) and urgency (soonest
-        finalization first) always take precedence over the retry count.
+        The same tie also arises for any challenge whose
+        ``last_answer_timestamp`` is falsy (yielding ``finalization = inf``
+        at ``(0, inf)``); the ``mech_retries`` dimension breaks both ties
+        uniformly.  Priority (``challenges < unanswered``) and urgency
+        (soonest finalization first) always take precedence over the retry
+        count.
 
         :param questions_db: the question state keyed by market id.
         :param item: the actionable entry being sorted (must contain
             ``market_id``).
-        :return: a tuple ``(priority, finalization, mech_retries)``.
+        :return: a tuple ``(priority, finalization, mech_retries)`` sorted
+            ascending (lower values are picked first).  ``priority`` is
+            ``0`` for challenges and ``1`` for unanswered markets, so
+            challenges sort before unanswered.  ``mech_retries`` is
+            coerced to ``int`` (``None`` is treated as ``0``) so the
+            sort never raises on a missing or null counter.
         """
         entry = questions_db[item["market_id"]]
         is_unanswered = entry.get("on_chain_answer") is None
         last_ts = int(entry.get("last_answer_timestamp") or 0)
         timeout = int(entry.get("realitio_timeout", 86400))
         finalization = last_ts + timeout if last_ts else float("inf")
-        mech_retries = int(entry.get("mech_retries", 0))
+        mech_retries = int(entry.get("mech_retries") or 0)
         return (1 if is_unanswered else 0, finalization, mech_retries)
 
     def _log_scan_summary(self, questions_db: Dict[str, Any]) -> None:

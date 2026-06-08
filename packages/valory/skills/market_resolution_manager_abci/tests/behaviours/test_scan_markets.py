@@ -427,6 +427,27 @@ class TestActionableSortKey:
         )
         assert key_challenge < key_unanswered
 
+    def test_none_mech_retries_treated_as_zero(self) -> None:
+        """A ``None`` value for ``mech_retries`` must not raise.
+
+        The sort key uses ``int(... or 0)`` so an explicitly-null counter
+        (e.g. from a future JSON snapshot or a stale entry) is coerced to
+        ``0`` rather than crashing ``actionable.sort()`` with a
+        ``TypeError`` and stalling the FSM round.
+        """
+        questions_db = {
+            "0xNull": {
+                "on_chain_answer": None,
+                "last_answer_timestamp": None,
+                "realitio_timeout": 86400,
+                "mech_retries": None,
+            },
+        }
+        key = ScanMarketsBehaviour._actionable_sort_key(
+            questions_db, {"market_id": "0xNull"}
+        )
+        assert key == (1, float("inf"), 0)
+
 
 class TestLogScanSummary:
     """Tests for _log_scan_summary."""
@@ -796,9 +817,10 @@ class TestAsyncActIntegration:
         ).start()
         patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
         patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
-        # Mech subgraph returns no fresh determinable delivery for this market;
-        # mech_retries stays at its locally-tracked value (1) via the
-        # max(local, len(subgraph)) monotonic guard.
+        # fetch_mech_requests_for_market returns [] (not None), so the
+        # ``if requests is None: continue`` skip path is bypassed and the
+        # code reaches ``max(local, len(subgraph)) = max(1, 0) = 1`` --
+        # the monotonic guard preserves the prior ``mech_retries`` value.
         patch.object(b, "fetch_mech_requests_for_market", new=_make_gen([])).start()
 
         with (
