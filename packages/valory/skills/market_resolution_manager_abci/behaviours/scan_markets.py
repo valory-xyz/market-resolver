@@ -212,6 +212,17 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             evaluation = entry.get("evaluation")
             mech_answer = evaluation.get("answer") if evaluation else None
 
+            # Clear stale undeterminable evaluations regardless of status
+            # so a fresh Mech request is made once retry_after expires.
+            # Without this, evaluate_answers reuses the cached undet
+            # evaluation, skips the Mech request, and build_answer_tx
+            # only re-sets retry_after -- the market never progresses
+            # past 1 on-chain Mech request and gets stuck in a daily
+            # zombie loop. ``mech_requests`` is sourced from the subgraph
+            # each scan; do not mutate it here.
+            if evaluation is not None and mech_answer is None:
+                entry["evaluation"] = None
+
             if on_chain_answer is None:
                 entry["status"] = AnswerStatus.NEEDS_ANSWER
             elif answerer in trusted:
@@ -221,12 +232,6 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             elif mech_answer is not None:
                 entry["status"] = AnswerStatus.TRANSACTION_PENDING
             else:
-                # No evaluation, or undeterminable (answer=None).
-                # Clear stale undeterminable evaluations so a fresh Mech
-                # request is made once retry_after expires. ``mech_requests``
-                # is sourced from the subgraph each scan; do not mutate it
-                # here.
-                entry["evaluation"] = None
                 entry["status"] = AnswerStatus.NEEDS_VERIFICATION
 
         # Step 7: Select actionable market
