@@ -266,7 +266,7 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
                 retry_after = entry.get("retry_after", 0)
                 if retry_after and now < retry_after:
                     continue
-                if entry.get("mech_retries", 0) >= self.params.max_mech_retries:
+                if int(entry.get("mech_retries") or 0) >= self.params.max_mech_retries:
                     continue
             elif status == AnswerStatus.TRANSACTION_PENDING:  # pragma: no branch
                 timeout = int(entry.get("realitio_timeout", 86400))

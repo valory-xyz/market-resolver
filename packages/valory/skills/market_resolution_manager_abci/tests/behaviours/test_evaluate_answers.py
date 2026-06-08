@@ -194,6 +194,52 @@ class TestEvaluateAnswersBehaviour:
         assert payload_sent[0].mech_requests is None
         assert payload_sent[0].evaluation_result is None
 
+    def test_retry_cap_gate_survives_none_mech_retries(self) -> None:
+        """Retry-cap gate at evaluate_answers.py:77 must not crash on ``None``.
+
+        Reachable path (follow-up to PR #30):
+
+        ``scan_markets`` can select an entry whose ``mech_retries`` is
+        ``None`` -- e.g. a transient ``fetch_mech_requests_for_market``
+        failure bypasses the line-204 normalization and leaves the
+        counter un-coerced. When ``evaluate_answers`` then reads it,
+        the unguarded comparison ``None >= max_mech_retries`` raises
+        ``TypeError`` in Python 3 and stops the FSM round.
+
+        The fix coerces ``None`` to ``0`` via ``int(... or 0)``. With
+        ``mech_retries=None`` and ``max_mech_retries=10``, the gate
+        should evaluate ``0 >= 10`` (False) and the behaviour should
+        proceed to fire a fresh Mech request rather than crashing.
+        """
+        entry = _base_entry()
+        entry["mech_retries"] = None  # type: ignore[assignment]
+        b = _make_behaviour(
+            questions_db={"0xM": entry},
+            selected_market_id="0xM",
+        )
+        b.context.params.max_mech_retries = 10
+
+        payload_sent = []
+
+        def capture_send(payload: Any) -> Any:
+            payload_sent.append(payload)
+            return None
+            yield  # noqa
+
+        with (
+            patch.object(b, "send_a2a_transaction", new=capture_send),
+            patch.object(b, "wait_until_round_end", new=_make_gen(None)),
+            patch.object(b, "set_done"),
+        ):
+            _run_async_act(b)
+
+        # Behaviour completed without TypeError; a fresh Mech request
+        # was prepared (mech_requests populated, retries bumped to 1
+        # from the coerced base value of 0).
+        assert len(payload_sent) == 1
+        assert payload_sent[0].mech_requests is not None
+        assert b.questions_db["0xM"]["mech_retries"] == 1
+
     def test_no_title_sends_none_payload(self) -> None:
         """Entry with empty title -> payload with both fields None."""
         entry = _base_entry(title="")

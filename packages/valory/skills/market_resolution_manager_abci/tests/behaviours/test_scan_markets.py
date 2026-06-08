@@ -1132,6 +1132,83 @@ class TestAsyncActIntegration:
         # collapse this to 0 and let the market be re-selected indefinitely.
         assert b.questions_db[market_id]["mech_retries"] == 3
 
+    def test_retry_cap_gate_survives_none_mech_retries(self) -> None:
+        """Retry-cap gate at scan_markets.py:269 must not crash on ``None``.
+
+        Reachable path (follow-up to PR #30):
+
+        1. ``fetch_mech_requests_for_market`` returns ``None`` for the
+           entry (transient subgraph failure) -> the ``if requests is
+           None: continue`` skip at scan_markets.py:196 bypasses the
+           line-204 normalization that would otherwise coerce
+           ``mech_retries`` to an int.
+        2. The entry's ``mech_retries`` stays ``None``.
+        3. Without the fix, ``None >= self.params.max_mech_retries``
+           raises ``TypeError`` in Python 3 and stalls the actionable
+           loop in the FSM round.
+
+        The fix wraps the comparison in ``int(... or 0)``. This test
+        seeds both preconditions and asserts the scan completes without
+        an exception.
+        """
+        market_id = "0xNoneRetries"
+        market = _make_market(market_id)
+        seeded_db: Dict[str, Any] = {
+            market_id: {
+                "status": None,
+                "market_id": market_id,
+                "title": "Will X happen?",
+                "question_id": "0xQ",
+                "detected_at": NOW - 1000,
+                "on_chain_answer": None,
+                "on_chain_bond": None,
+                "last_answerer": "",
+                "last_answer_timestamp": None,
+                "market_closing_timestamp": NOW - 500,
+                "realitio_timeout": 86400,
+                "mech_requests": [],
+                "pending_nonce": None,
+                "evaluation": None,
+                "pending_tx": None,
+                "mech_retries": None,
+            }
+        }
+        b = _make_behaviour(questions_db=seeded_db)
+        b.context.params.max_mech_retries = 10
+        patch.object(
+            b, "_fetch_pending_and_finalizing_markets", new=_make_gen([market])
+        ).start()
+        patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
+        patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
+        # Returning ``None`` here triggers the ``continue`` skip on
+        # line 196, leaving ``mech_retries`` un-normalized so the
+        # downstream gate sees the seeded ``None``.
+        patch.object(
+            b,
+            "fetch_mech_requests_for_market",
+            new=_make_gen(None),
+        ).start()
+
+        payload_sent = []
+
+        def capture_send(payload: Any) -> Any:
+            payload_sent.append(payload)
+            return None
+            yield  # noqa
+
+        with (
+            patch.object(b, "send_a2a_transaction", new=capture_send),
+            patch.object(b, "wait_until_round_end", new=_make_gen(None)),
+            patch.object(b, "set_done"),
+        ):
+            _run_async_act(b)
+
+        # The scan completed without a TypeError; the market is treated
+        # as having ``mech_retries=0`` and is therefore selectable
+        # (below the cap).
+        assert len(payload_sent) == 1
+        assert payload_sent[0].selected_market_id == market_id
+
     def test_bond_too_high_market_skipped(self) -> None:
         """Market with bond exceeding max_challenge_bond is skipped when prefetch=False."""
         # Bond is 32 xDAI, max is 16 xDAI
