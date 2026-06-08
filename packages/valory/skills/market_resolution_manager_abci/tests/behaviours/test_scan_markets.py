@@ -339,6 +339,115 @@ class TestActionableSortKey:
         )
         assert key[1] == float("inf")
 
+    def test_fewer_mech_retries_breaks_tie_for_unanswered(self) -> None:
+        """Within identical priority+urgency, fewer retries wins.
+
+        Without this tiebreaker the unanswered population all ties at
+        ``(1, inf)``, so Python's stable sort hands the slot to whichever
+        market was inserted first in ``questions_db`` -- concentrating
+        retries on the oldest-by-opening market every cycle.
+        """
+        questions_db = {
+            "0xRetriedTwice": {
+                "on_chain_answer": None,
+                "last_answer_timestamp": None,
+                "realitio_timeout": 86400,
+                "mech_retries": 2,
+            },
+            "0xFresh": {
+                "on_chain_answer": None,
+                "last_answer_timestamp": None,
+                "realitio_timeout": 86400,
+                "mech_retries": 0,
+            },
+        }
+        key_retried = ScanMarketsBehaviour._actionable_sort_key(
+            questions_db, {"market_id": "0xRetriedTwice"}
+        )
+        key_fresh = ScanMarketsBehaviour._actionable_sort_key(
+            questions_db, {"market_id": "0xFresh"}
+        )
+        assert key_fresh < key_retried
+
+    def test_urgency_beats_retry_count(self) -> None:
+        """Soonest finalization wins even if the urgent market has more retries.
+
+        Priority and urgency must take precedence over fair rotation: a
+        challenge with a near-finalization deadline must not lose its slot to
+        a fresher challenge with a later deadline.
+        """
+        questions_db = {
+            "0xUrgentRetried": {
+                "on_chain_answer": ANSWER_NO,
+                "last_answer_timestamp": str(NOW - 80000),
+                "realitio_timeout": 86400,
+                "mech_retries": 5,
+            },
+            "0xLaterFresh": {
+                "on_chain_answer": ANSWER_NO,
+                "last_answer_timestamp": str(NOW - 10000),
+                "realitio_timeout": 86400,
+                "mech_retries": 0,
+            },
+        }
+        key_urgent = ScanMarketsBehaviour._actionable_sort_key(
+            questions_db, {"market_id": "0xUrgentRetried"}
+        )
+        key_later = ScanMarketsBehaviour._actionable_sort_key(
+            questions_db, {"market_id": "0xLaterFresh"}
+        )
+        assert key_urgent < key_later
+
+    def test_challenge_beats_unanswered_regardless_of_retries(self) -> None:
+        """A challenge always sorts before any unanswered market.
+
+        Priority is the first dimension of the sort key, so even an
+        unanswered market with zero retries cannot jump ahead of a
+        challenge that has already been retried multiple times.
+        """
+        questions_db = {
+            "0xChallengeRetried": {
+                "on_chain_answer": ANSWER_NO,
+                "last_answer_timestamp": str(NOW - 10000),
+                "realitio_timeout": 86400,
+                "mech_retries": 5,
+            },
+            "0xUnansweredFresh": {
+                "on_chain_answer": None,
+                "last_answer_timestamp": None,
+                "realitio_timeout": 86400,
+                "mech_retries": 0,
+            },
+        }
+        key_challenge = ScanMarketsBehaviour._actionable_sort_key(
+            questions_db, {"market_id": "0xChallengeRetried"}
+        )
+        key_unanswered = ScanMarketsBehaviour._actionable_sort_key(
+            questions_db, {"market_id": "0xUnansweredFresh"}
+        )
+        assert key_challenge < key_unanswered
+
+    def test_none_mech_retries_treated_as_zero(self) -> None:
+        """A ``None`` value for ``mech_retries`` must not raise.
+
+        The sort key uses ``int(... or 0)`` so an explicitly-null counter
+        (e.g. from a future JSON snapshot or a stale entry) is coerced to
+        ``0`` rather than crashing ``actionable.sort()`` with a
+        ``TypeError`` and stalling the FSM round.
+        """
+        questions_db = {
+            "0xNull": {
+                "on_chain_answer": None,
+                "last_answer_timestamp": None,
+                "realitio_timeout": 86400,
+                "mech_retries": None,
+            },
+        }
+        key = ScanMarketsBehaviour._actionable_sort_key(
+            questions_db, {"market_id": "0xNull"}
+        )
+        assert key == (1, float("inf"), 0)
+
 
 class TestLogScanSummary:
     """Tests for _log_scan_summary."""
@@ -708,7 +817,10 @@ class TestAsyncActIntegration:
         ).start()
         patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
         patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
-        # Subgraph still has the 1 prior request, undeterminable delivery
+        # fetch_mech_requests_for_market returns [] (not None), so the
+        # ``if requests is None: continue`` skip path is bypassed and the
+        # code reaches ``max(local, len(subgraph)) = max(1, 0) = 1`` --
+        # the monotonic guard preserves the prior ``mech_retries`` value.
         patch.object(b, "fetch_mech_requests_for_market", new=_make_gen([])).start()
 
         with (
