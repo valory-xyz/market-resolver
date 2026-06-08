@@ -339,6 +339,94 @@ class TestActionableSortKey:
         )
         assert key[1] == float("inf")
 
+    def test_fewer_mech_retries_breaks_tie_for_unanswered(self) -> None:
+        """Within identical priority+urgency, fewer retries wins.
+
+        Without this tiebreaker the unanswered population all ties at
+        ``(1, inf)``, so Python's stable sort hands the slot to whichever
+        market was inserted first in ``questions_db`` -- concentrating
+        retries on the oldest-by-opening market every cycle.
+        """
+        questions_db = {
+            "0xRetriedTwice": {
+                "on_chain_answer": None,
+                "last_answer_timestamp": None,
+                "realitio_timeout": 86400,
+                "mech_retries": 2,
+            },
+            "0xFresh": {
+                "on_chain_answer": None,
+                "last_answer_timestamp": None,
+                "realitio_timeout": 86400,
+                "mech_retries": 0,
+            },
+        }
+        key_retried = ScanMarketsBehaviour._actionable_sort_key(
+            questions_db, {"market_id": "0xRetriedTwice"}
+        )
+        key_fresh = ScanMarketsBehaviour._actionable_sort_key(
+            questions_db, {"market_id": "0xFresh"}
+        )
+        assert key_fresh < key_retried
+
+    def test_urgency_beats_retry_count(self) -> None:
+        """Soonest finalization wins even if the urgent market has more retries.
+
+        Priority and urgency must take precedence over fair rotation: a
+        challenge with a near-finalization deadline must not lose its slot to
+        a fresher challenge with a later deadline.
+        """
+        questions_db = {
+            "0xUrgentRetried": {
+                "on_chain_answer": ANSWER_NO,
+                "last_answer_timestamp": str(NOW - 80000),
+                "realitio_timeout": 86400,
+                "mech_retries": 5,
+            },
+            "0xLaterFresh": {
+                "on_chain_answer": ANSWER_NO,
+                "last_answer_timestamp": str(NOW - 10000),
+                "realitio_timeout": 86400,
+                "mech_retries": 0,
+            },
+        }
+        key_urgent = ScanMarketsBehaviour._actionable_sort_key(
+            questions_db, {"market_id": "0xUrgentRetried"}
+        )
+        key_later = ScanMarketsBehaviour._actionable_sort_key(
+            questions_db, {"market_id": "0xLaterFresh"}
+        )
+        assert key_urgent < key_later
+
+    def test_challenge_beats_unanswered_regardless_of_retries(self) -> None:
+        """A challenge always sorts before any unanswered market.
+
+        Priority is the first dimension of the sort key, so even an
+        unanswered market with zero retries cannot jump ahead of a
+        challenge that has already been retried multiple times.
+        """
+        questions_db = {
+            "0xChallengeRetried": {
+                "on_chain_answer": ANSWER_NO,
+                "last_answer_timestamp": str(NOW - 10000),
+                "realitio_timeout": 86400,
+                "mech_retries": 5,
+            },
+            "0xUnansweredFresh": {
+                "on_chain_answer": None,
+                "last_answer_timestamp": None,
+                "realitio_timeout": 86400,
+                "mech_retries": 0,
+            },
+        }
+        key_challenge = ScanMarketsBehaviour._actionable_sort_key(
+            questions_db, {"market_id": "0xChallengeRetried"}
+        )
+        key_unanswered = ScanMarketsBehaviour._actionable_sort_key(
+            questions_db, {"market_id": "0xUnansweredFresh"}
+        )
+        assert key_challenge < key_unanswered
+
 
 class TestLogScanSummary:
     """Tests for _log_scan_summary."""

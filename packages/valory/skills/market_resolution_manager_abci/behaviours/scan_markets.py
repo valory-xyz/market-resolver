@@ -435,13 +435,30 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
     def _actionable_sort_key(
         questions_db: Dict[str, Any], item: Dict[str, Any]
     ) -> tuple:
-        """Sort key: challenges first (soonest deadline), then unanswered."""
+        """Sort key: challenges first (soonest deadline), then unanswered.
+
+        Tied entries (same priority and finalization) are further ordered by
+        ``mech_retries`` ascending, so markets that have received fewer Mech
+        requests are picked before markets that have already been retried.
+        Without this tiebreaker, the unanswered population shares the key
+        ``(1, inf)`` and Python's stable sort keeps the dict-iteration order
+        intact, causing the first-inserted (oldest-by-opening) market to win
+        every cycle and concentrating retries on a small front of the queue.
+        Priority (``challenges < unanswered``) and urgency (soonest
+        finalization first) always take precedence over the retry count.
+
+        :param questions_db: the question state keyed by market id.
+        :param item: the actionable entry being sorted (must contain
+            ``market_id``).
+        :return: a tuple ``(priority, finalization, mech_retries)``.
+        """
         entry = questions_db[item["market_id"]]
         is_unanswered = entry.get("on_chain_answer") is None
         last_ts = int(entry.get("last_answer_timestamp") or 0)
         timeout = int(entry.get("realitio_timeout", 86400))
         finalization = last_ts + timeout if last_ts else float("inf")
-        return (1 if is_unanswered else 0, finalization)
+        mech_retries = int(entry.get("mech_retries", 0))
+        return (1 if is_unanswered else 0, finalization, mech_retries)
 
     def _log_scan_summary(self, questions_db: Dict[str, Any]) -> None:
         """Log scan summary counts and actionable market details."""
