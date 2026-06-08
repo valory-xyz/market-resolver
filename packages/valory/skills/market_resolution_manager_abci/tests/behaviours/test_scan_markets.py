@@ -730,6 +730,90 @@ class TestAsyncActIntegration:
 
         assert b.questions_db["0xM6"]["status"] == AnswerStatus.NEEDS_VERIFICATION
 
+    def test_stale_undeterminable_evaluation_cleared_on_needs_answer(self) -> None:
+        """Regression for stale undeterminable evaluation persisting.
+
+        Stale undeterminable evaluations must be cleared even when the
+        status would be NEEDS_ANSWER (no on-chain answer).
+
+        Production bug: when a Mech response came back undeterminable
+        (``answer=None``), ``build_answer_tx`` stored the evaluation on the
+        entry and set ``retry_after = now + 24h``. The classification block
+        in scan_markets only cleared stale undeterminable evaluations in
+        the ``NEEDS_VERIFICATION`` (else) branch -- not in the
+        ``NEEDS_ANSWER`` branch (taken when nobody has answered on-chain).
+
+        Result: after the 24h cooldown, the market would be selected
+        again, but ``evaluate_answers`` would see the cached undeterminable
+        evaluation, log "reusing existing Mech evaluation, skipping Mech
+        request", and route to ``build_answer_tx``, which just re-set
+        ``retry_after`` for another 24h. The on-chain Mech request counter
+        never advanced past 1; ``max_mech_retries=10`` was unreachable;
+        markets piled up in zombie state forever.
+
+        This test pins the fix: a market with no on-chain answer but a
+        stale undeterminable cached evaluation must have that evaluation
+        cleared during classification so the next selection cycle fires
+        a fresh Mech request.
+        """
+        # Pre-existing entry: no on-chain answer, but a stale undeterminable
+        # evaluation cached from a previous cycle.
+        market_id = "0xStuck"
+        existing_db = {
+            market_id: {
+                "status": AnswerStatus.NEEDS_ANSWER,
+                "market_id": market_id,
+                "title": "Will X happen?",
+                "question_id": "0xQStuck",
+                "detected_at": NOW - 100000,
+                "on_chain_answer": None,
+                "on_chain_bond": None,
+                "last_answerer": "",
+                "last_answer_timestamp": None,
+                "market_closing_timestamp": NOW + 100000,
+                "realitio_timeout": 86400,
+                "mech_requests": [],
+                "pending_nonce": None,
+                "evaluation": {
+                    "answer": None,  # <-- stale undeterminable
+                    "is_valid": True,
+                    "is_determinable": False,
+                    "has_occurred": None,
+                    "agreement_ratio": 0.5,
+                    "agrees_with_on_chain": None,
+                    "reasoning": "stale undeterminable",
+                },
+                "pending_tx": None,
+                "mech_retries": 1,
+                "retry_after": NOW - 10,  # cooldown already expired
+            }
+        }
+        # Subgraph returns the same market still pending
+        market = _make_market(market_id)
+        b = _make_behaviour(questions_db=existing_db)
+        patch.object(
+            b, "_fetch_pending_and_finalizing_markets", new=_make_gen([market])
+        ).start()
+        patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
+        patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
+        # Mech subgraph returns no fresh determinable delivery for this market;
+        # mech_retries stays at its locally-tracked value (1) via the
+        # max(local, len(subgraph)) monotonic guard.
+        patch.object(b, "fetch_mech_requests_for_market", new=_make_gen([])).start()
+
+        with (
+            patch.object(b, "send_a2a_transaction", new=_make_gen(None)),
+            patch.object(b, "wait_until_round_end", new=_make_gen(None)),
+            patch.object(b, "set_done"),
+        ):
+            _run_async_act(b)
+
+        # Status is NEEDS_ANSWER (no on-chain answer) AND evaluation has
+        # been cleared so evaluate_answers will fire a fresh Mech request
+        # rather than reusing the stale undeterminable.
+        assert b.questions_db[market_id]["status"] == AnswerStatus.NEEDS_ANSWER
+        assert b.questions_db[market_id]["evaluation"] is None
+
     def test_stale_market_purged_from_db(self) -> None:
         """Market no longer in subgraph results is removed from DB."""
         # Pre-existing stale entry
