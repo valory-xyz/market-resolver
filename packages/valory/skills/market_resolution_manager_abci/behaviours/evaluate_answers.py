@@ -74,7 +74,7 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
             return
 
         # Check retry limit
-        retries = entry.get("mech_retries", 0)
+        retries = int(entry.get("mech_retries") or 0)
         if retries >= self.params.max_mech_retries:
             self.context.logger.warning(
                 f"Market {market_id}: max Mech retries ({retries}) reached."
