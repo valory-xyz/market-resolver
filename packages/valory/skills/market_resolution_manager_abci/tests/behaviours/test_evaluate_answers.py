@@ -195,22 +195,7 @@ class TestEvaluateAnswersBehaviour:
         assert payload_sent[0].evaluation_result is None
 
     def test_retry_cap_gate_survives_none_mech_retries(self) -> None:
-        """Retry-cap gate at evaluate_answers.py:77 must not crash on ``None``.
-
-        Reachable path (follow-up to PR #30):
-
-        ``scan_markets`` can select an entry whose ``mech_retries`` is
-        ``None`` -- e.g. a transient ``fetch_mech_requests_for_market``
-        failure bypasses the line-204 normalization and leaves the
-        counter un-coerced. When ``evaluate_answers`` then reads it,
-        the unguarded comparison ``None >= max_mech_retries`` raises
-        ``TypeError`` in Python 3 and stops the FSM round.
-
-        The fix coerces ``None`` to ``0`` via ``int(... or 0)``. With
-        ``mech_retries=None`` and ``max_mech_retries=10``, the gate
-        should evaluate ``0 >= 10`` (False) and the behaviour should
-        proceed to fire a fresh Mech request rather than crashing.
-        """
+        """Retry-cap gate treats ``None`` mech_retries as ``0`` and fires a fresh Mech request."""
         entry = _base_entry()
         entry["mech_retries"] = None  # type: ignore[assignment]
         b = _make_behaviour(
