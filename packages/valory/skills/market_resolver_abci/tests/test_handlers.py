@@ -266,8 +266,13 @@ class TestHandleGetHealth:
         context.state.round_sequence = round_sequence
         return handler
 
-    def test_no_last_round_ts_returns_nulls(self) -> None:
-        """When no last_round_transition_timestamp, times are None."""
+    def test_no_last_round_ts_is_unhealthy(self) -> None:
+        """Frozen FSM (no last_round_transition_timestamp) -> is_healthy False.
+
+        This is the wedge case: the old handler reported is_tm_healthy True
+        (not None == True); the fix reports is_healthy False with liveness
+        reason no-fsm-data and three-state is_tm_healthy None.
+        """
         handler = self._setup_handler_with_round_sequence(last_round_ts=None)
         msg = _make_http_message()
         dialogue = MagicMock()
@@ -278,12 +283,36 @@ class TestHandleGetHealth:
         call_kwargs = dialogue.reply.call_args[1]
         body = json.loads(call_kwargs["body"])
         assert body["seconds_since_last_transition"] is None
-        assert (
-            body["is_tm_healthy"] is not False
-        )  # is_tm_unhealthy=None -> not None = True
+        assert body["is_healthy"] is False
+        assert body["liveness"] == {"ok": False, "reason": "no-fsm-data"}
+        assert body["readiness"] == {"ok": True, "reason": "idle-ok"}
+        assert body["progress"] == {"ok": True, "reason": "idle-ok"}
+        assert body["is_tm_healthy"] is None
+        assert body["health_version"] == 2
 
-    def test_with_last_round_ts_computes_seconds(self) -> None:
-        """With a valid timestamp, seconds_since_last_transition is computed."""
+    def test_recent_transition_is_healthy(self) -> None:
+        """Recent transition + tm healthy -> is_healthy True, liveness ok."""
+        recent_ts = datetime.now()
+        handler = self._setup_handler_with_round_sequence(
+            last_round_ts=recent_ts,
+            block_stall=False,
+        )
+        msg = _make_http_message()
+        dialogue = MagicMock()
+        dialogue.reply.return_value = MagicMock()
+
+        handler._handle_get_health(msg, dialogue)
+
+        call_kwargs = dialogue.reply.call_args[1]
+        body = json.loads(call_kwargs["body"])
+        assert body["seconds_since_last_transition"] is not None
+        assert body["is_healthy"] is True
+        assert body["liveness"] == {"ok": True, "reason": "ok"}
+        assert body["is_tm_healthy"] is True
+        assert body["is_transitioning_fast"] is True
+
+    def test_stale_transition_is_stuck(self) -> None:
+        """Old timestamp (FSM frozen but tm not flagged) -> stuck-no-transition."""
         past_ts = datetime(2026, 1, 1, 0, 0, 0)
         handler = self._setup_handler_with_round_sequence(
             last_round_ts=past_ts,
@@ -297,11 +326,12 @@ class TestHandleGetHealth:
 
         call_kwargs = dialogue.reply.call_args[1]
         body = json.loads(call_kwargs["body"])
-        assert body["seconds_since_last_transition"] is not None
         assert body["seconds_since_last_transition"] > 0
+        assert body["is_healthy"] is False
+        assert body["liveness"] == {"ok": False, "reason": "stuck-no-transition"}
 
     def test_block_stall_reflected_in_is_tm_healthy(self) -> None:
-        """block_stall_deadline_expired=True -> is_tm_healthy=False."""
+        """block_stall_deadline_expired=True -> is_tm_healthy False, tm-unhealthy."""
         past_ts = datetime(2026, 1, 1, 0, 0, 0)
         handler = self._setup_handler_with_round_sequence(
             last_round_ts=past_ts, block_stall=True
@@ -315,6 +345,8 @@ class TestHandleGetHealth:
         call_kwargs = dialogue.reply.call_args[1]
         body = json.loads(call_kwargs["body"])
         assert body["is_tm_healthy"] is False
+        assert body["is_healthy"] is False
+        assert body["liveness"] == {"ok": False, "reason": "tm-unhealthy"}
 
     def test_with_abci_app_populates_rounds(self) -> None:
         """When _abci_app is set, rounds list is populated."""
