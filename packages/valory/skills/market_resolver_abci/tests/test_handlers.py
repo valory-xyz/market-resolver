@@ -329,6 +329,7 @@ class TestHandleGetHealth:
         assert body["seconds_since_last_transition"] > 0
         assert body["is_healthy"] is False
         assert body["liveness"] == {"ok": False, "reason": "stuck-no-transition"}
+        assert body["is_transitioning_fast"] is False
 
     def test_block_stall_reflected_in_is_tm_healthy(self) -> None:
         """block_stall_deadline_expired=True -> is_tm_healthy False, tm-unhealthy."""
@@ -347,6 +348,7 @@ class TestHandleGetHealth:
         assert body["is_tm_healthy"] is False
         assert body["is_healthy"] is False
         assert body["liveness"] == {"ok": False, "reason": "tm-unhealthy"}
+        assert body["is_transitioning_fast"] is False
 
     def test_with_abci_app_populates_rounds(self) -> None:
         """When _abci_app is set, rounds list is populated."""
