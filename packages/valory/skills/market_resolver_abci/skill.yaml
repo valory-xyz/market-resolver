@@ -13,13 +13,13 @@ fingerprint:
   composition.py: bafybeifj7oao5gv4lsqcwtg4yme7os2norr2swtd5kbxwzcg4cgh3bkanu
   dialogues.py: bafybeidhc2scoo5hrmpovzoem5s36b3yas6vggkkajoijautv7g3bqaeb4
   fsm_specification.yaml: bafybeifnirdnjmcxrryfs5darcsdo2t4bcvvvpa2tckbdm6qakhoapghlm
-  handlers.py: bafybeigxrvyvbp7b64ucrsyzg37ofo3il6uz6l5x6svx6tg4a4rolel4oi
+  handlers.py: bafybeifmxnl7yb7kp6liqmirfzvjloenohntyhoqlqkurjm2dwsyly6axy
   models.py: bafybeidsszitssqqgcdsgmxvaefp2wm7xq7swvqfvvxlz4ah5vz6yl2knq
   tests/__init__.py: bafybeibb6rglfusig6k56wjqe6pofhyjt2hbknwk6culahlooxo73bx2lu
   tests/test_behaviours.py: bafybeihencjmvknad45fimyeefym5x727iodmwbv435rswbyrmv6nqm3qi
   tests/test_composition.py: bafybeia4e3ntcm3xrrezln5ke2z7m63ir34uigylytk66mlja6zjh7pb5u
   tests/test_dialogues.py: bafybeihliu56ebvohw4xeztkingoyyqtb5ivcpkw6gn6cqdghbb5i7hzd4
-  tests/test_handlers.py: bafybeia3beto47tok37y6ys4gltw2qvdovy2fan5hsq5cmlra55jensf34
+  tests/test_handlers.py: bafybeih3zrglr7i4vqrpgebopapd2vzdwh3ad5lpokfveoywm5ei2ttw3m
   tests/test_models.py: bafybeidb2pfq4zci2f6nqfylggmzxjdfpv7aa5jtyt7i47tgunu5lupdly
 fingerprint_ignore_patterns: []
 connections:
