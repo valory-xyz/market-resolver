@@ -350,6 +350,28 @@ class TestHandleGetHealth:
         assert body["liveness"] == {"ok": False, "reason": "tm-unhealthy"}
         assert body["is_transitioning_fast"] is False
 
+    def test_recent_transition_tm_unhealthy(self) -> None:
+        """Fresh timestamp + stalled TM -> reason tm-unhealthy (not stuck).
+
+        Decouples the tm-unhealthy reason from the stale-timestamp (stuck)
+        path: with a recent transition, only block_stall drives the verdict.
+        """
+        handler = self._setup_handler_with_round_sequence(
+            last_round_ts=datetime.now(), block_stall=True
+        )
+        msg = _make_http_message()
+        dialogue = MagicMock()
+        dialogue.reply.return_value = MagicMock()
+
+        handler._handle_get_health(msg, dialogue)
+
+        call_kwargs = dialogue.reply.call_args[1]
+        body = json.loads(call_kwargs["body"])
+        assert body["is_healthy"] is False
+        assert body["liveness"] == {"ok": False, "reason": "tm-unhealthy"}
+        assert body["is_tm_healthy"] is False
+        assert body["is_transitioning_fast"] is False
+
     def test_with_abci_app_populates_rounds(self) -> None:
         """When _abci_app is set, rounds list is populated."""
         past_ts = datetime(2026, 1, 1, 0, 0, 0)
