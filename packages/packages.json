@@ -1,9 +1,9 @@
 {
     "dev": {
-        "skill/valory/market_resolution_manager_abci/0.1.0": "bafybeidxta4lx5bcw5leonshjmo2tnz2nxl7mlhixwkpn5dohx2jrtagda",
-        "skill/valory/market_resolver_abci/0.1.0": "bafybeifisdtwbyvgeuq3nzztgof4yu7kcykhjra67h742bpim7sfpnbfzu",
-        "agent/valory/market_resolver/0.1.0": "bafybeif4x6x2ndcklc2hngn4rmeyzc2lpcjpcjvbodrd4zunbxcf5bbtw4",
-        "service/valory/market_resolver/0.1.0": "bafybeicnc5lbkoowc4humczkhl3o2jrxy364qa6ub7qlw2axatyu5drtju"
+        "skill/valory/market_resolution_manager_abci/0.1.0": "bafybeihtefimhnadi256uy2pel7cvjkcwu4izpqejdpka7u7u6dcbsquuy",
+        "skill/valory/market_resolver_abci/0.1.0": "bafybeidi7tvgvfaziggsjcaqcro37oc26lpanx3xdelofrxjiz2v7tahce",
+        "agent/valory/market_resolver/0.1.0": "bafybeie2okzeq7erfzz76xpoyo4dgqjrspqgq3alksyoypjtwxz4qa2rea",
+        "service/valory/market_resolver/0.1.0": "bafybeiht6544yju7zl6m5nxgmvbfhha5emylinjkavugcjnruhjmuuczn4"
     },
     "third_party": {
         "protocol/valory/contract_api/1.0.0": "bafybeibld2xb5m7kyluiptkamp4nrt6oeomkohz7a3yppbv2oo7qw2e4la",
@@ -59,6 +59,6 @@
         "skill/valory/funds_forwarder_abci/0.1.0": "bafybeihuxw5tgnp4hie76as2jwnbp5abxrkmlmmpu4ila6ey34xrfkqqie",
         "skill/valory/omen_ct_redeem_tokens_abci/0.1.0": "bafybeif6w2bplgceactukt5b6qpth5nxspdeljsxaywrlyxvymdxxiefsq",
         "skill/valory/omen_fpmm_remove_liquidity_abci/0.1.0": "bafybeibuldgtifqjst4oeremvl6huzvdnq36opgwv2wupsnplf4er5frpm",
-        "skill/valory/omen_realitio_withdraw_bonds_abci/0.1.0": "bafybeicj3pgdx7q5chbms3pxrb6pcv7lbqhkigwnmjuo54p63ub7mkqe5i"
+        "skill/valory/omen_realitio_withdraw_bonds_abci/0.1.0": "bafybeiabqn6mcg4nw3mqbyxcuiyxgwlf7e2il3cj4awpmdi7bibqlwvklq"
     }
 }
