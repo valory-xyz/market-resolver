@@ -65,7 +65,7 @@ prerelease = "allow"
 # connection.
 upstream_pins = [
     "valory-xyz/mech-interact@v0.32.2",
-    "valory-xyz/omen-protocol@v0.1.1",
+    "valory-xyz/omen-protocol@v0.1.2",
     "valory-xyz/genai@v7.2.1",
 ]
 # Content-based gitleaks allowlist — preferred over `gitleaks_extra_paths`
