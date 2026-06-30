@@ -183,6 +183,38 @@ class TestSharedState:
         state.questions_db = {"0xMarket": {"status": "NEEDS_ANSWER"}}
         assert "0xMarket" in state.questions_db
 
+    def test_realitio_claim_build_cache_initialized_empty(self) -> None:
+        """The withdraw-bonds claim cache must be initialized on the shared state.
+
+        Regression for the production crash-loop: ``self.context.state``
+        resolves to this composed ``SharedState``, and
+        ``RealitioWithdrawBondsBehaviour._build_claim_txs`` reads
+        ``state.realitio_claim_build_cache`` directly. The cache only
+        exists if ``RealitioWithdrawBondsSharedState`` is in this class's
+        MRO so its ``__init__`` runs via the cooperative ``super()`` chain
+        (the same mechanism that provides ``ignored_ct_positions`` from
+        the CT-redeem sub-skill). When it was missing from the MRO the
+        attribute was absent and the round raised ``AttributeError`` ->
+        ``stop_and_exit`` -> Propel restart loop.
+        """
+        context = MagicMock()
+        context.params = MagicMock()
+        state = SharedState(name="state", skill_context=context)
+        assert state.realitio_claim_build_cache == {}
+
+    def test_withdraw_bonds_sharedstate_in_mro(self) -> None:
+        """The withdraw-bonds sub-skill SharedState must be in the MRO.
+
+        Direct guard on the inheritance that makes the cache attribute
+        exist on the composed runtime state. Mirrors how the CT-redeem
+        and mech-interact sub-skill SharedStates are wired in.
+        """
+        from packages.valory.skills.omen_realitio_withdraw_bonds_abci.models import (
+            SharedState as RealitioWithdrawBondsSharedState,
+        )
+
+        assert RealitioWithdrawBondsSharedState in SharedState.__mro__
+
 
 class TestMechGnosisSubgraph:
     """Tests for MechGnosisSubgraph."""
