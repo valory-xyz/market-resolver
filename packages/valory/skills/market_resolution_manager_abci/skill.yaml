@@ -19,7 +19,7 @@ fingerprint:
   dialogues.py: bafybeict7mdksmjklx6wy2zplunpcfwhgxv5votxbsodidyum2phx3tv34
   fsm_specification.yaml: bafybeibibqujtoh4cp5qivd4fkguo7edjmdhggw6ihitjnzp4p2xr5vg3i
   handlers.py: bafybeigby2ymzvsoiwbgtdd4esk6xrkrafp2b22yqz5xi4ekrnqwqqoq4y
-  models.py: bafybeib7budbxam5wiykqduwa2rkiuev3g6qlwlekuqnlpzrzecyek2rk4
+  models.py: bafybeifej4htpsbqccquz32wo3dc3vq4y4elq7yiufwevpwkuhtriem7xq
   payloads.py: bafybeih6zkrc5mnkpifctn4cg3myqr3qrdw5v42hg7ldfbuzw7gjbgeoja
   rounds.py: bafybeihfhcmmatxx5ztgao2ft7jfh2su5bbp2b7ua3qxb4luvwltbvdqby
   states/__init__.py: bafybeiho5s4sehwxmgtp4ddgntnkxhjks5cflihdtag7zqy6btjrhzcyti
@@ -36,7 +36,7 @@ fingerprint:
   tests/conftest.py: bafybeiaemzro7plaeklgfk5kvsw62kzgf5uym4e4xqcxwfwzqfcpnct4eq
   tests/test_dialogues.py: bafybeiaue4klz37jrmqlu46xj442v3mazx3fqmuay7thbakeyfy4ohrac4
   tests/test_handlers.py: bafybeib66usugomzo47zrgo635ewzjikixorkuelk5tdgdbckzx4dwfpia
-  tests/test_models.py: bafybeifqqdw3bpwaux6bj4l7u3igx5pt23dgms6onwoxkq42yuenhoxy3e
+  tests/test_models.py: bafybeigv3plblcxdpqv4c2kx6qwagdbsxdw4cjqydihn4xt3ddnnm5wcbm
   tests/test_payloads.py: bafybeiakjhvniimjyynaeq3n3udkdnjcvm4tuzafyrirsvwjgwwqkxb5j4
   tests/test_rounds.py: bafybeicyvamo4xohu6zsrnbawe4secam6c7pirftapfwpqobmutfmjk45i
 fingerprint_ignore_patterns: []
