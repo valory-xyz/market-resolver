@@ -30,6 +30,7 @@ from packages.valory.connections.kv_store.connection import (
 from packages.valory.protocols.kv_store.message import KvStoreMessage
 from packages.valory.protocols.ledger_api import LedgerApiMessage
 from packages.valory.skills.abstract_round_abci.behaviours import BaseBehaviour
+from packages.valory.skills.market_resolution_manager_abci import mech_cache
 from packages.valory.skills.market_resolution_manager_abci.models import (
     MarketResolutionManagerParams,
     SharedState,
@@ -44,54 +45,6 @@ HTTP_OK = 200
 ANSWER_YES = "0x0000000000000000000000000000000000000000000000000000000000000000"
 ANSWER_NO = "0x0000000000000000000000000000000000000000000000000000000000000001"
 ANSWER_INVALID = "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-
-# GraphQL query template: prior Mech requests from our Safe for a given
-# prompt, scoped to blocks after the market closed (openingTimestamp).
-# Variables are inlined because the base helper only posts the `query` field.
-#
-# NOTE: the Mech Marketplace Gnosis subgraph stores the market question in
-# ``parsedRequest.prompt``, NOT in ``parsedRequest.questionTitle`` (which is
-# always empty for our requests). We filter on ``prompt`` accordingly.
-#
-# ``parsedRequest`` has no ``nonce`` field on this subgraph. Selecting it
-# makes the whole query error with ``data: null`` -- a previous version of
-# this template did exactly that, which silently disabled the retry-budget
-# gate (the extractor walked ``data.sender.requests`` against ``null`` and
-# got ``[]``, so ``len(requests) == 0`` every cycle no matter how many
-# requests had really been fired). Keep the projection to ``prompt`` and
-# ``tool`` only.
-#
-# Top-level ``requests`` (with ``sender:`` in the ``where`` clause) is
-# equivalent to ``sender(id) { requests(...) }`` on this subgraph -- both
-# return the same rows -- but the top-level form matches the pattern used
-# by watchdog and trader, and is what the framework's ``response_key:
-# data:requests`` walks.
-MECH_CACHE_QUERY_TEMPLATE = """
-{{
-  requests(
-    where: {{
-      sender: "{sender}"
-      parsedRequest_: {{ prompt: {prompt} }}
-      blockTimestamp_gt: "{block_timestamp_gt}"
-    }}
-    orderBy: blockTimestamp
-    orderDirection: asc
-    first: 1000
-  ) {{
-    id
-    blockTimestamp
-    parsedRequest {{
-      prompt
-      tool
-    }}
-    deliveries(orderBy: blockTimestamp, orderDirection: asc) {{
-      id
-      blockTimestamp
-      toolResponse
-    }}
-  }}
-}}
-"""
 
 
 def parse_mech_response(  # pylint: disable=too-many-return-statements
@@ -294,37 +247,6 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
             )
             return None
 
-    def get_mech_gnosis_subgraph_result(
-        self,
-        query: str,
-    ) -> Generator[None, None, Optional[List[Dict[str, Any]]]]:
-        """Query the Mech Marketplace Gnosis subgraph.
-
-        :param query: the GraphQL query string.
-        :yield: None
-        :return: the parsed + key-walked response, or None on error.
-        """
-        subgraph = self.context.mech_gnosis_subgraph
-        response = yield from self.get_http_response(
-            content=to_content(query),
-            **subgraph.get_spec(),
-        )
-
-        if response is None:
-            self.context.logger.error(
-                "Could not retrieve response from Mech Gnosis subgraph. "
-                "Response was None."
-            )
-            return None
-        if response.status_code != HTTP_OK:
-            self.context.logger.error(
-                f"Could not retrieve response from Mech Gnosis subgraph. "
-                f"Received status code {response.status_code}.\n{response}"
-            )
-            return None
-
-        return subgraph.process_response(response)
-
     def get_realitio_subgraph_result(
         self,
         query: str,
@@ -364,37 +286,54 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
     def fetch_mech_requests_for_market(
         self, entry: Dict[str, Any]
     ) -> Generator[None, None, Optional[list]]:
-        """Fetch Mech requests + deliveries for this market from the subgraph.
+        """Fetch prior Mech fires + deliveries for this market from kv_store.
 
-        Returns the verbatim subgraph request entries (each containing its
-        nested ``deliveries`` list), filtered to those whose ``parsedRequest``
-        matches the expected tool and the market title.
+        Under the on-chain path this used to query the Mech Marketplace
+        Gnosis subgraph. Under the off-chain path the subgraph's
+        ``parsedRequest.prompt`` and ``deliveries[].toolResponse`` go empty
+        (the mech no longer publishes to IPFS), so the subgraph stops
+        answering "have I already asked this market?". The kv_store cache
+        (written by ``evaluate_answers._buffer_mech_request_fired`` and
+        updated by ``build_answer_tx._buffer_mech_response_delivered``)
+        replaces it. Same behaviour, both onchain and offchain: mech-interact
+        internally decides which mode to use and hides that from us.
+
+        Returns the same list-of-dicts shape the previous subgraph result
+        did, so ``_earliest_valid_evaluation`` and the ``mech_retries``
+        counter in ``scan_markets`` need zero changes.
 
         :param entry: the per-market state dict.
-        :yield: subgraph HTTP request.
-        :return: list of matching verbatim subgraph request entries, or
-            ``None`` on subgraph error.
+        :yield: control to the FSM while LIST_REQUEST pages complete.
+        :return: rehydrated list of rows for this (safe, market) pair, or
+            ``None`` on kv_store error.
         """
-        title = entry.get("title") or ""
-        closing_ts = entry.get("market_closing_timestamp") or 0
+        market_id = entry.get("market_id") or ""
         safe_address = self.synchronized_data.safe_contract_address or ""
 
-        expected_tool = self.params.mech_tool_resolve_market
-        query = MECH_CACHE_QUERY_TEMPLATE.format(
-            sender=safe_address.lower(),
-            prompt=json.dumps(title),
-            block_timestamp_gt=int(closing_ts),
+        prefix = mech_cache.list_prefix(
+            prefix=self.params.mech_cache_key_prefix,
+            safe_address=safe_address,
+            market_id=str(market_id),
         )
-
-        all_requests = yield from self.get_mech_gnosis_subgraph_result(query)
-        if all_requests is None:
+        rows_by_key = yield from self._send_kv_list(prefix)
+        if rows_by_key is None:
             return None
 
+        expected_tool = self.params.mech_tool_resolve_market
+        expected_prompt = entry.get("title") or ""
+        rehydrated = mech_cache.rehydrate_to_subgraph_shape(rows_by_key)
+        # Filter to rows whose stored (tool, prompt) match the entry we're
+        # scanning against. Same filter the subgraph path applied. Under
+        # normal operation every row for this (safe, market_id) prefix
+        # was written by evaluate_answers with the same tool+prompt, so
+        # the filter is a no-op; keeping it lets a future param change
+        # (different mech_tool_resolve_market) not mis-count rows from
+        # the old tool as "already asked".
         return [
             req
-            for req in all_requests
+            for req in rehydrated
             if (req.get("parsedRequest") or {}).get("tool") == expected_tool
-            and (req.get("parsedRequest") or {}).get("prompt") == title
+            and (req.get("parsedRequest") or {}).get("prompt") == expected_prompt
         ]
 
     def _wait_for_kv_reply(self) -> Generator[None, None, None]:

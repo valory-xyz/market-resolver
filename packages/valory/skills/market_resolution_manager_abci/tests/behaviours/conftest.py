@@ -62,12 +62,6 @@ def _make_context(questions_db: Any = None) -> MagicMock:
         "url": "https://api.thegraph.com/omen",
         "headers": {},
     }
-    context.mech_gnosis_subgraph = MagicMock()
-    context.mech_gnosis_subgraph.get_spec.return_value = {
-        "method": "POST",
-        "url": "https://api.thegraph.com/mech-gnosis",
-        "headers": {},
-    }
     context.realitio_subgraph = MagicMock()
     context.realitio_subgraph.get_spec.return_value = {
         "method": "POST",

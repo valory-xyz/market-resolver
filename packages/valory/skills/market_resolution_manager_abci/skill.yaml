@@ -10,7 +10,7 @@ fingerprint:
   README.md: bafybeicebua5cqf3pfr34hy5mmnr6i7m7wgxlkzbto6woi5dkuv4fqbymi
   __init__.py: bafybeiedhf4rirdachml54zzde7nl3nhuwz4c5xwskrc5udfphefbrdsfu
   behaviours/__init__.py: bafybeignnrbklzekhqurn6ptli5zhzsov2qtdzr5se4xe4hqdywt2vbtvu
-  behaviours/base.py: bafybeidvfso5uxd6tmmwtmmcpxcindtduzlqyto6zrk3krotl2kb6bbooq
+  behaviours/base.py: bafybeiad2wiflwdv3ksfp3ul4d5ign3ybukucwk6yeui27yndi2wcqgpyu
   behaviours/build_answer_tx.py: bafybeigzazw4vv37wjuxnihvezyrelotihvkrhzv6ovdtgujx5hr2dk73q
   behaviours/evaluate_answers.py: bafybeie2htenmx2fpyt67cvbj6s2ih4dciejlfju2q2y6slzysm2xkrqr4
   behaviours/post_transaction.py: bafybeih3sx6y2xhuc5gkoeed6skfb6zyur4xc36b2vma2hprpk4lqhgvlq
@@ -19,25 +19,26 @@ fingerprint:
   dialogues.py: bafybeihoudfbpl4zj6de34rpagbzjrfh3nvjmdwnm2v4dkhnkxvvp77ta4
   fsm_specification.yaml: bafybeibibqujtoh4cp5qivd4fkguo7edjmdhggw6ihitjnzp4p2xr5vg3i
   handlers.py: bafybeifhqkplnep5tgkifrgs3r7fhmucrggwbikrgny5lgmk2ibrv6ujte
-  mech_cache.py: bafybeiedqy4dikgauyymxtaeu22uqkmw4kiyh7tiixazpgqvu25pdhhnfy
-  models.py: bafybeiezktrcfrkyxm4w34d6d4fl3rmpukijy4j5bkcktet3rem3sc2eb4
+  mech_cache.py: bafybeid67itvk3dtjdh6d54b4phbtai2ya4vu24a622lkwo4ohaaqfn3rm
+  models.py: bafybeihaow367ag72adyby7nny5pxb2a7wuoqfobi5gk5zautxad6dmvku
   payloads.py: bafybeih6zkrc5mnkpifctn4cg3myqr3qrdw5v42hg7ldfbuzw7gjbgeoja
   rounds.py: bafybeihfhcmmatxx5ztgao2ft7jfh2su5bbp2b7ua3qxb4luvwltbvdqby
   states/__init__.py: bafybeiho5s4sehwxmgtp4ddgntnkxhjks5cflihdtag7zqy6btjrhzcyti
   states/base.py: bafybeieywx5f6xtiu5ds5dsy4ewgjqjgkyiw537lwykmejstucch52g45i
   tests/__init__.py: bafybeidpf4le7kmwrvl6u3s4yl2mrlznnu7scha3hvcpd3s2omwo7bdwkq
   tests/behaviours/__init__.py: bafybeierpqlj4wjvfsa2acmkibioivviqudq4ulu5ifuqwcvdcfewzdgau
-  tests/behaviours/conftest.py: bafybeifjneftj5czv37bfy2snbcy4mzxsnrz6mcohjokw4u3c3tniasaqe
-  tests/behaviours/test_base.py: bafybeiayo3hev4vxont4hbxffrrvqqtsirkm2vtp7uluxxdqhtlchmuahm
-  tests/behaviours/test_build_answer_tx.py: bafybeihyhv4wkzipaeqvqg4a4zyfyrpil6l3c4lxbwxahejtzfzwqssnme
-  tests/behaviours/test_evaluate_answers.py: bafybeihxksrmavxt3ht7jeibrsjzgmmcj4nvmemslm76wkocvjkn5ael7a
+  tests/behaviours/conftest.py: bafybeidkqr5ockrncp2a25dsop2azlwcvdkjgmp6nd4poov4i6fpj4vy64
+  tests/behaviours/test_base.py: bafybeih7oa7z5fm5eulget6lkibp77cbsv3bbvmz33bf3u4ft4qkjlzvcm
+  tests/behaviours/test_build_answer_tx.py: bafybeigidfebu4245be2lptnrihgkgmwgt5sdwu4lmytu7hsrndzwkh6fi
+  tests/behaviours/test_evaluate_answers.py: bafybeian6uqrxtqghowqem4vayacdgpns27jfobuzcf4bdstd33mzq2nmm
   tests/behaviours/test_post_transaction.py: bafybeibihvgozgvlrfyrkpq7gg3hpvzp5h7g633oggqnu5auqtnfyakbcy
   tests/behaviours/test_round_behaviour.py: bafybeifcvxp5vlshg4xbego4frjsahvvvmjebj5s27l5ba7eyijsxry7ka
   tests/behaviours/test_scan_markets.py: bafybeibtq3fno5xobfpwukipl3sqbgugavavbjxvpgu3wi6nsp3j2znbre
   tests/conftest.py: bafybeiaemzro7plaeklgfk5kvsw62kzgf5uym4e4xqcxwfwzqfcpnct4eq
   tests/test_dialogues.py: bafybeiaue4klz37jrmqlu46xj442v3mazx3fqmuay7thbakeyfy4ohrac4
   tests/test_handlers.py: bafybeib66usugomzo47zrgo635ewzjikixorkuelk5tdgdbckzx4dwfpia
-  tests/test_models.py: bafybeigv3plblcxdpqv4c2kx6qwagdbsxdw4cjqydihn4xt3ddnnm5wcbm
+  tests/test_mech_cache.py: bafybeid33ofydwlsptjshgjzmeqe44c5sqfptecpurl3iegapeqgblbpji
+  tests/test_models.py: bafybeieunb2g66l4dtqmck537r5fycc7xttllfhjonhqcvjp7ap3qxilpy
   tests/test_payloads.py: bafybeiakjhvniimjyynaeq3n3udkdnjcvm4tuzafyrirsvwjgwwqkxb5j4
   tests/test_rounds.py: bafybeicyvamo4xohu6zsrnbawe4secam6c7pirftapfwpqobmutfmjk45i
 fingerprint_ignore_patterns: []
@@ -111,18 +112,6 @@ models:
   kv_store_dialogues:
     args: {}
     class_name: KvStoreDialogues
-  mech_gnosis_subgraph:
-    args:
-      api_id: mech_gnosis
-      headers:
-        Content-Type: application/json
-      method: POST
-      parameters: {}
-      response_key: data:requests
-      response_type: list
-      retries: 5
-      url: https://api.subgraph.autonolas.tech/api/proxy/marketplace-gnosis
-    class_name: MechGnosisSubgraph
   params:
     args:
       watched_creator_addresses: []

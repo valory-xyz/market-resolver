@@ -111,6 +111,16 @@ def _make_behaviour(
     )
     patcher.start()
     behaviour._sd_patcher = patcher
+
+    # The kv_store delivery-write is best-effort side-effect from the FSM's
+    # perspective; these tests focus on evaluation parsing + tx-building,
+    # so stub it out. Suite-level tests for the write path itself live in
+    # test_base.py against ``_send_kv_write``.
+    def _noop_gen(*_a: Any, **_k: Any):  # type: ignore[no-untyped-def]
+        if False:  # pragma: no cover -- keep this a generator
+            yield None
+
+    behaviour._buffer_mech_response_delivered = _noop_gen  # type: ignore[assignment]
     return behaviour
 
 

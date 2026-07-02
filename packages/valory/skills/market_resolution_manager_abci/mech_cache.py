@@ -37,8 +37,7 @@ The row schema mirrors the fields the downstream code
 (``_earliest_valid_evaluation`` and the retry counter) already expects
 from the old subgraph return shape, so callers don't need to change:
 ``rehydrate_to_subgraph_shape`` turns a batch of kv rows into a list of
-dicts identical in shape to the previous
-``get_mech_gnosis_subgraph_result`` output.
+dicts identical in shape to what the removed subgraph query returned.
 
 Scope: storage-bound, not privacy-bound. The kv_store file is per-agent
 local on a Propel PVC; a fresh redeploy starts empty and market-resolver
