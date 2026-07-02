@@ -213,5 +213,3 @@ class TestSharedState:
         )
 
         assert RealitioWithdrawBondsSharedState in SharedState.__mro__
-
-

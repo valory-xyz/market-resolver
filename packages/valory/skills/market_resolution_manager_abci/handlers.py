@@ -103,9 +103,7 @@ class KvStoreHandler(AbstractResponseHandler):
             KvStoreMessage.Performative.ERROR,
         ):
             nonce = kv_store_msg.dialogue_reference[0]
-            callback, kwargs = self.context.state.req_to_callback.pop(
-                nonce, (None, {})
-            )
+            callback, kwargs = self.context.state.req_to_callback.pop(nonce, (None, {}))
             if callback is not None:
                 dialogue = self.context.kv_store_dialogues.update(kv_store_msg)
                 callback(kv_store_msg, dialogue, **kwargs)

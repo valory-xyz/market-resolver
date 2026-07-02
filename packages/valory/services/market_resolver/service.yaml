@@ -7,7 +7,7 @@ license: Apache-2.0
 fingerprint:
   README.md: bafybeie6lb2mlmzmkycbcfma4onidhegfu4ipgpybg2av5mhfs5zx42b2m
 fingerprint_ignore_patterns: []
-agent: valory/market_resolver:0.1.0:bafybeifopeesaiya3euhffs4uqh7azko7hwtme2tx72rlhtqtxkq73eiim
+agent: valory/market_resolver:0.1.0:bafybeicu7cfpmu2j22q5tf3qnoalnsd43opdb4d2bm473t7wdbd6l65hca
 number_of_agents: 1
 deployment:
   agent:
@@ -139,15 +139,6 @@ models:
       response_type: ${CT_SUBGRAPH_RESPONSE_TYPE:str:list}
       retries: ${CT_SUBGRAPH_RETRIES:int:5}
       url: ${CT_SUBGRAPH_URL:str:https://gateway.thegraph.com/api/api-key/subgraphs/id/7s9rGBffUTL8kDZuxvvpuc46v44iuDarbrADBFw5uVp2}
-  mech_gnosis_subgraph:
-    args:
-      headers:
-        Content-Type: ${MECH_GNOSIS_SUBGRAPH_CONTENT_TYPE:str:application/json}
-      method: ${MECH_GNOSIS_SUBGRAPH_METHOD:str:POST}
-      response_key: ${MECH_GNOSIS_SUBGRAPH_RESPONSE_KEY:str:data:requests}
-      response_type: ${MECH_GNOSIS_SUBGRAPH_RESPONSE_TYPE:str:list}
-      retries: ${MECH_GNOSIS_SUBGRAPH_RETRIES:int:5}
-      url: ${MECH_GNOSIS_SUBGRAPH_URL:str:https://api.subgraph.autonolas.tech/api/proxy/marketplace-gnosis}
   omen_subgraph:
     args:
       headers:

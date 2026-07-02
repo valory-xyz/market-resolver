@@ -642,8 +642,11 @@ class TestFetchMechRequestsForMarket:
 
     def _patched_behaviour(self, kv_reply: Any):  # type: ignore[no-untyped-def]
         """Return a behaviour whose ``_send_kv_list`` yields ``kv_reply``."""
-        b = _make_behaviour()
-        b.synchronized_data.safe_contract_address = self._SAFE
+        # safe_contract_address is a read-only property on
+        # BaseSynchronizedData, so we thread it through the
+        # ``_make_synced_data`` factory rather than assign after
+        # construction.
+        b = _make_behaviour(synced_data=_make_synced_data(safe_address=self._SAFE))
         return b, patch.object(b, "_send_kv_list", new=_make_gen(kv_reply))
 
     def test_kv_error_returns_none(self) -> None:

@@ -14,13 +14,13 @@ fingerprint:
   dialogues.py: bafybeidhc2scoo5hrmpovzoem5s36b3yas6vggkkajoijautv7g3bqaeb4
   fsm_specification.yaml: bafybeifnirdnjmcxrryfs5darcsdo2t4bcvvvpa2tckbdm6qakhoapghlm
   handlers.py: bafybeifmxnl7yb7kp6liqmirfzvjloenohntyhoqlqkurjm2dwsyly6axy
-  models.py: bafybeidsszitssqqgcdsgmxvaefp2wm7xq7swvqfvvxlz4ah5vz6yl2knq
+  models.py: bafybeichllltqtakerhvw7q537sie2ijwby5cxmpl726i4q5hj25l4ig6a
   tests/__init__.py: bafybeibb6rglfusig6k56wjqe6pofhyjt2hbknwk6culahlooxo73bx2lu
   tests/test_behaviours.py: bafybeihencjmvknad45fimyeefym5x727iodmwbv435rswbyrmv6nqm3qi
   tests/test_composition.py: bafybeia4e3ntcm3xrrezln5ke2z7m63ir34uigylytk66mlja6zjh7pb5u
   tests/test_dialogues.py: bafybeihliu56ebvohw4xeztkingoyyqtb5ivcpkw6gn6cqdghbb5i7hzd4
   tests/test_handlers.py: bafybeih3zrglr7i4vqrpgebopapd2vzdwh3ad5lpokfveoywm5ei2ttw3m
-  tests/test_models.py: bafybeidb2pfq4zci2f6nqfylggmzxjdfpv7aa5jtyt7i47tgunu5lupdly
+  tests/test_models.py: bafybeihmzakwtca53ex4byuxxlhc622x2fk4ujzwijevwo3wtxh4f3mpim
 fingerprint_ignore_patterns: []
 connections:
 - valory/http_server:0.22.0:bafybeihs6dufyaa5l4uorplzx3wiyna5qlq2x43tmyl3yonkl265vspdle
@@ -39,7 +39,7 @@ skills:
 - valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeibuldgtifqjst4oeremvl6huzvdnq36opgwv2wupsnplf4er5frpm
 - valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeiabqn6mcg4nw3mqbyxcuiyxgwlf7e2il3cj4awpmdi7bibqlwvklq
 - valory/mech_interact_abci:0.1.0:bafybeidnmszufszq3ro4ebgrqzmhqgctrsc6sykeanfsbvotghvt2cgfsy
-- valory/market_resolution_manager_abci:0.1.0:bafybeiflxondsgee2abh44kti2zbj4a3gnqms6p5dzt4jplh2j5c4phb6e
+- valory/market_resolution_manager_abci:0.1.0:bafybeihd7krvqkw2uav3e6wjxj2lxbeb7qc4ook3676g2qyxtklngvahtq
 behaviours:
   main:
     args: {}
@@ -212,18 +212,6 @@ models:
       retries: 5
       url: https://gateway.thegraph.com/api/api-key/subgraphs/id/7s9rGBffUTL8kDZuxvvpuc46v44iuDarbrADBFw5uVp2
     class_name: ConditionalTokensSubgraph
-  mech_gnosis_subgraph:
-    args:
-      api_id: mech_gnosis
-      headers:
-        Content-Type: application/json
-      method: POST
-      parameters: {}
-      response_key: data:requests
-      response_type: list
-      retries: 5
-      url: https://api.subgraph.autonolas.tech/api/proxy/marketplace-gnosis
-    class_name: MechGnosisSubgraph
   omen_subgraph:
     args:
       api_id: omen

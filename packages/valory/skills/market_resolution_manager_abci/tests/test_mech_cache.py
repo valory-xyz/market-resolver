@@ -23,7 +23,6 @@ import json
 
 from packages.valory.skills.market_resolution_manager_abci import mech_cache
 
-
 PREFIX = "market_resolver/"
 
 

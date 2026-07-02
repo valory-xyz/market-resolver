@@ -42,7 +42,7 @@ protocols:
 skills:
 - valory/abstract_abci:0.1.0:bafybeie5et43th2nta76cd3kpm3fmurd7oyzk3qxim76octvt56m6r2poi
 - valory/abstract_round_abci:0.1.0:bafybeicioxhbhnsoqyqvkeevd7df7r2vubbiglyf7ucps2el73objazjsq
-- valory/market_resolver_abci:0.1.0:bafybeihe4uyxakzfp7byma3u2se64rfcx5a35iiyxw3cvrh5yj64hfg7sq
+- valory/market_resolver_abci:0.1.0:bafybeigfcpgvm24jq647rqu4eu73nurffvehb522g7ugyoh3qyzfvwxmg4
 - valory/registration_abci:0.1.0:bafybeihjhbn5seffyu5cwugvm26fkamp3svhggmtzh577daijgl2ksxs3e
 - valory/reset_pause_abci:0.1.0:bafybeihc4ruh25s7wuunfy2b3k2n4eypyhvtry3usgom44wsymagbcr3ki
 - valory/termination_abci:0.1.0:bafybeibnnzry5kknci3z46gcjgutv4jid3ir6xn6a5adq3tx6v2e25augq
@@ -53,7 +53,7 @@ skills:
 - valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeibuldgtifqjst4oeremvl6huzvdnq36opgwv2wupsnplf4er5frpm
 - valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeiabqn6mcg4nw3mqbyxcuiyxgwlf7e2il3cj4awpmdi7bibqlwvklq
 - valory/mech_interact_abci:0.1.0:bafybeidnmszufszq3ro4ebgrqzmhqgctrsc6sykeanfsbvotghvt2cgfsy
-- valory/market_resolution_manager_abci:0.1.0:bafybeiflxondsgee2abh44kti2zbj4a3gnqms6p5dzt4jplh2j5c4phb6e
+- valory/market_resolution_manager_abci:0.1.0:bafybeihd7krvqkw2uav3e6wjxj2lxbeb7qc4ook3676g2qyxtklngvahtq
 default_ledger: ethereum
 required_ledgers:
 - ethereum
@@ -277,15 +277,6 @@ models:
       response_type: ${CT_SUBGRAPH_RESPONSE_TYPE:str:list}
       retries: ${CT_SUBGRAPH_RETRIES:int:5}
       url: ${CT_SUBGRAPH_URL:str:https://gateway.thegraph.com/api/api-key/subgraphs/id/7s9rGBffUTL8kDZuxvvpuc46v44iuDarbrADBFw5uVp2}
-  mech_gnosis_subgraph:
-    args:
-      headers:
-        Content-Type: ${MECH_GNOSIS_SUBGRAPH_CONTENT_TYPE:str:application/json}
-      method: ${MECH_GNOSIS_SUBGRAPH_METHOD:str:POST}
-      response_key: ${MECH_GNOSIS_SUBGRAPH_RESPONSE_KEY:str:data:requests}
-      response_type: ${MECH_GNOSIS_SUBGRAPH_RESPONSE_TYPE:str:list}
-      retries: ${MECH_GNOSIS_SUBGRAPH_RETRIES:int:5}
-      url: ${MECH_GNOSIS_SUBGRAPH_URL:str:https://api.subgraph.autonolas.tech/api/proxy/marketplace-gnosis}
   omen_subgraph:
     args:
       headers:

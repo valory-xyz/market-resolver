@@ -22,7 +22,7 @@
 import json
 import time
 from abc import ABC
-from typing import Any, Dict, Generator, List, Optional, cast
+from typing import Any, Dict, Generator, Optional, cast
 
 from packages.valory.connections.kv_store.connection import (
     PUBLIC_ID as KV_STORE_CONNECTION_PUBLIC_ID,
@@ -377,9 +377,7 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
         outcome: Dict[str, bool] = {"ok": False}
 
         def _cb(reply: KvStoreMessage, _dlg: Any) -> None:
-            outcome["ok"] = (
-                reply.performative == KvStoreMessage.Performative.SUCCESS
-            )
+            outcome["ok"] = reply.performative == KvStoreMessage.Performative.SUCCESS
 
         state = cast(SharedState, self.context.state)
         msg, dlg = self.context.kv_store_dialogues.create(
@@ -421,10 +419,17 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
         for _ in range(max_pages):
             page: Dict[str, Any] = {}
 
-            def _cb(reply: KvStoreMessage, _dlg: Any) -> None:
+            # ``page`` bound as a default arg so the closure captures the
+            # current iteration's dict, not a re-used loop-scope name
+            # (flake8-bugbear B023).
+            def _cb(
+                reply: KvStoreMessage,
+                _dlg: Any,
+                _page: Dict[str, Any] = page,
+            ) -> None:
                 if reply.performative == KvStoreMessage.Performative.LIST_RESPONSE:
-                    page["data"] = dict(reply.data)
-                    page["next_cursor"] = reply.next_cursor or ""
+                    _page["data"] = dict(reply.data)
+                    _page["next_cursor"] = reply.next_cursor or ""
 
             state = cast(SharedState, self.context.state)
             msg, dlg = self.context.kv_store_dialogues.create(

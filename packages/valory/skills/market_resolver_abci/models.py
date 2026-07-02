@@ -39,9 +39,6 @@ from packages.valory.skills.market_resolution_manager_abci.models import (
     MarketResolutionManagerParams,
 )
 from packages.valory.skills.market_resolution_manager_abci.models import (
-    MechGnosisSubgraph as BaseMechGnosisSubgraph,
-)
-from packages.valory.skills.market_resolution_manager_abci.models import (
     SharedState as BaseSharedState,
 )
 from packages.valory.skills.market_resolution_manager_abci.rounds import (
@@ -106,7 +103,6 @@ RealitioSubgraph = BaseRealitioSubgraph
 MechResponseSpecs = BaseMechResponseSpecs
 MechToolsSpecs = BaseMechToolsSpecs
 MechsSubgraph = BaseMechsSubgraph
-MechGnosisSubgraph = BaseMechGnosisSubgraph
 
 
 class SharedState(BaseSharedState):
