@@ -1751,6 +1751,7 @@ dependencies = [
     { name = "openapi-core" },
     { name = "openapi-spec-validator" },
     { name = "packaging" },
+    { name = "peewee" },
     { name = "protobuf" },
     { name = "py-eth-sig-utils" },
     { name = "py-multibase" },
@@ -1793,6 +1794,7 @@ requires-dist = [
     { name = "openapi-core", specifier = "==0.22.0" },
     { name = "openapi-spec-validator", specifier = ">=0.7.0,<0.8.0" },
     { name = "packaging", specifier = "==26" },
+    { name = "peewee", specifier = ">=3.17,<4" },
     { name = "protobuf", specifier = ">=5,<6" },
     { name = "py-eth-sig-utils", specifier = "==0.4.0" },
     { name = "py-multibase", specifier = "==1.0.3" },
@@ -2315,6 +2317,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/67/93/8f2c2075b180c12c1e9f6a09d1a985bc2036906b13dff1d8917e395f2048/pathable-0.4.4.tar.gz", hash = "sha256:6905a3cd17804edfac7875b5f6c9142a218c7caef78693c2dbbbfbac186d88b2", size = 8124, upload-time = "2025-01-10T18:43:13.247Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7d/eb/b6260b31b1a96386c0a880edebe26f89669098acea8e0318bff6adb378fd/pathable-0.4.4-py3-none-any.whl", hash = "sha256:5ae9e94793b6ef5a4cbe0a7ce9dbbefc1eec38df253763fd0aeeacf2762dbbc2", size = 9592, upload-time = "2025-01-10T18:43:11.88Z" },
+]
+
+[[package]]
+name = "peewee"
+version = "3.19.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/88/b0/79462b42e89764998756e0557f2b58a15610a5b4512fbbcccae58fba7237/peewee-3.19.0.tar.gz", hash = "sha256:f88292a6f0d7b906cb26bca9c8599b8f4d8920ebd36124400d0cbaaaf915511f", size = 974035, upload-time = "2026-01-07T17:24:59.597Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1a/41/19c65578ef9a54b3083253c68a607f099642747168fe00f3a2bceb7c3a34/peewee-3.19.0-py3-none-any.whl", hash = "sha256:de220b94766e6008c466e00ce4ba5299b9a832117d9eb36d45d0062f3cfd7417", size = 411885, upload-time = "2026-01-07T17:24:58.33Z" },
 ]
 
 [[package]]

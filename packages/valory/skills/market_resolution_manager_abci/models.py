@@ -19,7 +19,7 @@
 
 """This module contains the models for the market resolution manager."""
 
-from typing import Any, Dict, List, Type
+from typing import Any, Callable, Dict, List, Tuple, Type
 
 from packages.valory.skills.abstract_round_abci.base import AbciApp
 from packages.valory.skills.abstract_round_abci.models import (
@@ -50,6 +50,9 @@ Requests = BaseRequests
 BenchmarkTool = BaseBenchmarkTool
 
 
+# TODO(kv_store cutover): remove once ``fetch_mech_requests_for_market`` is
+# rewritten to LIST kv_store instead of querying the subgraph
+# (Phase 3 of docs/market_resolver_offchain_scope.md).
 class MechGnosisSubgraph(ApiSpecs):
     """ApiSpecs wrapper for the Mech Marketplace Gnosis subgraph."""
 
@@ -68,6 +71,13 @@ class SharedState(
         """Initialize."""
         super().__init__(*args, **kwargs)
         self.questions_db: Dict[str, Any] = {}
+        # kv_store single-in-flight gate + callback dispatch. Matches the
+        # pattern already in use by optimus (liquidity_trader_abci).
+        # Behaviours flip in_flight_req to True, register a callback
+        # keyed by the dialogue nonce, then yield until the handler
+        # invokes the callback and clears the gate.
+        self.in_flight_req: bool = False
+        self.req_to_callback: Dict[str, Tuple[Callable, Dict[str, Any]]] = {}
 
 
 class MarketResolutionManagerParams(  # pylint: disable=too-many-instance-attributes
@@ -107,6 +117,18 @@ class MarketResolutionManagerParams(  # pylint: disable=too-many-instance-attrib
         # outage to clear before burning the next retry, but short enough
         # that ``max_mech_retries=10`` still spans <2 days total.
         self.mech_retry_cooldown: int = kwargs.pop("mech_retry_cooldown", 14400)  # 4h
+        # kv_store cache tuning. The store answers "has my safe already
+        # asked the mech about this market?" durably; see
+        # docs/market_resolver_offchain_scope.md in autonolas-marketplace.
+        self.mech_cache_key_prefix: str = kwargs.pop(
+            "mech_cache_key_prefix", "market_resolver/"
+        )
+        self.mech_cache_list_page_size: int = kwargs.pop(
+            "mech_cache_list_page_size", 100
+        )
+        self.mech_cache_kv_request_timeout: float = kwargs.pop(
+            "mech_cache_kv_request_timeout", 5.0
+        )
         self.omen_subgraph_max_market_age_seconds: int = kwargs.pop(
             "omen_subgraph_max_market_age_seconds",
             365 * 86400,  # 1 year

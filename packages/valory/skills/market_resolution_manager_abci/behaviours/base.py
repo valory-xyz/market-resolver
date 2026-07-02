@@ -20,9 +20,14 @@
 """This module contains the base behaviour for the market resolution manager."""
 
 import json
+import time
 from abc import ABC
 from typing import Any, Dict, Generator, List, Optional, cast
 
+from packages.valory.connections.kv_store.connection import (
+    PUBLIC_ID as KV_STORE_CONNECTION_PUBLIC_ID,
+)
+from packages.valory.protocols.kv_store.message import KvStoreMessage
 from packages.valory.protocols.ledger_api import LedgerApiMessage
 from packages.valory.skills.abstract_round_abci.behaviours import BaseBehaviour
 from packages.valory.skills.market_resolution_manager_abci.models import (
@@ -391,3 +396,121 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
             if (req.get("parsedRequest") or {}).get("tool") == expected_tool
             and (req.get("parsedRequest") or {}).get("prompt") == title
         ]
+
+    def _wait_for_kv_reply(self) -> Generator[None, None, None]:
+        """Block until the kv_store handler clears the single in-flight gate.
+
+        The handler flips ``state.in_flight_req`` to ``False`` when the
+        reply arrives and the per-nonce callback has run. A watchdog
+        bounds the wait so a lost reply (dropped envelope, connection
+        crash) doesn't wedge the scan cycle: the gate is force-cleared
+        after ``mech_cache_kv_request_timeout`` seconds. Local SQLite
+        replies land in sub-millisecond time in the healthy case, so the
+        watchdog is only relevant to genuinely-stuck plumbing.
+
+        :yield: control to the FSM until the reply lands or the watchdog fires.
+        """
+        state = cast(SharedState, self.context.state)
+        deadline = time.time() + self.params.mech_cache_kv_request_timeout
+        while state.in_flight_req and time.time() < deadline:
+            yield from self.sleep(0.05)
+        if state.in_flight_req:
+            self.context.logger.warning(
+                "kv_store reply did not arrive within "
+                f"{self.params.mech_cache_kv_request_timeout}s; force-clearing "
+                "in_flight_req. The scan cycle will proceed with whatever "
+                "partial data the callback recorded."
+            )
+            state.in_flight_req = False
+
+    def _send_kv_write(
+        self,
+        key: str,
+        value: str,
+    ) -> Generator[None, None, bool]:
+        """Upsert one row into the kv_store and block until the reply lands.
+
+        :param key: the fully-namespaced kv_store key.
+        :param value: the JSON-serialised row payload.
+        :yield: control to the FSM until the reply lands.
+        :return: True on SUCCESS, False on ERROR / no-reply.
+        """
+        outcome: Dict[str, bool] = {"ok": False}
+
+        def _cb(reply: KvStoreMessage, _dlg: Any) -> None:
+            outcome["ok"] = (
+                reply.performative == KvStoreMessage.Performative.SUCCESS
+            )
+
+        state = cast(SharedState, self.context.state)
+        msg, dlg = self.context.kv_store_dialogues.create(
+            counterparty=str(KV_STORE_CONNECTION_PUBLIC_ID),
+            performative=KvStoreMessage.Performative.CREATE_OR_UPDATE_REQUEST,
+            data={key: value},
+        )
+        nonce = dlg.dialogue_label.dialogue_reference[0]
+        state.req_to_callback[nonce] = (_cb, {})
+        state.in_flight_req = True
+        self.context.outbox.put_message(message=msg)
+        yield from self._wait_for_kv_reply()
+        return outcome["ok"]
+
+    def _send_kv_list(
+        self,
+        prefix: str,
+    ) -> Generator[None, None, Optional[Dict[str, str]]]:
+        """LIST kv_store rows under a prefix, paginating until exhausted.
+
+        Returns the merged ``{key -> value}`` map across all pages, or
+        ``None`` on ERROR / no-reply. Pagination uses the connection's
+        ``next_cursor`` field: an empty cursor means the walk is complete.
+
+        :param prefix: the kv_store key prefix to filter by.
+        :yield: control to the FSM until each page reply lands.
+        :return: merged rows, or None on error.
+        """
+        merged: Dict[str, str] = {}
+        cursor: str = ""
+        # Bound the walk defensively; each iteration issues one LIST.
+        # A namespace bigger than page_size * max_pages hasn't been seen
+        # in practice (a single safe wouldn't ask about > page_size
+        # markets in one retention window), but the guard prevents an
+        # infinite loop if the server ever returns a non-empty cursor
+        # on an empty page.
+        max_pages = 1024
+
+        for _ in range(max_pages):
+            page: Dict[str, Any] = {}
+
+            def _cb(reply: KvStoreMessage, _dlg: Any) -> None:
+                if reply.performative == KvStoreMessage.Performative.LIST_RESPONSE:
+                    page["data"] = dict(reply.data)
+                    page["next_cursor"] = reply.next_cursor or ""
+
+            state = cast(SharedState, self.context.state)
+            msg, dlg = self.context.kv_store_dialogues.create(
+                counterparty=str(KV_STORE_CONNECTION_PUBLIC_ID),
+                performative=KvStoreMessage.Performative.LIST_REQUEST,
+                key_prefix=prefix,
+                limit=self.params.mech_cache_list_page_size,
+                cursor=cursor,
+            )
+            nonce = dlg.dialogue_label.dialogue_reference[0]
+            state.req_to_callback[nonce] = (_cb, {})
+            state.in_flight_req = True
+            self.context.outbox.put_message(message=msg)
+            yield from self._wait_for_kv_reply()
+
+            if "data" not in page:
+                # ERROR or watchdog timeout; abandon the walk.
+                return None
+            merged.update(page["data"])
+            cursor = page["next_cursor"]
+            if not cursor:
+                return merged
+        self.context.logger.warning(
+            "kv_store LIST paginated past %d pages without exhausting the "
+            "namespace; returning partial results.",
+            max_pages,
+        )
+        return merged

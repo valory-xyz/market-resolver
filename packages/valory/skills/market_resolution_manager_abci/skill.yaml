@@ -10,16 +10,17 @@ fingerprint:
   README.md: bafybeicebua5cqf3pfr34hy5mmnr6i7m7wgxlkzbto6woi5dkuv4fqbymi
   __init__.py: bafybeiedhf4rirdachml54zzde7nl3nhuwz4c5xwskrc5udfphefbrdsfu
   behaviours/__init__.py: bafybeignnrbklzekhqurn6ptli5zhzsov2qtdzr5se4xe4hqdywt2vbtvu
-  behaviours/base.py: bafybeib4swnebtev45mvt6zjblmitx54d5v2bndcxvjrswklcy5xoq62dq
+  behaviours/base.py: bafybeidvfso5uxd6tmmwtmmcpxcindtduzlqyto6zrk3krotl2kb6bbooq
   behaviours/build_answer_tx.py: bafybeidv7zsaxwm7c34p2zr3li4kbnh7bjvh6torlss76zjthsoaywwv6e
   behaviours/evaluate_answers.py: bafybeieh3szyspcyu7fpqmh75srassk7kyj5tp44gbykiputtpffoqgieu
   behaviours/post_transaction.py: bafybeih3sx6y2xhuc5gkoeed6skfb6zyur4xc36b2vma2hprpk4lqhgvlq
   behaviours/round_behaviour.py: bafybeiecxju6t7zsojnrhrefy4a7c75lkbveoxcayntw6heacao2qqkfdm
   behaviours/scan_markets.py: bafybeias6emiuptj7iyslpl3shpci2yw2vo3lshho6uw46ovzqe67y5724
-  dialogues.py: bafybeict7mdksmjklx6wy2zplunpcfwhgxv5votxbsodidyum2phx3tv34
+  dialogues.py: bafybeihoudfbpl4zj6de34rpagbzjrfh3nvjmdwnm2v4dkhnkxvvp77ta4
   fsm_specification.yaml: bafybeibibqujtoh4cp5qivd4fkguo7edjmdhggw6ihitjnzp4p2xr5vg3i
-  handlers.py: bafybeigby2ymzvsoiwbgtdd4esk6xrkrafp2b22yqz5xi4ekrnqwqqoq4y
-  models.py: bafybeifej4htpsbqccquz32wo3dc3vq4y4elq7yiufwevpwkuhtriem7xq
+  handlers.py: bafybeifhqkplnep5tgkifrgs3r7fhmucrggwbikrgny5lgmk2ibrv6ujte
+  mech_cache.py: bafybeiedqy4dikgauyymxtaeu22uqkmw4kiyh7tiixazpgqvu25pdhhnfy
+  models.py: bafybeiezktrcfrkyxm4w34d6d4fl3rmpukijy4j5bkcktet3rem3sc2eb4
   payloads.py: bafybeih6zkrc5mnkpifctn4cg3myqr3qrdw5v42hg7ldfbuzw7gjbgeoja
   rounds.py: bafybeihfhcmmatxx5ztgao2ft7jfh2su5bbp2b7ua3qxb4luvwltbvdqby
   states/__init__.py: bafybeiho5s4sehwxmgtp4ddgntnkxhjks5cflihdtag7zqy6btjrhzcyti
@@ -40,7 +41,8 @@ fingerprint:
   tests/test_payloads.py: bafybeiakjhvniimjyynaeq3n3udkdnjcvm4tuzafyrirsvwjgwwqkxb5j4
   tests/test_rounds.py: bafybeicyvamo4xohu6zsrnbawe4secam6c7pirftapfwpqobmutfmjk45i
 fingerprint_ignore_patterns: []
-connections: []
+connections:
+- valory/kv_store:0.1.0:bafybeib2tvoui6kndvrd2gpvs55rizpjee7mqjtjsfbr6fdp5hxslh6gd4
 contracts:
 - valory/gnosis_safe:0.1.0:bafybeif6cfjeruji2ovns6dhc5qivvjr7t7rh5mmudgh5gvumezin26qne
 - valory/multisend:0.1.0:bafybeidl74hh6g34kgxay3fzapz26dhfmc6s2kjnt6edmaxgrklhge3omy
@@ -48,6 +50,7 @@ contracts:
 protocols:
 - valory/ledger_api:1.0.0:bafybeiecq56phjfws36rgrefw6niyo4ezesloodsfis647mpm5ygqo4ysi
 - valory/contract_api:1.0.0:bafybeibld2xb5m7kyluiptkamp4nrt6oeomkohz7a3yppbv2oo7qw2e4la
+- valory/kv_store:0.1.0:bafybeidlfrgv5rc7m7kj3j6u6umogmpy5bgcdzqtnsy3v75wn3likvyt6m
 skills:
 - valory/abstract_round_abci:0.1.0:bafybeicioxhbhnsoqyqvkeevd7df7r2vubbiglyf7ucps2el73objazjsq
 - valory/mech_interact_abci:0.1.0:bafybeidnmszufszq3ro4ebgrqzmhqgctrsc6sykeanfsbvotghvt2cgfsy
@@ -82,6 +85,9 @@ handlers:
   tendermint:
     args: {}
     class_name: TendermintHandler
+  kv_store:
+    args: {}
+    class_name: KvStoreHandler
 models:
   abci_dialogues:
     args: {}
@@ -102,6 +108,9 @@ models:
   ledger_api_dialogues:
     args: {}
     class_name: LedgerApiDialogues
+  kv_store_dialogues:
+    args: {}
+    class_name: KvStoreDialogues
   mech_gnosis_subgraph:
     args:
       api_id: mech_gnosis
@@ -126,6 +135,9 @@ models:
       max_escalation_rounds: 5
       max_mech_retries: 10
       mech_retry_cooldown: 14400
+      mech_cache_key_prefix: market_resolver/
+      mech_cache_list_page_size: 100
+      mech_cache_kv_request_timeout: 5.0
       omen_subgraph_max_market_age_seconds: 31536000
       cleanup_history_depth: 1
       cleanup_history_depth_current: null
