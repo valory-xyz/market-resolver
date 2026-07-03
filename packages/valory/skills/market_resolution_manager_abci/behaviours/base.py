@@ -336,7 +336,7 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
             and (req.get("parsedRequest") or {}).get("prompt") == expected_prompt
         ]
 
-    def _wait_for_kv_reply(self) -> Generator[None, None, None]:
+    def _wait_for_kv_reply(self, nonce: str) -> Generator[None, None, None]:
         """Block until the kv_store handler clears the single in-flight gate.
 
         The handler flips ``state.in_flight_req`` to ``False`` when the
@@ -347,6 +347,18 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
         replies land in sub-millisecond time in the healthy case, so the
         watchdog is only relevant to genuinely-stuck plumbing.
 
+        On timeout the caller's callback is popped from ``req_to_callback``
+        so a late reply for this nonce can't fire the (now-abandoned)
+        callback. Without that pop, a stale reply arriving during the
+        next kv_store request would (a) invoke the previous callback
+        against the wrong reply and (b) flip ``in_flight_req`` to False
+        while the current op is still waiting, letting the current
+        caller's ``while state.in_flight_req`` loop exit early and read
+        a partial result. The single-in-flight-op protocol depends on
+        this pop.
+
+        :param nonce: dialogue nonce of the in-flight op, popped on
+            timeout so a late reply is inert.
         :yield: control to the FSM until the reply lands or the watchdog fires.
         """
         state = cast(SharedState, self.context.state)
@@ -360,6 +372,7 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
                 "in_flight_req. The scan cycle will proceed with whatever "
                 "partial data the callback recorded."
             )
+            state.req_to_callback.pop(nonce, None)
             state.in_flight_req = False
 
     def _send_kv_write(
@@ -389,7 +402,7 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
         state.req_to_callback[nonce] = (_cb, {})
         state.in_flight_req = True
         self.context.outbox.put_message(message=msg)
-        yield from self._wait_for_kv_reply()
+        yield from self._wait_for_kv_reply(nonce)
         return outcome["ok"]
 
     def _send_kv_list(
@@ -443,7 +456,7 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
             state.req_to_callback[nonce] = (_cb, {})
             state.in_flight_req = True
             self.context.outbox.put_message(message=msg)
-            yield from self._wait_for_kv_reply()
+            yield from self._wait_for_kv_reply(nonce)
 
             if "data" not in page:
                 # ERROR or watchdog timeout; abandon the walk.

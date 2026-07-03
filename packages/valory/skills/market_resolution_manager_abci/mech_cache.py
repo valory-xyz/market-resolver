@@ -39,10 +39,22 @@ from the old subgraph return shape, so callers don't need to change:
 ``rehydrate_to_subgraph_shape`` turns a batch of kv rows into a list of
 dicts identical in shape to what the removed subgraph query returned.
 
-Scope: storage-bound, not privacy-bound. The kv_store file is per-agent
-local on a Propel PVC; a fresh redeploy starts empty and market-resolver
-will re-ask a bounded number of markets before catching up. Documented
-in ``docs/market_resolver_offchain_scope.md`` in autonolas-marketplace.
+**Rows are never pruned in this PR.** Nothing sends ``DELETE_REQUEST``
+today; the store grows on every fired mech request and only shrinks on a
+fresh redeploy (which starts from an empty PVC). Reads stay cheap
+because ``LIST_REQUEST`` is scoped to a per-market prefix, but the raw
+size grows with the fleet's lifetime request volume. Pruning is a
+planned follow-up:
+
+- Simplest: age-based DELETE keyed on ``fired_at`` past a configurable
+  retention window (mirrors the mech-side preimage buffer pattern
+  established in valory-xyz/mech PR #455).
+- Alternative: LIST + filter + DELETE by market_id once a market
+  finalises on-chain, since the "have I asked?" question is moot for
+  finalised markets.
+
+Neither is in scope here. Tracking issue TBD; see
+``docs/market_resolver_offchain_scope.md`` in autonolas-marketplace.
 """
 
 from __future__ import annotations

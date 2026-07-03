@@ -63,11 +63,16 @@ class KvStoreHandler(AbstractResponseHandler):
     """Route kv_store replies to per-nonce callbacks registered by behaviours."""
 
     SUPPORTED_PROTOCOL: Optional[PublicId] = KvStoreMessage.protocol_id
+    # Performatives the handler recognises. Excludes DELETE_REQUEST
+    # (deliberately -- nothing in this skill sends deletes today, and
+    # advertising the outgoing performative in the allowed-set alongside
+    # LIST/READ/CREATE misled a reviewer into thinking pruning happened;
+    # add it back if and when a sweeper lands, see mech_cache.py module
+    # docstring for the follow-up plan).
     allowed_response_performatives = frozenset(
         {
             KvStoreMessage.Performative.READ_REQUEST,
             KvStoreMessage.Performative.CREATE_OR_UPDATE_REQUEST,
-            KvStoreMessage.Performative.DELETE_REQUEST,
             KvStoreMessage.Performative.LIST_REQUEST,
             KvStoreMessage.Performative.READ_RESPONSE,
             KvStoreMessage.Performative.LIST_RESPONSE,

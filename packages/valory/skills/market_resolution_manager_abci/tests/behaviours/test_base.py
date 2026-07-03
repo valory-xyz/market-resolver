@@ -751,6 +751,70 @@ class TestFetchMechRequestsForMarket:
         assert result[0]["id"] == "nonce-f"
 
 
+class TestWaitForKvReplyTimeout:
+    """Cover the pop-on-timeout behaviour of ``_wait_for_kv_reply``.
+
+    Regression pin for bennyjo's #1 comment on PR #36: without this pop,
+    a late reply for a timed-out nonce would trip the next kv request's
+    gate. The scan cycle would then read a partial result and false-
+    report "already asked", or false-report "never asked" and re-fire.
+    """
+
+    def _make_behaviour_with_real_state(self) -> Any:
+        """Return a behaviour whose context.state carries a real dict + bool."""
+        # The shared ``_make_context`` uses ``MagicMock()`` for state,
+        # which silently swallows dict writes to ``req_to_callback``.
+        # These tests need real values.
+        b = _make_behaviour()
+        b.context.state.req_to_callback = {}
+        b.context.state.in_flight_req = False
+        return b
+
+    def test_timeout_pops_nonce_from_req_to_callback(self) -> None:
+        """When the watchdog fires, the caller's callback is popped so a late reply is inert."""
+        b = self._make_behaviour_with_real_state()
+        # Squeeze the watchdog so the test runs in a few ms of wall clock.
+        b.context.params.mech_cache_kv_request_timeout = 0.05
+        # Simulate an op that was fired and never replied.
+        b.context.state.in_flight_req = True
+        b.context.state.req_to_callback["stuck-nonce"] = (
+            lambda *_a, **_k: None,
+            {},
+        )
+
+        _exhaust_gen(b._wait_for_kv_reply("stuck-nonce"))
+
+        # Gate cleared so the scan cycle can proceed.
+        assert b.context.state.in_flight_req is False
+        # Callback popped so a late reply arriving after this point is
+        # inert -- the handler will see ``req_to_callback.pop(nonce)``
+        # return ``None`` and fall through to ``super().handle()``.
+        assert "stuck-nonce" not in b.context.state.req_to_callback
+
+    def test_normal_reply_leaves_unrelated_callbacks_alone(self) -> None:
+        """A normal (handler-cleared) reply exits the wait without touching other entries."""
+        # Under the healthy path, the KvStoreHandler pops the callback
+        # and clears the gate BEFORE ``_wait_for_kv_reply`` observes the
+        # transition; the timeout branch never runs. This test pins that
+        # ``_wait_for_kv_reply`` doesn't pop unrelated nonces on the
+        # happy path -- otherwise concurrent kv users in other skills
+        # would lose their callbacks.
+        b = self._make_behaviour_with_real_state()
+        b.context.params.mech_cache_kv_request_timeout = 5.0
+        # Gate already cleared by the (simulated) handler.
+        b.context.state.in_flight_req = False
+        # Some UNRELATED nonce sitting in the map (e.g. left over from
+        # another skill's kv usage). It must not be touched.
+        b.context.state.req_to_callback["other-op"] = (
+            lambda *_a, **_k: None,
+            {},
+        )
+
+        _exhaust_gen(b._wait_for_kv_reply("nonce-that-was-just-served"))
+
+        assert "other-op" in b.context.state.req_to_callback
+
+
 # ---------------------------------------------------------------------------
 # ScanMarketsBehaviour._earliest_valid_evaluation -- helper unit tests
 # ---------------------------------------------------------------------------

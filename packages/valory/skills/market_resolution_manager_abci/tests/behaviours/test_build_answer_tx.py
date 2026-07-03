@@ -114,8 +114,10 @@ def _make_behaviour(
 
     # The kv_store delivery-write is best-effort side-effect from the FSM's
     # perspective; these tests focus on evaluation parsing + tx-building,
-    # so stub it out. Suite-level tests for the write path itself live in
-    # test_base.py against ``_send_kv_write``.
+    # so stub it out. Dispatch/wait/handler coverage lives elsewhere:
+    # KvStoreHandler nonce lookup in tests/test_handlers.py, and the
+    # _wait_for_kv_reply pop-on-timeout in
+    # tests/behaviours/test_base.py::TestWaitForKvReplyTimeout.
     def _noop_gen(*_a: Any, **_k: Any):  # type: ignore[no-untyped-def]
         if False:  # pragma: no cover -- keep this a generator
             yield None
