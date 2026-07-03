@@ -315,6 +315,7 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
             - fpmm remove liquidity tx done: 9.
             - ct redeem tokens tx done: 10.
             - realitio withdraw bonds tx done: 11.
+            - offchain deposit done: 12.
             - done: 7.
             - none: 7.
             - no majority: 7.
@@ -327,8 +328,9 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
         9. FinishedWithFpmmRemoveLiquidityPostTxRound
         10. FinishedWithCtRedeemTokensPostTxRound
         11. FinishedWithRealitioWithdrawBondsPostTxRound
+        12. FinishedWithOffchainDepositPostTxRound
 
-    Final states: {FinishedResolutionRound, FinishedWithAnswerTxRound, FinishedWithCtRedeemTokensPostTxRound, FinishedWithFpmmRemoveLiquidityPostTxRound, FinishedWithFundsForwarderPostTxRound, FinishedWithMechPollRound, FinishedWithMechRequestRound, FinishedWithRealitioWithdrawBondsPostTxRound}
+    Final states: {FinishedResolutionRound, FinishedWithAnswerTxRound, FinishedWithCtRedeemTokensPostTxRound, FinishedWithFpmmRemoveLiquidityPostTxRound, FinishedWithFundsForwarderPostTxRound, FinishedWithMechPollRound, FinishedWithMechRequestRound, FinishedWithOffchainDepositPostTxRound, FinishedWithRealitioWithdrawBondsPostTxRound}
 
     Timeouts:
         round timeout: 180.0
