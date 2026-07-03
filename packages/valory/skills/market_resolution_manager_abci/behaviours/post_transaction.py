@@ -23,6 +23,9 @@ from typing import Generator
 
 import packages.valory.skills.mech_interact_abci.states.request as MechRequestStates
 from packages.valory.skills.funds_forwarder_abci.rounds import FundsForwarderRound
+from packages.valory.skills.mech_interact_abci.states.request import (
+    OFFCHAIN_DEPOSIT_TX_SUBMITTER,
+)
 from packages.valory.skills.market_resolution_manager_abci.behaviours.base import (
     MarketResolutionManagerBaseBehaviour,
 )
@@ -57,7 +60,9 @@ class PostTransactionBehaviour(MarketResolutionManagerBaseBehaviour):
             f"settled_tx_hash={settled_tx_hash}"
         )
 
-        if tx_submitter == MechRequestStates.MechRequestRound.auto_round_id():
+        if tx_submitter == OFFCHAIN_DEPOSIT_TX_SUBMITTER:
+            content = PostTransactionRound.OFFCHAIN_DEPOSIT_DONE_PAYLOAD
+        elif tx_submitter == MechRequestStates.MechRequestRound.auto_round_id():
             content = PostTransactionRound.MECH_REQUEST_DONE_PAYLOAD
         elif tx_submitter == BuildAnswerTxRound.auto_round_id():
             content = PostTransactionRound.ANSWER_TX_DONE_PAYLOAD

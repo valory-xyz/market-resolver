@@ -19,6 +19,7 @@ alphabet_in:
 - NO_MAJORITY
 - NO_MARKETPLACE
 - OFFCHAIN_ALL_FAILED
+- OFFCHAIN_DEPOSIT_DONE
 - OFFCHAIN_DEPOSIT_NEEDED
 - OFFCHAIN_DONE
 - REALITIO_WITHDRAW_BONDS_TX_DONE
@@ -33,10 +34,7 @@ alphabet_in:
 - V2
 - VALIDATE_TIMEOUT
 default_start_state: RegistrationStartupRound
-final_states:
-- FailedOffchainMechRequestRound
-- FinishedOffchainMechDepositNeededRound
-- FinishedOffchainMechRequestRound
+final_states: []
 label: MarketResolverAbciApp
 start_states:
 - RegistrationRound
@@ -48,10 +46,7 @@ states:
 - CollectSignatureRound
 - CtRedeemTokensRound
 - EvaluateAnswersRound
-- FailedOffchainMechRequestRound
 - FinalizationRound
-- FinishedOffchainMechDepositNeededRound
-- FinishedOffchainMechRequestRound
 - FpmmRemoveLiquidityRound
 - FundsForwarderRound
 - IdentifyServiceOwnerRound
@@ -131,9 +126,9 @@ transition_func:
     (MechRequestRound, BUY_SUBSCRIPTION): MechPurchaseSubscriptionRound
     (MechRequestRound, DONE): RandomnessTransactionSubmissionRound
     (MechRequestRound, NO_MAJORITY): MechRequestRound
-    (MechRequestRound, OFFCHAIN_ALL_FAILED): FailedOffchainMechRequestRound
-    (MechRequestRound, OFFCHAIN_DEPOSIT_NEEDED): FinishedOffchainMechDepositNeededRound
-    (MechRequestRound, OFFCHAIN_DONE): FinishedOffchainMechRequestRound
+    (MechRequestRound, OFFCHAIN_ALL_FAILED): ResetAndPauseRound
+    (MechRequestRound, OFFCHAIN_DEPOSIT_NEEDED): RandomnessTransactionSubmissionRound
+    (MechRequestRound, OFFCHAIN_DONE): MechResponseRound
     (MechRequestRound, ROUND_TIMEOUT): MechRequestRound
     (MechRequestRound, SKIP_REQUEST): ResetAndPauseRound
     (MechResponseRound, DONE): BuildAnswerTxRound
@@ -152,6 +147,7 @@ transition_func:
     (PostTransactionRound, MECH_REQUEST_DONE): MechResponseRound
     (PostTransactionRound, NONE): ResetAndPauseRound
     (PostTransactionRound, NO_MAJORITY): ResetAndPauseRound
+    (PostTransactionRound, OFFCHAIN_DEPOSIT_DONE): MechRequestRound
     (PostTransactionRound, REALITIO_WITHDRAW_BONDS_TX_DONE): ScanMarketsRound
     (PostTransactionRound, ROUND_TIMEOUT): ResetAndPauseRound
     (RandomnessTransactionSubmissionRound, DONE): SelectKeeperTransactionSubmissionARound

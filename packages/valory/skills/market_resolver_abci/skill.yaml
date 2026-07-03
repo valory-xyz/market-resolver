@@ -10,9 +10,9 @@ fingerprint:
   README.md: bafybeiahbbj3x5pfg3tqbnrrnw2mhc2jguaqrwg7pjzk2ycxoqmlm6scje
   __init__.py: bafybeig5dyyxibrg3ouf4ax53l5mpytzttebdvqmjewltawxtswk4op364
   behaviours.py: bafybeicmmvab5ltot5euedicqhvuy7ndsp2q4zgrmwzepwscczjjqa4qxe
-  composition.py: bafybeifj7oao5gv4lsqcwtg4yme7os2norr2swtd5kbxwzcg4cgh3bkanu
+  composition.py: bafybeifle5ccsvcdxahtrex3b55nw4kjwyugiul3ztpozvugpjxdksk46i
   dialogues.py: bafybeidrboj26t25l7sumxlfe7j3bgeduxnbqaymtpewdb5kpj7baquu44
-  fsm_specification.yaml: bafybeibzdt67tupdgdpmgylfkhcxi4ov4gz4j64looekjp6fbfvxkbnmh4
+  fsm_specification.yaml: bafybeiefy32ru5hbxwfh63ba3htxrdc7uk5x6mnf7j3fx4gdty4nhmoejy
   handlers.py: bafybeidjzuhl26obyngr2zouskfiunxsupqjhdbvtknppgwt3os4ytwqsi
   models.py: bafybeichllltqtakerhvw7q537sie2ijwby5cxmpl726i4q5hj25l4ig6a
   tests/__init__.py: bafybeibb6rglfusig6k56wjqe6pofhyjt2hbknwk6culahlooxo73bx2lu
@@ -24,9 +24,11 @@ fingerprint:
 fingerprint_ignore_patterns: []
 connections:
 - valory/http_server:0.22.0:bafybeihs6dufyaa5l4uorplzx3wiyna5qlq2x43tmyl3yonkl265vspdle
+- valory/kv_store:0.1.0:bafybeib2tvoui6kndvrd2gpvs55rizpjee7mqjtjsfbr6fdp5hxslh6gd4
 contracts: []
 protocols:
 - valory/http:1.0.0:bafybeidxkp3vga7t6x2pbt2tpkgyaxa5bgpdgryao54py7w3yxyzr7neoy
+- valory/kv_store:0.1.0:bafybeidlfrgv5rc7m7kj3j6u6umogmpy5bgcdzqtnsy3v75wn3likvyt6m
 skills:
 - valory/abstract_round_abci:0.1.0:bafybeicioxhbhnsoqyqvkeevd7df7r2vubbiglyf7ucps2el73objazjsq
 - valory/registration_abci:0.1.0:bafybeihjhbn5seffyu5cwugvm26fkamp3svhggmtzh577daijgl2ksxs3e
@@ -39,7 +41,7 @@ skills:
 - valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeibuldgtifqjst4oeremvl6huzvdnq36opgwv2wupsnplf4er5frpm
 - valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeiabqn6mcg4nw3mqbyxcuiyxgwlf7e2il3cj4awpmdi7bibqlwvklq
 - valory/mech_interact_abci:0.1.0:bafybeihhwzpa6x5ypth426tzd2zjsnys6jmjaab4zvk4edisetzktft754
-- valory/market_resolution_manager_abci:0.1.0:bafybeicyddcycdqi3tgknww7bmehkbpy6vsqlsoqpol56orxytxhvmvjiy
+- valory/market_resolution_manager_abci:0.1.0:bafybeidddit6oywocuzllze2um3x6innpbf3cwsxllchnhtdwsa5qsq7ai
 behaviours:
   main:
     args: {}
@@ -57,6 +59,9 @@ handlers:
   ipfs:
     args: {}
     class_name: IpfsHandler
+  kv_store:
+    args: {}
+    class_name: KvStoreHandler
   ledger_api:
     args: {}
     class_name: LedgerApiHandler
@@ -83,6 +88,9 @@ models:
   ipfs_dialogues:
     args: {}
     class_name: IpfsDialogues
+  kv_store_dialogues:
+    args: {}
+    class_name: KvStoreDialogues
   ledger_api_dialogues:
     args: {}
     class_name: LedgerApiDialogues

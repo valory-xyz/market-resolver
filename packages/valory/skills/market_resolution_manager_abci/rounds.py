@@ -198,6 +198,7 @@ class PostTransactionRound(CollectSameUntilThresholdRound):
     FPMM_REMOVE_LIQUIDITY_TX_DONE_PAYLOAD = "FPMM_REMOVE_LIQUIDITY_TX_DONE"
     CT_REDEEM_TOKENS_TX_DONE_PAYLOAD = "CT_REDEEM_TOKENS_TX_DONE"
     REALITIO_WITHDRAW_BONDS_TX_DONE_PAYLOAD = "REALITIO_WITHDRAW_BONDS_TX_DONE"
+    OFFCHAIN_DEPOSIT_DONE_PAYLOAD = "OFFCHAIN_DEPOSIT_DONE"
     ERROR_PAYLOAD = "ERROR"
 
     payload_class = PostTransactionPayload
@@ -225,6 +226,8 @@ class PostTransactionRound(CollectSameUntilThresholdRound):
                 return self.synchronized_data, Event.CT_REDEEM_TOKENS_TX_DONE
             if self.most_voted_payload == self.REALITIO_WITHDRAW_BONDS_TX_DONE_PAYLOAD:
                 return self.synchronized_data, Event.REALITIO_WITHDRAW_BONDS_TX_DONE
+            if self.most_voted_payload == self.OFFCHAIN_DEPOSIT_DONE_PAYLOAD:
+                return self.synchronized_data, Event.OFFCHAIN_DEPOSIT_DONE
             return self.synchronized_data, Event.DONE
         if not self.is_majority_possible(
             self.collection, self.synchronized_data.nb_participants
@@ -263,6 +266,21 @@ class FinishedWithCtRedeemTokensPostTxRound(DegenerateRound):
 
 class FinishedWithRealitioWithdrawBondsPostTxRound(DegenerateRound):
     """Degenerate round: RealitioWithdrawBond tx settled; chain complete, enter core."""
+
+
+class FinishedWithOffchainDepositPostTxRound(DegenerateRound):
+    """Degenerate round: offchain-402 deposit tx settled; re-enter MechRequest.
+
+    The offchain flow signed a request that got a 402, mech-interact
+    auto-built a depositFor tx that TxSettlement just landed. Now
+    ``mapNonces`` has NOT advanced (deposits don't consume a nonce),
+    the cached ``request_id`` is still valid, and the balance has
+    increased. Re-entering MechRequestRound triggers the retry leg
+    which POSTs the same signed request against the freshly-funded
+    balance. Without this branch, the tx_submitter falls through to
+    the ANSWER_TX_DONE default and the FSM heads to reset -- the
+    deposit lands but the request is never retried, so the market
+    stays stuck until the next scan cycle re-fires from scratch."""
 
 
 class MarketResolutionManagerAbciApp(AbciApp[Event]):
@@ -348,6 +366,7 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
             Event.FPMM_REMOVE_LIQUIDITY_TX_DONE: FinishedWithFpmmRemoveLiquidityPostTxRound,
             Event.CT_REDEEM_TOKENS_TX_DONE: FinishedWithCtRedeemTokensPostTxRound,
             Event.REALITIO_WITHDRAW_BONDS_TX_DONE: FinishedWithRealitioWithdrawBondsPostTxRound,
+            Event.OFFCHAIN_DEPOSIT_DONE: FinishedWithOffchainDepositPostTxRound,
             Event.DONE: FinishedResolutionRound,
             Event.NONE: FinishedResolutionRound,
             Event.NO_MAJORITY: FinishedResolutionRound,
@@ -361,6 +380,7 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
         FinishedWithFpmmRemoveLiquidityPostTxRound: {},
         FinishedWithCtRedeemTokensPostTxRound: {},
         FinishedWithRealitioWithdrawBondsPostTxRound: {},
+        FinishedWithOffchainDepositPostTxRound: {},
     }
     final_states: Set[AppState] = {
         FinishedWithMechRequestRound,
@@ -371,6 +391,7 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
         FinishedWithFpmmRemoveLiquidityPostTxRound,
         FinishedWithCtRedeemTokensPostTxRound,
         FinishedWithRealitioWithdrawBondsPostTxRound,
+        FinishedWithOffchainDepositPostTxRound,
     }
     event_to_timeout: Dict[Event, float] = {
         Event.ROUND_TIMEOUT: 180.0,
@@ -390,4 +411,5 @@ class MarketResolutionManagerAbciApp(AbciApp[Event]):
         FinishedWithFpmmRemoveLiquidityPostTxRound: set(),
         FinishedWithCtRedeemTokensPostTxRound: set(),
         FinishedWithRealitioWithdrawBondsPostTxRound: set(),
+        FinishedWithOffchainDepositPostTxRound: set(),
     }

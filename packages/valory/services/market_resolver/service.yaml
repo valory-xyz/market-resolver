@@ -7,7 +7,7 @@ license: Apache-2.0
 fingerprint:
   README.md: bafybeie6lb2mlmzmkycbcfma4onidhegfu4ipgpybg2av5mhfs5zx42b2m
 fingerprint_ignore_patterns: []
-agent: valory/market_resolver:0.1.0:bafybeidzpucsd6n5h63qycsnlthz2vc3iix55aatz5o2qz3qhb45ih7tky
+agent: valory/market_resolver:0.1.0:bafybeidtjdzeqtffmbylsqrm3o3po6y5727si5srckeyx56comgvordls4
 number_of_agents: 1
 deployment:
   agent:
@@ -221,3 +221,8 @@ config:
   port: ${HTTP_SERVER_PORT:int:8000}
   timeout: ${HTTP_SERVER_TIMEOUT:float:30.0}
   target_skill_id: valory/market_resolver_abci:0.1.0
+---
+public_id: valory/kv_store:0.1.0:bafybeib2tvoui6kndvrd2gpvs55rizpjee7mqjtjsfbr6fdp5hxslh6gd4
+type: connection
+config:
+  store_path: ${STORE_PATH:str:/data}
