@@ -280,7 +280,8 @@ class FinishedWithOffchainDepositPostTxRound(DegenerateRound):
     balance. Without this branch, the tx_submitter falls through to
     the ANSWER_TX_DONE default and the FSM heads to reset -- the
     deposit lands but the request is never retried, so the market
-    stays stuck until the next scan cycle re-fires from scratch."""
+    stays stuck until the next scan cycle re-fires from scratch.
+    """
 
 
 class MarketResolutionManagerAbciApp(AbciApp[Event]):

@@ -23,9 +23,6 @@ from typing import Generator
 
 import packages.valory.skills.mech_interact_abci.states.request as MechRequestStates
 from packages.valory.skills.funds_forwarder_abci.rounds import FundsForwarderRound
-from packages.valory.skills.mech_interact_abci.states.request import (
-    OFFCHAIN_DEPOSIT_TX_SUBMITTER,
-)
 from packages.valory.skills.market_resolution_manager_abci.behaviours.base import (
     MarketResolutionManagerBaseBehaviour,
 )
@@ -35,6 +32,9 @@ from packages.valory.skills.market_resolution_manager_abci.payloads import (
 from packages.valory.skills.market_resolution_manager_abci.rounds import (
     BuildAnswerTxRound,
     PostTransactionRound,
+)
+from packages.valory.skills.mech_interact_abci.states.request import (
+    OFFCHAIN_DEPOSIT_TX_SUBMITTER,
 )
 from packages.valory.skills.omen_ct_redeem_tokens_abci.rounds import CtRedeemTokensRound
 from packages.valory.skills.omen_fpmm_remove_liquidity_abci.rounds import (
