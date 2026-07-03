@@ -61,6 +61,9 @@ from packages.valory.skills.abstract_round_abci.dialogues import (
 from packages.valory.skills.abstract_round_abci.dialogues import (
     TendermintDialogues as BaseTendermintDialogues,
 )
+from packages.valory.skills.market_resolution_manager_abci.dialogues import (
+    KvStoreDialogues as _InnerKvStoreDialogues,
+)
 
 AbciDialogue = BaseAbciDialogue
 AbciDialogues = BaseAbciDialogues
@@ -82,3 +85,11 @@ TendermintDialogues = BaseTendermintDialogues
 
 IpfsDialogue = BaseIpfsDialogue
 IpfsDialogues = BaseIpfsDialogues
+
+# Composed skill re-export: the inner sub-skill's KvStoreDialogues class must
+# be reachable on the composed context so behaviours (which run bound to the
+# composed skill at runtime) can register kv_store messages. Without this,
+# ``self.context.kv_store_dialogues`` AttributeErrors on the first cache
+# hit -- and the mocked-context unit tests do not catch it, since
+# ``conftest.py`` uses ``MagicMock()`` which silently returns a mock.
+KvStoreDialogues = _InnerKvStoreDialogues

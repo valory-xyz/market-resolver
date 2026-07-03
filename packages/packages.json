@@ -1,9 +1,9 @@
 {
     "dev": {
         "skill/valory/market_resolution_manager_abci/0.1.0": "bafybeiar3stw727xc4bk5egoovp6oikwbhquunq3g2ydrvr6wphrvlyazq",
-        "skill/valory/market_resolver_abci/0.1.0": "bafybeicqudnr2j4ofkn3dlz34gkdzhdcntxfbold5dl67hiaps3xyyvmhm",
-        "agent/valory/market_resolver/0.1.0": "bafybeicpboczsmvdvht4zhbzlglj6c3pvadhfjsggtd7mkwwo7v26gnlvu",
-        "service/valory/market_resolver/0.1.0": "bafybeigooe44lribdlp2xojxewss6m6rdnmc6p3vn2jfm35omzcys3uiri"
+        "skill/valory/market_resolver_abci/0.1.0": "bafybeica2q5kknwq3mntpm4fyyiw6iv3gorca6nsvbr5tzxuuyfj5gbku4",
+        "agent/valory/market_resolver/0.1.0": "bafybeib5mjnjzurmfgaovvouywbgq2saukuid7rmunp3sojyyu4vmb3o2a",
+        "service/valory/market_resolver/0.1.0": "bafybeifothzde3szww47jg76rlx7sjcogzled7777satq7qukxy5t2lrye"
     },
     "third_party": {
         "protocol/valory/contract_api/1.0.0": "bafybeibld2xb5m7kyluiptkamp4nrt6oeomkohz7a3yppbv2oo7qw2e4la",
