@@ -12,23 +12,21 @@ fingerprint:
   behaviours.py: bafybeicmmvab5ltot5euedicqhvuy7ndsp2q4zgrmwzepwscczjjqa4qxe
   composition.py: bafybeifj7oao5gv4lsqcwtg4yme7os2norr2swtd5kbxwzcg4cgh3bkanu
   dialogues.py: bafybeidrboj26t25l7sumxlfe7j3bgeduxnbqaymtpewdb5kpj7baquu44
-  fsm_specification.yaml: bafybeifnirdnjmcxrryfs5darcsdo2t4bcvvvpa2tckbdm6qakhoapghlm
-  handlers.py: bafybeihw7tgamtnozuunbgv2657qxmh4kaexlh2zgajr4mxhz5lcjbcpou
+  fsm_specification.yaml: bafybeibzdt67tupdgdpmgylfkhcxi4ov4gz4j64looekjp6fbfvxkbnmh4
+  handlers.py: bafybeidjzuhl26obyngr2zouskfiunxsupqjhdbvtknppgwt3os4ytwqsi
   models.py: bafybeichllltqtakerhvw7q537sie2ijwby5cxmpl726i4q5hj25l4ig6a
   tests/__init__.py: bafybeibb6rglfusig6k56wjqe6pofhyjt2hbknwk6culahlooxo73bx2lu
   tests/test_behaviours.py: bafybeihencjmvknad45fimyeefym5x727iodmwbv435rswbyrmv6nqm3qi
-  tests/test_composition.py: bafybeifpyn56i4fcpq7lfeufwkef4orbfmxy64rlgch62bbegk52fmgdie
+  tests/test_composition.py: bafybeihmw45bckdgg2hkocp5jgbexndwq5as4w4bujyidv42txauhzqbsa
   tests/test_dialogues.py: bafybeihliu56ebvohw4xeztkingoyyqtb5ivcpkw6gn6cqdghbb5i7hzd4
   tests/test_handlers.py: bafybeih3zrglr7i4vqrpgebopapd2vzdwh3ad5lpokfveoywm5ei2ttw3m
   tests/test_models.py: bafybeihmzakwtca53ex4byuxxlhc622x2fk4ujzwijevwo3wtxh4f3mpim
 fingerprint_ignore_patterns: []
 connections:
 - valory/http_server:0.22.0:bafybeihs6dufyaa5l4uorplzx3wiyna5qlq2x43tmyl3yonkl265vspdle
-- valory/kv_store:0.1.0:bafybeib2tvoui6kndvrd2gpvs55rizpjee7mqjtjsfbr6fdp5hxslh6gd4
 contracts: []
 protocols:
 - valory/http:1.0.0:bafybeidxkp3vga7t6x2pbt2tpkgyaxa5bgpdgryao54py7w3yxyzr7neoy
-- valory/kv_store:0.1.0:bafybeidlfrgv5rc7m7kj3j6u6umogmpy5bgcdzqtnsy3v75wn3likvyt6m
 skills:
 - valory/abstract_round_abci:0.1.0:bafybeicioxhbhnsoqyqvkeevd7df7r2vubbiglyf7ucps2el73objazjsq
 - valory/registration_abci:0.1.0:bafybeihjhbn5seffyu5cwugvm26fkamp3svhggmtzh577daijgl2ksxs3e
@@ -59,9 +57,6 @@ handlers:
   ipfs:
     args: {}
     class_name: IpfsHandler
-  kv_store:
-    args: {}
-    class_name: KvStoreHandler
   ledger_api:
     args: {}
     class_name: LedgerApiHandler
@@ -88,9 +83,6 @@ models:
   ipfs_dialogues:
     args: {}
     class_name: IpfsDialogues
-  kv_store_dialogues:
-    args: {}
-    class_name: KvStoreDialogues
   ledger_api_dialogues:
     args: {}
     class_name: LedgerApiDialogues
