@@ -28,6 +28,9 @@ contracts:
 - valory/fpmm:0.1.0:bafybeiceekyspyvqkzint67psqumphhmiiwkcy5satkm4kzo62i56mbkcm
 - valory/erc20:0.1.0:bafybeig4tin5v5ahiiz4fysocl7gjhpjtgzko3w6cr2iz3q5a4bxutwewu
 - valory/agent_registry:0.1.0:bafybeihq4z4goum5ie7xwx723ub3bmuqql5hpys6kzy5cvt5g6y4k7eooe
+- valory/mech_marketplace:0.1.0:bafybeieadbmhzndxe6jcfwujcpjrljpc5kfwffkd3zzpg75uxksufn4l3i
+- valory/balance_tracker_fixed_price_native:0.1.0:bafybeifobvptvc7mkrztfij664dqqegl6qi32773zewvyuftes32faemw4
+- valory/balance_tracker_fixed_price_token:0.1.0:bafybeienpn5nb7mgiw5uitm5mjwcgc2xd7bzx5rxu2mqsvjziwvlg6poxa
 protocols:
 - open_aea/signing:1.0.0:bafybeifsjmldwyki3beqyvdt5lzenrg6wyrqaar5plc5rpnvtc4zlentye
 - valory/abci:0.1.0:bafybeiak4pwac3pwjtd7weskxdhkrcopckr32vtazfbuteu6yqjkwarpte
@@ -42,7 +45,7 @@ protocols:
 skills:
 - valory/abstract_abci:0.1.0:bafybeie5et43th2nta76cd3kpm3fmurd7oyzk3qxim76octvt56m6r2poi
 - valory/abstract_round_abci:0.1.0:bafybeicioxhbhnsoqyqvkeevd7df7r2vubbiglyf7ucps2el73objazjsq
-- valory/market_resolver_abci:0.1.0:bafybeich22ukhe3tocom2l5tf2hhsqd54fjxsneni6vcvmegv5qdz47r4q
+- valory/market_resolver_abci:0.1.0:bafybeifvitx7fm7bmp3a5ewn4nh5pxvh5vazf4u6kyzi4434bv24agv7ou
 - valory/registration_abci:0.1.0:bafybeihjhbn5seffyu5cwugvm26fkamp3svhggmtzh577daijgl2ksxs3e
 - valory/reset_pause_abci:0.1.0:bafybeihc4ruh25s7wuunfy2b3k2n4eypyhvtry3usgom44wsymagbcr3ki
 - valory/termination_abci:0.1.0:bafybeibnnzry5kknci3z46gcjgutv4jid3ir6xn6a5adq3tx6v2e25augq
@@ -52,8 +55,8 @@ skills:
 - valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeif6w2bplgceactukt5b6qpth5nxspdeljsxaywrlyxvymdxxiefsq
 - valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeibuldgtifqjst4oeremvl6huzvdnq36opgwv2wupsnplf4er5frpm
 - valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeiabqn6mcg4nw3mqbyxcuiyxgwlf7e2il3cj4awpmdi7bibqlwvklq
-- valory/mech_interact_abci:0.1.0:bafybeidnmszufszq3ro4ebgrqzmhqgctrsc6sykeanfsbvotghvt2cgfsy
-- valory/market_resolution_manager_abci:0.1.0:bafybeiar3stw727xc4bk5egoovp6oikwbhquunq3g2ydrvr6wphrvlyazq
+- valory/mech_interact_abci:0.1.0:bafybeihhwzpa6x5ypth426tzd2zjsnys6jmjaab4zvk4edisetzktft754
+- valory/market_resolution_manager_abci:0.1.0:bafybeicc5miexb6zgxpvrp3cihtg23z3ov7fc5yrjyujycvnv2n2mr6f6y
 default_ledger: ethereum
 required_ledgers:
 - ethereum
@@ -230,7 +233,7 @@ models:
       mech_interact_round_timeout_seconds: ${MECH_INTERACT_ROUND_TIMEOUT_SECONDS:int:1200}
       mech_interaction_sleep_time: ${MECH_INTERACTION_SLEEP_TIME:int:10}
       use_mech_marketplace: ${USE_MECH_MARKETPLACE:bool:true}
-      mech_marketplace_config: ${MECH_MARKETPLACE_CONFIG:dict:{"mech_marketplace_address":"0x735FAAb1c4Ec41128c367AFb5c3baC73509f70bB","priority_mech_address":"0x601024E27f1C67B28209E24272CED8A31fc8151F","priority_mech_staking_instance_address":"0x998dEFafD094817EF329f6dc79c703f1CF18bC90","priority_mech_service_id":2198,"requester_staking_instance_address":"0xeF44Fb0842DDeF59D37f85D61A1eF492bbA6135d","use_dynamic_mech_selection":false,"response_timeout":300}}
+      mech_marketplace_config: ${MECH_MARKETPLACE_CONFIG:dict:{"mech_marketplace_address":"0x735FAAb1c4Ec41128c367AFb5c3baC73509f70bB","priority_mech_address":"0x601024E27f1C67B28209E24272CED8A31fc8151F","priority_mech_staking_instance_address":"0x998dEFafD094817EF329f6dc79c703f1CF18bC90","priority_mech_service_id":2198,"requester_staking_instance_address":"0xeF44Fb0842DDeF59D37f85D61A1eF492bbA6135d","use_dynamic_mech_selection":false,"response_timeout":300,"use_offchain":false,"offchain_url":null,"offchain_deposit_target_calls":10,"auto_deposit_cap_per_cycle":5000000000000000000,"offchain_poll_interval_seconds":3.0,"offchain_poll_timeout_seconds":300.0,"offchain_failover_max_retries":2}}
       mech_contract_address: ${MECH_CONTRACT_ADDRESS:str:0x601024E27f1C67B28209E24272CED8A31fc8151F}
       mech_wrapped_native_token_address: ${MECH_WRAPPED_NATIVE_TOKEN_ADDRESS:str:0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d}
       ignored_mechs: ${IGNORED_MECHS:list:[]}

@@ -13,18 +13,18 @@ fingerprint:
   behaviours/base.py: bafybeidkcsproj2itxjplr5emtd5mm775cbaewxfs2ax4cpsupxu2ssfle
   behaviours/build_answer_tx.py: bafybeigzazw4vv37wjuxnihvezyrelotihvkrhzv6ovdtgujx5hr2dk73q
   behaviours/evaluate_answers.py: bafybeie2htenmx2fpyt67cvbj6s2ih4dciejlfju2q2y6slzysm2xkrqr4
-  behaviours/post_transaction.py: bafybeih3sx6y2xhuc5gkoeed6skfb6zyur4xc36b2vma2hprpk4lqhgvlq
+  behaviours/post_transaction.py: bafybeig7wndmyilfbwshtr2wmeluzr4rzl3uri656tu5if4ar7dta6wnei
   behaviours/round_behaviour.py: bafybeiecxju6t7zsojnrhrefy4a7c75lkbveoxcayntw6heacao2qqkfdm
   behaviours/scan_markets.py: bafybeias6emiuptj7iyslpl3shpci2yw2vo3lshho6uw46ovzqe67y5724
   dialogues.py: bafybeihoudfbpl4zj6de34rpagbzjrfh3nvjmdwnm2v4dkhnkxvvp77ta4
-  fsm_specification.yaml: bafybeibibqujtoh4cp5qivd4fkguo7edjmdhggw6ihitjnzp4p2xr5vg3i
+  fsm_specification.yaml: bafybeidel6ahx7syvu37eu22y4udmdtgjc6ra5auo5bujjiiclpcfgf4n4
   handlers.py: bafybeibqutcanxc3fto7l62btwk77np4xykd6rguobg4nqai7hzstja47a
   mech_cache.py: bafybeieryi7ve3r4qvyanf7awpwb7yzuvu7abpjed3uavrhhyv2pjnfshe
   models.py: bafybeihaow367ag72adyby7nny5pxb2a7wuoqfobi5gk5zautxad6dmvku
   payloads.py: bafybeih6zkrc5mnkpifctn4cg3myqr3qrdw5v42hg7ldfbuzw7gjbgeoja
-  rounds.py: bafybeihfhcmmatxx5ztgao2ft7jfh2su5bbp2b7ua3qxb4luvwltbvdqby
+  rounds.py: bafybeiarus542z5wbpgthn4bgxuyqyqediby7eli24uccck6ro6e5isymu
   states/__init__.py: bafybeiho5s4sehwxmgtp4ddgntnkxhjks5cflihdtag7zqy6btjrhzcyti
-  states/base.py: bafybeieywx5f6xtiu5ds5dsy4ewgjqjgkyiw537lwykmejstucch52g45i
+  states/base.py: bafybeibmobpd7u2zgca6ztjkhehbdzstuqts7lavjsd52gkqt6yglieo74
   tests/__init__.py: bafybeidpf4le7kmwrvl6u3s4yl2mrlznnu7scha3hvcpd3s2omwo7bdwkq
   tests/behaviours/__init__.py: bafybeierpqlj4wjvfsa2acmkibioivviqudq4ulu5ifuqwcvdcfewzdgau
   tests/behaviours/conftest.py: bafybeidkqr5ockrncp2a25dsop2azlwcvdkjgmp6nd4poov4i6fpj4vy64
@@ -54,7 +54,7 @@ protocols:
 - valory/kv_store:0.1.0:bafybeidlfrgv5rc7m7kj3j6u6umogmpy5bgcdzqtnsy3v75wn3likvyt6m
 skills:
 - valory/abstract_round_abci:0.1.0:bafybeicioxhbhnsoqyqvkeevd7df7r2vubbiglyf7ucps2el73objazjsq
-- valory/mech_interact_abci:0.1.0:bafybeidnmszufszq3ro4ebgrqzmhqgctrsc6sykeanfsbvotghvt2cgfsy
+- valory/mech_interact_abci:0.1.0:bafybeihhwzpa6x5ypth426tzd2zjsnys6jmjaab4zvk4edisetzktft754
 - valory/transaction_settlement_abci:0.1.0:bafybeibv3tycpdhphlblu62zpcbjsj7hnwkutexxqagorkelhjlt4t4fii
 - valory/funds_forwarder_abci:0.1.0:bafybeihuxw5tgnp4hie76as2jwnbp5abxrkmlmmpu4ila6ey34xrfkqqie
 - valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeif6w2bplgceactukt5b6qpth5nxspdeljsxaywrlyxvymdxxiefsq

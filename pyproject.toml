@@ -68,7 +68,7 @@ prerelease = "allow"
 # omen_* resolution skills, and genai for the llm protocol + openai
 # connection.
 upstream_pins = [
-    "valory-xyz/mech-interact@v0.32.2",
+    "valory-xyz/mech-interact@v0.32.4-rc1",
     "valory-xyz/omen-protocol@v0.1.2",
     "valory-xyz/genai@v7.2.1",
     # kv-store 0.7.0-rc1 is the first release that ships LIST/DELETE

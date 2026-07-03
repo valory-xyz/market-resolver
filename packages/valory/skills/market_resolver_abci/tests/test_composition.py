@@ -21,8 +21,9 @@
 
 # pylint: disable=unused-import
 
+import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict
 
 import yaml
 
@@ -116,3 +117,113 @@ class TestKvStoreComposedWiring:
             "market_resolver_abci.dialogues must re-export KvStoreDialogues "
             "so the skill.yaml model entry can resolve the class."
         )
+
+
+_AGENT_CONFIG_YAML = (
+    Path(packages.valory.skills.market_resolver_abci.__file__).parent.parent.parent
+    / "agents"
+    / "market_resolver"
+    / "aea-config.yaml"
+)
+_SERVICE_YAML = (
+    Path(packages.valory.skills.market_resolver_abci.__file__).parent.parent.parent
+    / "services"
+    / "market_resolver"
+    / "service.yaml"
+)
+
+
+def _extract_marketplace_dict(dumped: str) -> Dict[str, Any]:
+    """Extract the mech_marketplace_config dict from an env-var default string.
+
+    Both ``aea-config.yaml`` and ``service.yaml`` render this field as a
+    ``${MECH_MARKETPLACE_CONFIG:dict:{...}}`` env-var default. Peel the
+    outer wrapping and parse the inner JSON to get the same shape as the
+    ``mech_marketplace_config`` mapping the skill.yaml declares natively.
+    """
+    marker = ":dict:"
+    idx = dumped.find(marker)
+    assert idx != -1, f"mech_marketplace_config default missing dict marker: {dumped}"
+    inner = dumped[idx + len(marker) :].rstrip("}").rstrip()
+    if not inner.endswith("}"):
+        inner = inner + "}"
+    return json.loads(inner)
+
+
+class TestMechMarketplaceConfigParity:
+    """The offchain config dict lives in 3 yaml layers; assert they agree.
+
+    ``MECH_MARKETPLACE_CONFIG`` is a dict-typed env var, which the AEA
+    framework replaces atomically -- setting one field in ops replaces the
+    whole dict. If the defaults across skill.yaml, aea-config.yaml and
+    service.yaml drift, operators who don't override every key silently
+    lose fields (e.g. ``use_offchain`` disappears and downstream Python
+    picks up whichever default the framework happens to fall through to).
+    Pin the seven offchain fields to identical values across all three
+    layers. Missing this coverage was jmoreira's MEDIUM finding on PR #37.
+    """
+
+    _OFFCHAIN_KEYS = (
+        "use_offchain",
+        "offchain_url",
+        "offchain_deposit_target_calls",
+        "auto_deposit_cap_per_cycle",
+        "offchain_poll_interval_seconds",
+        "offchain_poll_timeout_seconds",
+        "offchain_failover_max_retries",
+    )
+
+    def _skill_yaml_mmc(self) -> Dict[str, Any]:
+        data = _load_composed_skill_yaml()
+        return data["models"]["params"]["args"]["mech_marketplace_config"]
+
+    def _config_yaml_mmc(self) -> Dict[str, Any]:
+        """The agent yaml is multi-doc; find the skill-scoped override."""
+        docs = list(yaml.safe_load_all(_AGENT_CONFIG_YAML.read_text()))
+        for doc in docs:
+            if not isinstance(doc, dict):
+                continue
+            if str(doc.get("public_id", "")).startswith("valory/market_resolver_abci"):
+                return _extract_marketplace_dict(
+                    doc["models"]["params"]["args"]["mech_marketplace_config"]
+                )
+        raise AssertionError("market_resolver_abci block missing from aea-config.yaml")
+
+    def _service_yaml_mmc(self) -> Dict[str, Any]:
+        """The service yaml is multi-doc; find the skill-scoped override."""
+        docs = list(yaml.safe_load_all(_SERVICE_YAML.read_text()))
+        for doc in docs:
+            if not isinstance(doc, dict):
+                continue
+            if str(doc.get("public_id", "")).startswith("valory/market_resolver_abci"):
+                return _extract_marketplace_dict(
+                    doc["models"]["params"]["args"]["mech_marketplace_config"]
+                )
+        raise AssertionError("market_resolver_abci block missing from service.yaml")
+
+    def test_offchain_defaults_agree_across_three_yaml_layers(self) -> None:
+        """All 7 offchain keys must be identical in the 3 yaml layers."""
+        skill = self._skill_yaml_mmc()
+        agent = self._config_yaml_mmc()
+        service = self._service_yaml_mmc()
+
+        for key in self._OFFCHAIN_KEYS:
+            assert key in skill, f"skill.yaml missing offchain key {key!r}"
+            assert key in agent, f"aea-config.yaml missing offchain key {key!r}"
+            assert key in service, f"service.yaml missing offchain key {key!r}"
+            assert skill[key] == agent[key] == service[key], (
+                f"mech_marketplace_config.{key} drift: "
+                f"skill={skill[key]!r} agent={agent[key]!r} "
+                f"service={service[key]!r}"
+            )
+
+    def test_use_offchain_defaults_false(self) -> None:
+        """Ships-dark invariant: default must be ``false`` on all 3 layers."""
+        skill = self._skill_yaml_mmc()
+        agent = self._config_yaml_mmc()
+        service = self._service_yaml_mmc()
+        for name, dumped in (("skill", skill), ("agent", agent), ("service", service)):
+            assert dumped["use_offchain"] is False, (
+                f"{name}.yaml default use_offchain must be false -- flipping "
+                "it on requires operator opt-in per PR #37's description."
+            )
