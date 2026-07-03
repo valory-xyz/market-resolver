@@ -40,8 +40,8 @@ skills:
 - valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeif6w2bplgceactukt5b6qpth5nxspdeljsxaywrlyxvymdxxiefsq
 - valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeibuldgtifqjst4oeremvl6huzvdnq36opgwv2wupsnplf4er5frpm
 - valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeiabqn6mcg4nw3mqbyxcuiyxgwlf7e2il3cj4awpmdi7bibqlwvklq
-- valory/mech_interact_abci:0.1.0:bafybeidnmszufszq3ro4ebgrqzmhqgctrsc6sykeanfsbvotghvt2cgfsy
-- valory/market_resolution_manager_abci:0.1.0:bafybeiar3stw727xc4bk5egoovp6oikwbhquunq3g2ydrvr6wphrvlyazq
+- valory/mech_interact_abci:0.1.0:bafybeihhwzpa6x5ypth426tzd2zjsnys6jmjaab4zvk4edisetzktft754
+- valory/market_resolution_manager_abci:0.1.0:bafybeicyddcycdqi3tgknww7bmehkbpy6vsqlsoqpol56orxytxhvmvjiy
 behaviours:
   main:
     args: {}
@@ -198,6 +198,13 @@ models:
         requester_staking_instance_address: '0xeF44Fb0842DDeF59D37f85D61A1eF492bbA6135d'
         response_timeout: 300
         use_dynamic_mech_selection: false
+        use_offchain: false
+        offchain_url: null
+        offchain_deposit_target_calls: 10
+        auto_deposit_cap_per_cycle: 5000000000000000000
+        offchain_poll_interval_seconds: 3.0
+        offchain_poll_timeout_seconds: 300.0
+        offchain_failover_max_retries: 2
       mech_contract_address: '0x601024E27f1C67B28209E24272CED8A31fc8151F'
       mech_wrapped_native_token_address: '0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d'
       ignored_mechs: []
