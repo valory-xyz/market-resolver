@@ -59,10 +59,14 @@ def _make_handler() -> Tuple[KvStoreHandler, _State, MagicMock]:
 
 
 def _make_msg(
-    performative: KvStoreMessage.Performative,
+    performative: Any,
     nonce: str = "nonce-abc",
 ) -> SimpleNamespace:
     """Build a minimal KvStoreMessage-shaped reply."""
+    # ``performative`` typed as Any because ``KvStoreMessage.Performative``
+    # is a str-Enum and CI mypy on 3.10 sees Enum members as ``str`` at
+    # the call site, refusing to narrow them to the enum class. Tests
+    # pass real Performative instances.
     return SimpleNamespace(
         performative=performative,
         dialogue_reference=(nonce, "responder"),

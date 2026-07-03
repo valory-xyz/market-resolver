@@ -36,7 +36,7 @@ fingerprint:
   tests/behaviours/test_scan_markets.py: bafybeibtq3fno5xobfpwukipl3sqbgugavavbjxvpgu3wi6nsp3j2znbre
   tests/conftest.py: bafybeiaemzro7plaeklgfk5kvsw62kzgf5uym4e4xqcxwfwzqfcpnct4eq
   tests/test_dialogues.py: bafybeiaue4klz37jrmqlu46xj442v3mazx3fqmuay7thbakeyfy4ohrac4
-  tests/test_handlers.py: bafybeibzcyrw25bfloneqz435q77rquheikx52y2fd2ku6xrw5cm2nwiui
+  tests/test_handlers.py: bafybeib7pwsixawfob5razwu7cdek6npsri2zkqjwicsawehz2bqmt7bna
   tests/test_mech_cache.py: bafybeig5botuorl2qncuyd44od6gotjcyvbwcwiauqnsoibgn3pbxvwqwi
   tests/test_models.py: bafybeifi73pinx7c4znt7arsd3x72glowulvfcakia6yfa6c7jtwasokx4
   tests/test_payloads.py: bafybeiakjhvniimjyynaeq3n3udkdnjcvm4tuzafyrirsvwjgwwqkxb5j4
