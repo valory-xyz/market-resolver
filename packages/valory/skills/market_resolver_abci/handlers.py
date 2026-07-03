@@ -35,9 +35,7 @@ from packages.valory.connections.kv_store.connection import (
     PUBLIC_ID as _KV_STORE_CONNECTION_PUBLIC_ID,
 )
 from packages.valory.protocols.http import HttpMessage
-from packages.valory.protocols.kv_store.message import (
-    KvStoreMessage as _KvStoreMessage,
-)
+from packages.valory.protocols.kv_store.message import KvStoreMessage as _KvStoreMessage
 from packages.valory.skills.abstract_round_abci.handlers import (
     ABCIRoundHandler,
 )

@@ -110,9 +110,7 @@ class TestKvStoreComposedWiring:
 
     def test_composed_dialogues_module_reexports_kv_store(self) -> None:
         """``dialogues.py`` must expose ``KvStoreDialogues`` at module scope."""
-        from packages.valory.skills.market_resolver_abci import (
-            dialogues as _dialogues,
-        )
+        from packages.valory.skills.market_resolver_abci import dialogues as _dialogues
 
         assert hasattr(_dialogues, "KvStoreDialogues"), (
             "market_resolver_abci.dialogues must re-export KvStoreDialogues "
