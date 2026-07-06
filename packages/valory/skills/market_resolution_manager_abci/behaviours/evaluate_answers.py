@@ -20,10 +20,12 @@
 """This module contains the EvaluateAnswersBehaviour."""
 
 import json
+import time
 from dataclasses import asdict
 from typing import Generator, Optional
 from uuid import uuid4
 
+from packages.valory.skills.market_resolution_manager_abci import mech_cache
 from packages.valory.skills.market_resolution_manager_abci.behaviours.base import (
     MarketResolutionManagerBaseBehaviour,
 )
@@ -116,11 +118,80 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
         # MechInteract delivery (``SynchronizedData.mech_responses``) back to
         # this market before the subgraph has indexed the new request.
         entry["pending_nonce"] = nonce
+        # Stashed so the delivery-side kv_store write (build_answer_tx)
+        # can preserve fired_at without a READ round-trip. In-cycle only:
+        # if the agent restarts between fire and delivery, questions_db
+        # is rebuilt from scan_markets + the LIST'd kv rows themselves,
+        # and this key isn't needed.
+        fired_at = int(time.time())
+        entry["mech_fired_at"] = fired_at
         questions_db[market_id] = entry
         self.questions_db = questions_db
 
+        # Durable record of this fire so the next scan cycle sees "yes, I
+        # already asked" without depending on the mech subgraph (which
+        # under the off-chain path stops carrying prompt / toolResponse).
+        # Best-effort: a kv_store failure here is logged but does not
+        # block the mech request itself -- the FSM would just fall back
+        # to the subgraph in Phase 1's coexistence window. Once the
+        # subgraph read is removed in Phase 3, this write becomes the
+        # single source of truth and a failure here means the next cycle
+        # would re-fire the request, bounded by max_mech_retries.
+        yield from self._buffer_mech_request_fired(
+            market_id=market_id,
+            nonce=nonce,
+            prompt=prompt,
+            fired_at=fired_at,
+        )
+
         # Send mech_requests -> done_event -> MechInteract
         yield from self._send_payload(mech_requests_json, None)
+
+    def _buffer_mech_request_fired(
+        self,
+        market_id: str,
+        nonce: str,
+        prompt: str,
+        fired_at: int,
+    ) -> Generator[None, None, None]:
+        """Write the "just fired" row into kv_store.
+
+        Ships dark alongside the subgraph read until Phase 3 removes the
+        subgraph. Write failure is logged and swallowed so the FSM
+        transitions into the mech request round regardless.
+
+        :param market_id: the Omen market id being asked about.
+        :param nonce: the uuid4 generated at fire time; used as the row PK
+            AND for the later delivery match on ``resp.nonce``.
+        :param prompt: the market title as sent to the mech.
+        :param fired_at: epoch seconds; passed in rather than sampled here
+            so the entry-side stash and the kv row share the same value.
+        :yield: control to the FSM while the kv write is in flight.
+        """
+        safe_address = self.synchronized_data.safe_contract_address or ""
+        key = mech_cache.cache_key(
+            prefix=self.params.mech_cache_key_prefix,
+            safe_address=safe_address,
+            market_id=market_id,
+            nonce=nonce,
+        )
+        value = mech_cache.serialize_row(
+            safe_address=safe_address,
+            market_id=market_id,
+            nonce=nonce,
+            tool=self.params.mech_tool_resolve_market,
+            prompt=prompt,
+            fired_at=fired_at,
+        )
+        ok = yield from self._send_kv_write(key=key, value=value)
+        if not ok:
+            self.context.logger.warning(
+                "kv_store write for market=%s nonce=%s failed; the next "
+                "scan cycle may re-request this market. Bounded by "
+                "max_mech_retries.",
+                market_id,
+                nonce,
+            )
 
     def _send_payload(
         self,

@@ -31,7 +31,6 @@ from packages.valory.skills.market_resolution_manager_abci.behaviours.base impor
     ANSWER_INVALID,
     ANSWER_NO,
     ANSWER_YES,
-    MECH_CACHE_QUERY_TEMPLATE,
     is_cached_evaluation_valid,
     jury_error_discriminator,
     parse_mech_response,
@@ -548,66 +547,6 @@ class TestGetOmenSubgraphResult:
         assert result is None
 
 
-class TestGetMechGnosisSubgraphResult:
-    """Tests for get_mech_gnosis_subgraph_result.
-
-    The helper now delegates to ``ApiSpecs.process_response`` so the
-    configured ``response_key`` (``data:requests``) is walked by the
-    framework. These tests stub ``process_response`` per case to assert
-    that its return value is propagated and that the wrapping error
-    paths still short-circuit.
-    """
-
-    def test_success_returns_processed_value(self) -> None:
-        """Returns whatever ``process_response`` returns on 200 response."""
-        b = _make_behaviour()
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.body = json.dumps({"data": {"requests": [{"id": "r1"}]}}).encode()
-        b.context.mech_gnosis_subgraph.process_response.return_value = [{"id": "r1"}]
-
-        with patch.object(b, "get_http_response", new=_make_gen(mock_resp)):
-            result = _exhaust_gen(b.get_mech_gnosis_subgraph_result("{ q }"))
-
-        assert result == [{"id": "r1"}]
-        b.context.mech_gnosis_subgraph.process_response.assert_called_once_with(
-            mock_resp
-        )
-
-    def test_none_response_returns_none(self) -> None:
-        """Returns None when HTTP response is None."""
-        b = _make_behaviour()
-        with patch.object(b, "get_http_response", new=_make_gen(None)):
-            result = _exhaust_gen(b.get_mech_gnosis_subgraph_result("{ q }"))
-        assert result is None
-        b.context.mech_gnosis_subgraph.process_response.assert_not_called()
-
-    def test_non_200_returns_none(self) -> None:
-        """Returns None on non-200 status."""
-        b = _make_behaviour()
-        mock_resp = MagicMock()
-        mock_resp.status_code = 503
-
-        with patch.object(b, "get_http_response", new=_make_gen(mock_resp)):
-            result = _exhaust_gen(b.get_mech_gnosis_subgraph_result("{ q }"))
-
-        assert result is None
-        b.context.mech_gnosis_subgraph.process_response.assert_not_called()
-
-    def test_process_response_returns_none_propagates(self) -> None:
-        """If ``process_response`` returns None (e.g. bad path), caller gets None."""
-        b = _make_behaviour()
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.body = b"<html>rate limited</html>"
-        b.context.mech_gnosis_subgraph.process_response.return_value = None
-
-        with patch.object(b, "get_http_response", new=_make_gen(mock_resp)):
-            result = _exhaust_gen(b.get_mech_gnosis_subgraph_result("{ q }"))
-
-        assert result is None
-
-
 class TestGetRealitioSubgraphResult:
     """Tests for get_realitio_subgraph_result."""
 
@@ -654,223 +593,226 @@ class TestGetRealitioSubgraphResult:
 
 
 class TestFetchMechRequestsForMarket:
-    """Tests for ``fetch_mech_requests_for_market``.
+    """Tests for ``fetch_mech_requests_for_market`` (kv_store-backed).
 
-    Returns the raw filtered list of subgraph request entries (matching
-    tool + title for the Safe), or ``None`` on subgraph error. The
-    earliest valid evaluation is derived separately by
-    ``ScanMarketsBehaviour._earliest_valid_evaluation`` -- not by this
-    function.
+    Reads its "have I asked this market?" state from the local
+    kv_store rather than the mech subgraph (see
+    ``docs/market_resolver_offchain_scope.md`` in autonolas-marketplace).
+    The return shape is unchanged so ``_earliest_valid_evaluation`` and
+    the ``mech_retries`` counter in ``scan_markets`` need no changes.
+    Callers who fed the return list into those pipelines still get the
+    same values; the only difference is the data source.
     """
 
+    _TITLE = "Will X happen?"
+    _MARKET_ID = "0xmarket"
+    _SAFE = "0xabc"
+
     def _make_entry(
-        self, title: str = "Will X happen?", closing_ts: int = 1_700_000_000
-    ) -> Dict[str, Any]:
-        return {"title": title, "market_closing_timestamp": closing_ts}
-
-    def _make_request_entry(
         self,
-        deliveries: Any = None,
-        tool: str = "resolve-market-jury-v1",
-        prompt: str = "Will X happen?",
-        req_id: str = "req1",
+        title: str = _TITLE,
+        market_id: str = _MARKET_ID,
     ) -> Dict[str, Any]:
-        return {
-            "id": req_id,
-            "blockTimestamp": "1700001000",
-            "parsedRequest": {"tool": tool, "prompt": prompt},
-            "deliveries": deliveries if deliveries is not None else [],
-        }
+        return {"title": title, "market_id": market_id}
 
-    def test_subgraph_error_returns_none(self) -> None:
-        """Returns ``None`` when subgraph call fails."""
-        b = _make_behaviour()
-        with patch.object(b, "get_mech_gnosis_subgraph_result", new=_make_gen(None)):
+    def _make_row_value(
+        self,
+        nonce: str = "nonce-1",
+        tool: str = "resolve-market-jury-v1",
+        prompt: str = _TITLE,
+        fired_at: int = 1_700_000_000,
+        result: Any = None,
+        error: Any = None,
+        delivered_at: Any = None,
+    ) -> str:
+        return json.dumps(
+            {
+                "safe": self._SAFE,
+                "market_id": self._MARKET_ID,
+                "nonce": nonce,
+                "tool": tool,
+                "prompt": prompt,
+                "fired_at": fired_at,
+                "result": result,
+                "error": error,
+                "delivered_at": delivered_at,
+            },
+            sort_keys=True,
+        )
+
+    def _patched_behaviour(self, kv_reply: Any):  # type: ignore[no-untyped-def]
+        """Return a behaviour whose ``_send_kv_list`` yields ``kv_reply``."""
+        # safe_contract_address is a read-only property on
+        # BaseSynchronizedData, so we thread it through the
+        # ``_make_synced_data`` factory rather than assign after
+        # construction.
+        b = _make_behaviour(synced_data=_make_synced_data(safe_address=self._SAFE))
+        return b, patch.object(b, "_send_kv_list", new=_make_gen(kv_reply))
+
+    def test_kv_error_returns_none(self) -> None:
+        """Returns None when the kv_store LIST fails or times out."""
+        b, patcher = self._patched_behaviour(None)
+        with patcher:
             result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
         assert result is None
 
-    def test_empty_list_returns_empty_list(self) -> None:
-        """Empty list from subgraph helper -> empty list (no error)."""
-        b = _make_behaviour()
-        with patch.object(b, "get_mech_gnosis_subgraph_result", new=_make_gen([])):
+    def test_empty_kv_returns_empty_list(self) -> None:
+        """Empty LIST reply (never asked this market) -> empty list, not None."""
+        b, patcher = self._patched_behaviour({})
+        with patcher:
             result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
         assert result == []
 
-    def test_wrong_tool_filtered_out(self) -> None:
-        """Request with a non-matching tool is filtered out of the list."""
-        b = _make_behaviour()
-        requests = [
-            self._make_request_entry(
-                deliveries=[
-                    {
-                        "toolResponse": json.dumps(
-                            {
-                                "is_valid": True,
-                                "is_determinable": True,
-                                "has_occurred": True,
-                            }
-                        )
-                    }
-                ],
-                tool="wrong-tool",
+    def test_fired_but_undelivered_kept_in_list(self) -> None:
+        """A row with delivered_at=None is kept so it counts toward mech_retries."""
+        # Production uses ``len(mech_requests)`` to drive the retry-counter
+        # gate; unanswered fires must contribute even if no evaluation
+        # can be derived yet.
+        rows = {
+            f"market_resolver/{self._SAFE}/{self._MARKET_ID}/nonce-a": (
+                self._make_row_value(nonce="nonce-a")
             )
-        ]
-        with patch.object(
-            b, "get_mech_gnosis_subgraph_result", new=_make_gen(requests)
-        ):
+        }
+        b, patcher = self._patched_behaviour(rows)
+        with patcher:
             result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
-        assert result == []
+        assert result is not None
+        assert len(result) == 1
+        assert result[0]["deliveries"] == []
+        assert result[0]["parsedRequest"]["prompt"] == self._TITLE
+        assert result[0]["parsedRequest"]["tool"] == "resolve-market-jury-v1"
 
-    def test_wrong_prompt_filtered_out(self) -> None:
-        """Request with a non-matching prompt is filtered out of the list."""
-        b = _make_behaviour()
-        request_entry = self._make_request_entry(
-            deliveries=[
-                {
-                    "toolResponse": json.dumps(
-                        {
-                            "is_valid": True,
-                            "is_determinable": True,
-                            "has_occurred": True,
-                        }
-                    )
-                }
-            ],
-            prompt="Different question?",
-        )
-        with patch.object(
-            b, "get_mech_gnosis_subgraph_result", new=_make_gen([request_entry])
-        ):
-            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
-        assert result == []
-
-    def test_no_deliveries_kept_in_list(self) -> None:
-        """A request with empty ``deliveries`` is still kept in the list.
-
-        Production uses ``len(mech_requests)`` to drive the retry-counter
-        gate, so unanswered requests must contribute even if no
-        evaluation can be derived from them.
-        """
-        b = _make_behaviour()
-        request_entry = self._make_request_entry(deliveries=[])
-        with patch.object(
-            b, "get_mech_gnosis_subgraph_result", new=_make_gen([request_entry])
-        ):
-            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
-        assert result == [request_entry]
-
-    def test_garbage_response_kept_in_list(self) -> None:
-        """A request with an unparseable ``toolResponse`` is still kept."""
-        b = _make_behaviour()
-        request_entry = self._make_request_entry(
-            deliveries=[{"toolResponse": "invalid json {{"}]
-        )
-        with patch.object(
-            b, "get_mech_gnosis_subgraph_result", new=_make_gen([request_entry])
-        ):
-            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
-        assert result == [request_entry]
-
-    def test_undeterminable_response_kept_in_list(self) -> None:
-        """A request whose verdict is undeterminable is still kept.
-
-        ``answer=None`` (Case B) fails ``is_cached_evaluation_valid`` so
-        no evaluation is derived, but the entry is retained for
-        retry-count purposes.
-        """
-        b = _make_behaviour()
-        request_entry = self._make_request_entry(
-            deliveries=[
-                {
-                    "toolResponse": json.dumps(
-                        {"is_valid": True, "is_determinable": False}
-                    )
-                }
-            ]
-        )
-        with patch.object(
-            b, "get_mech_gnosis_subgraph_result", new=_make_gen([request_entry])
-        ):
-            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
-        assert result == [request_entry]
-
-    def test_valid_cache_hit_returns_request_in_list(self) -> None:
-        """A request with a valid YES verdict is returned in the list verbatim.
-
-        The verdict-extraction is the caller's responsibility (via
-        ``_earliest_valid_evaluation`` in scan_markets); this function
-        only filters + returns the raw request entries.
-        """
-        b = _make_behaviour()
+    def test_delivered_row_rehydrates_to_delivery_shape(self) -> None:
+        """A delivered row surfaces its toolResponse via deliveries[0]."""
         tool_response = json.dumps(
             {"is_valid": True, "is_determinable": True, "has_occurred": True}
         )
-        request_entry = self._make_request_entry(
-            deliveries=[{"toolResponse": tool_response}], req_id="req-abc"
-        )
-        with patch.object(
-            b, "get_mech_gnosis_subgraph_result", new=_make_gen([request_entry])
-        ):
+        rows = {
+            f"market_resolver/{self._SAFE}/{self._MARKET_ID}/nonce-b": (
+                self._make_row_value(
+                    nonce="nonce-b",
+                    result=tool_response,
+                    delivered_at=1_700_000_100,
+                )
+            )
+        }
+        b, patcher = self._patched_behaviour(rows)
+        with patcher:
             result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
-
-        assert isinstance(result, list)
-        assert result == [request_entry]
-        # Verify the caller can derive YES from this list via the helper.
+        assert result is not None
+        assert len(result) == 1
+        # _earliest_valid_evaluation can still derive YES from the same shape.
         evaluation = ScanMarketsBehaviour._earliest_valid_evaluation(result)
         assert evaluation is not None
         assert evaluation["answer"] == ANSWER_YES
 
-    def test_helper_returns_list_directly_no_data_walk(self) -> None:
-        """Regression: helper returns the list directly (no ``data`` wrapper).
+    def test_wrong_tool_filtered_out(self) -> None:
+        """A row with a non-matching tool is filtered out."""
+        rows = {
+            f"market_resolver/{self._SAFE}/{self._MARKET_ID}/nonce-c": (
+                self._make_row_value(nonce="nonce-c", tool="old-mech-tool")
+            )
+        }
+        b, patcher = self._patched_behaviour(rows)
+        with patcher:
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+        assert result == []
 
-        After switching to ``ApiSpecs.process_response``, the configured
-        ``response_key: data:requests`` is walked by the framework, so
-        ``get_mech_gnosis_subgraph_result`` hands a list back -- not
-        a ``{"data": {"requests": [...]}}`` wrapper. This test pins
-        that contract so a regression to manual ``data.sender.requests``
-        walking would fail loudly.
-        """
-        b = _make_behaviour()
-        request_entry = self._make_request_entry(req_id="req-top-level")
-        with patch.object(
-            b, "get_mech_gnosis_subgraph_result", new=_make_gen([request_entry])
-        ):
+    def test_wrong_prompt_filtered_out(self) -> None:
+        """A row whose stored prompt doesn't match the entry title is filtered."""
+        rows = {
+            f"market_resolver/{self._SAFE}/{self._MARKET_ID}/nonce-d": (
+                self._make_row_value(nonce="nonce-d", prompt="Different question?")
+            )
+        }
+        b, patcher = self._patched_behaviour(rows)
+        with patcher:
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+        assert result == []
+
+    def test_malformed_row_silently_skipped(self) -> None:
+        """A row whose value isn't valid JSON is skipped, not raised."""
+        # Pinned because a poison-pill row would otherwise crash the scan
+        # loop and stall market-resolver until the row aged out. The
+        # mech_cache helpers must swallow bad rows.
+        rows = {
+            f"market_resolver/{self._SAFE}/{self._MARKET_ID}/nonce-e": (
+                "not-json-at-all"
+            ),
+            f"market_resolver/{self._SAFE}/{self._MARKET_ID}/nonce-f": (
+                self._make_row_value(nonce="nonce-f")
+            ),
+        }
+        b, patcher = self._patched_behaviour(rows)
+        with patcher:
             result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
         assert result is not None
         assert len(result) == 1
-        assert result[0]["id"] == "req-top-level"
+        assert result[0]["id"] == "nonce-f"
 
-    def test_query_renders_top_level_request_form(self) -> None:
-        """The rendered query uses top-level ``requests(where:``.
 
-        Pins two invariants:
+class TestWaitForKvReplyTimeout:
+    """Cover the pop-on-timeout behaviour of ``_wait_for_kv_reply``.
 
-        - ``parsedRequest { nonce }`` is NOT selected. ``nonce`` is not a
-          field on ``ParsedRequest`` in the marketplace-gnosis subgraph,
-          and selecting it makes the whole query error with ``data:
-          null`` -- which previously masqueraded as "zero matching
-          requests" and silently disabled the retry-budget gate.
-        - The query uses top-level ``requests(where:`` rather than the
-          older ``sender(id) { requests(where:) }`` traversal. The
-          top-level form is the canonical pattern used by watchdog and
-          trader and is what the ``response_key: data:requests`` config
-          walks.
+    Regression pin for bennyjo's #1 comment on PR #36: without this pop,
+    a late reply for a timed-out nonce would trip the next kv request's
+    gate. The scan cycle would then read a partial result and false-
+    report "already asked", or false-report "never asked" and re-fire.
+    """
 
-        Tool filtering is intentionally NOT in the where-clause -- the
-        Python post-filter at ``fetch_mech_requests_for_market`` is the
-        authoritative tool check, so a where-clause filter would only
-        duplicate it and create a coupling risk if the tool slug ever
-        gets renamed.
-        """
-        rendered = MECH_CACHE_QUERY_TEMPLATE.format(
-            sender="0xabc",
-            prompt=json.dumps("Will X?"),
-            block_timestamp_gt=123,
+    def _make_behaviour_with_real_state(self) -> Any:
+        """Return a behaviour whose context.state carries a real dict + bool."""
+        # The shared ``_make_context`` uses ``MagicMock()`` for state,
+        # which silently swallows dict writes to ``req_to_callback``.
+        # These tests need real values.
+        b = _make_behaviour()
+        b.context.state.req_to_callback = {}
+        b.context.state.in_flight_req = False
+        return b
+
+    def test_timeout_pops_nonce_from_req_to_callback(self) -> None:
+        """When the watchdog fires, the caller's callback is popped so a late reply is inert."""
+        b = self._make_behaviour_with_real_state()
+        # Squeeze the watchdog so the test runs in a few ms of wall clock.
+        b.context.params.mech_cache_kv_request_timeout = 0.05
+        # Simulate an op that was fired and never replied.
+        b.context.state.in_flight_req = True
+        b.context.state.req_to_callback["stuck-nonce"] = (
+            lambda *_a, **_k: None,
+            {},
         )
-        assert "requests(" in rendered
-        assert "sender(id:" not in rendered
-        assert "nonce" not in rendered
-        assert "tool:" not in rendered
+
+        _exhaust_gen(b._wait_for_kv_reply("stuck-nonce"))
+
+        # Gate cleared so the scan cycle can proceed.
+        assert b.context.state.in_flight_req is False
+        # Callback popped so a late reply arriving after this point is
+        # inert -- the handler will see ``req_to_callback.pop(nonce)``
+        # return ``None`` and fall through to ``super().handle()``.
+        assert "stuck-nonce" not in b.context.state.req_to_callback
+
+    def test_normal_reply_leaves_unrelated_callbacks_alone(self) -> None:
+        """A normal (handler-cleared) reply exits the wait without touching other entries."""
+        # Under the healthy path, the KvStoreHandler pops the callback
+        # and clears the gate BEFORE ``_wait_for_kv_reply`` observes the
+        # transition; the timeout branch never runs. This test pins that
+        # ``_wait_for_kv_reply`` doesn't pop unrelated nonces on the
+        # happy path -- otherwise concurrent kv users in other skills
+        # would lose their callbacks.
+        b = self._make_behaviour_with_real_state()
+        b.context.params.mech_cache_kv_request_timeout = 5.0
+        # Gate already cleared by the (simulated) handler.
+        b.context.state.in_flight_req = False
+        # Some UNRELATED nonce sitting in the map (e.g. left over from
+        # another skill's kv usage). It must not be touched.
+        b.context.state.req_to_callback["other-op"] = (
+            lambda *_a, **_k: None,
+            {},
+        )
+
+        _exhaust_gen(b._wait_for_kv_reply("nonce-that-was-just-served"))
+
+        assert "other-op" in b.context.state.req_to_callback
 
 
 # ---------------------------------------------------------------------------

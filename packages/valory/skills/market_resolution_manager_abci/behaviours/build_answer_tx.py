@@ -19,7 +19,8 @@
 
 """This module contains the BuildAnswerTxBehaviour."""
 
-from typing import Generator, Optional, Tuple, cast
+import time
+from typing import Any, Generator, Optional, Tuple, cast
 
 from packages.valory.contracts.gnosis_safe.contract import GnosisSafeContract
 from packages.valory.contracts.multisend.contract import (
@@ -28,6 +29,7 @@ from packages.valory.contracts.multisend.contract import (
 )
 from packages.valory.contracts.realitio.contract import RealitioContract
 from packages.valory.protocols.contract_api import ContractApiMessage
+from packages.valory.skills.market_resolution_manager_abci import mech_cache
 from packages.valory.skills.market_resolution_manager_abci.behaviours.base import (
     MarketResolutionManagerBaseBehaviour,
     jury_error_discriminator,
@@ -109,10 +111,12 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
             mech_responses = self.synchronized_data.mech_responses
         else:
             mech_responses = []
+        matched_resp: Optional[Any] = None
         if mech_responses and expected_nonce:
             # Find the response matching our request (by nonce)
             for resp in mech_responses:
                 if resp.nonce == expected_nonce:
+                    matched_resp = resp
                     self.context.logger.info(
                         f"Market {market_id}: received Mech response -- "
                         f"result={resp.result}, error={resp.error}"
@@ -143,6 +147,19 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
             # Save DB with evaluation if matched
             questions_db[market_id] = entry
             self.questions_db = questions_db
+
+        # Durable "delivered" side of the kv_store row. Ships dark
+        # alongside the subgraph query until Phase 3 removes it. Only
+        # runs when we actually matched a response this cycle -- the
+        # non-match path leaves the row's ``result``/``delivered_at``
+        # null so the next scan sees "asked but not delivered yet".
+        if matched_resp is not None:
+            yield from self._buffer_mech_response_delivered(
+                market_id=market_id,
+                entry=entry,
+                nonce=expected_nonce,
+                resp=matched_resp,
+            )
 
         evaluation = entry.get("evaluation")
         now = int(self.last_synced_timestamp)
@@ -565,3 +582,64 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
         yield from self.send_a2a_transaction(payload)
         yield from self.wait_until_round_end()
         self.set_done()
+
+    def _buffer_mech_response_delivered(
+        self,
+        market_id: str,
+        entry: dict,
+        nonce: str,
+        resp: Any,
+    ) -> Generator[None, None, None]:
+        """Update the kv_store row for this nonce with the delivered response.
+
+        kv_store's CREATE_OR_UPDATE_REQUEST overwrites the whole value,
+        so we rebuild the full row from what we have on hand. ``entry``
+        was set at fire time by ``evaluate_answers`` with ``mech_fired_at``
+        stashed; on the post-restart path (agent restarted between fire
+        and delivery) that stash is gone and we fall back to ``now``, which
+        makes the delivery row's ``fired_at`` slightly less accurate but
+        does not affect the "have I asked?" cache -- the row simply
+        exists with ``delivered_at`` set.
+
+        Best-effort: kv failure here is logged and swallowed. A future
+        cycle will still see ``synchronized_data.mech_responses`` empty
+        (because build_answer_tx already consumed it via the FSM), and
+        the market will be re-fired only if the cache miss persists past
+        the retry cooldown.
+
+        :param market_id: the Omen market id being answered.
+        :param entry: the questions_db entry, needed for
+            ``mech_fired_at`` and ``title``.
+        :param nonce: the fire-time uuid4, also the row PK.
+        :param resp: the MechInteractionResponse matched by nonce.
+        :yield: control to the FSM while the kv write is in flight.
+        """
+        safe_address = self.synchronized_data.safe_contract_address or ""
+        fired_at = int(entry.get("mech_fired_at") or time.time())
+        prompt = str(entry.get("title") or "")
+        key = mech_cache.cache_key(
+            prefix=self.params.mech_cache_key_prefix,
+            safe_address=safe_address,
+            market_id=market_id,
+            nonce=nonce,
+        )
+        value = mech_cache.serialize_row(
+            safe_address=safe_address,
+            market_id=market_id,
+            nonce=nonce,
+            tool=self.params.mech_tool_resolve_market,
+            prompt=prompt,
+            fired_at=fired_at,
+            result=resp.result,
+            error=resp.error,
+            delivered_at=int(time.time()),
+        )
+        ok = yield from self._send_kv_write(key=key, value=value)
+        if not ok:
+            self.context.logger.warning(
+                "kv_store delivery update for market=%s nonce=%s failed. "
+                "Cache miss on the next cycle would re-fire this market "
+                "unless another agent's row landed.",
+                market_id,
+                nonce,
+            )

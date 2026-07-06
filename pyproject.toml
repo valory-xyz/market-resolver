@@ -42,6 +42,10 @@ dependencies = [
     "setuptools>=78.0.1,<79",
     "py-multibase==1.0.3",
     "py-multicodec==0.2.1",
+    # kv-store connection uses peewee for its SQLite ORM. Version range
+    # tracks kv-store's own connection.yaml (==3.17.5 as of v0.7.0-rc1),
+    # loosened to a compatible range so we can pick up patch bumps.
+    "peewee>=3.17,<4",
 ]
 
 [project.urls]
@@ -64,9 +68,14 @@ prerelease = "allow"
 # omen_* resolution skills, and genai for the llm protocol + openai
 # connection.
 upstream_pins = [
-    "valory-xyz/mech-interact@v0.32.2",
+    "valory-xyz/mech-interact@v0.32.4-rc1",
     "valory-xyz/omen-protocol@v0.1.2",
     "valory-xyz/genai@v7.2.1",
+    # kv-store 0.7.0-rc1 is the first release that ships LIST/DELETE
+    # performatives + pagination. Needed for market-resolver's "have I
+    # asked this market?" cache (see docs/market_resolver_offchain_scope.md
+    # in autonolas-marketplace).
+    "valory-xyz/kv-store@0.7.0-rc1",
 ]
 # Content-based gitleaks allowlist — preferred over `gitleaks_extra_paths`
 # so the scanner still inspects skill source for genuine secrets (private

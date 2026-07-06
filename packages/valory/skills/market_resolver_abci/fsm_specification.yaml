@@ -18,9 +18,14 @@ alphabet_in:
 - NONE
 - NO_MAJORITY
 - NO_MARKETPLACE
+- OFFCHAIN_ALL_FAILED
+- OFFCHAIN_DEPOSIT_DONE
+- OFFCHAIN_DEPOSIT_NEEDED
+- OFFCHAIN_DONE
 - REALITIO_WITHDRAW_BONDS_TX_DONE
 - RESET_AND_PAUSE_TIMEOUT
 - RESET_TIMEOUT
+- RESPONSE_ROUND_TIMEOUT
 - ROUND_TIMEOUT
 - SKIP
 - SKIP_REQUEST
@@ -121,11 +126,14 @@ transition_func:
     (MechRequestRound, BUY_SUBSCRIPTION): MechPurchaseSubscriptionRound
     (MechRequestRound, DONE): RandomnessTransactionSubmissionRound
     (MechRequestRound, NO_MAJORITY): MechRequestRound
+    (MechRequestRound, OFFCHAIN_ALL_FAILED): ResetAndPauseRound
+    (MechRequestRound, OFFCHAIN_DEPOSIT_NEEDED): RandomnessTransactionSubmissionRound
+    (MechRequestRound, OFFCHAIN_DONE): MechResponseRound
     (MechRequestRound, ROUND_TIMEOUT): MechRequestRound
     (MechRequestRound, SKIP_REQUEST): ResetAndPauseRound
     (MechResponseRound, DONE): BuildAnswerTxRound
     (MechResponseRound, NO_MAJORITY): MechResponseRound
-    (MechResponseRound, ROUND_TIMEOUT): ResetAndPauseRound
+    (MechResponseRound, RESPONSE_ROUND_TIMEOUT): ResetAndPauseRound
     (MechVersionDetectionRound, NO_MAJORITY): MechVersionDetectionRound
     (MechVersionDetectionRound, NO_MARKETPLACE): MechRequestRound
     (MechVersionDetectionRound, ROUND_TIMEOUT): MechVersionDetectionRound
@@ -139,6 +147,7 @@ transition_func:
     (PostTransactionRound, MECH_REQUEST_DONE): MechResponseRound
     (PostTransactionRound, NONE): ResetAndPauseRound
     (PostTransactionRound, NO_MAJORITY): ResetAndPauseRound
+    (PostTransactionRound, OFFCHAIN_DEPOSIT_DONE): MechRequestRound
     (PostTransactionRound, REALITIO_WITHDRAW_BONDS_TX_DONE): ScanMarketsRound
     (PostTransactionRound, ROUND_TIMEOUT): ResetAndPauseRound
     (RandomnessTransactionSubmissionRound, DONE): SelectKeeperTransactionSubmissionARound

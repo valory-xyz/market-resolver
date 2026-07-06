@@ -7,6 +7,7 @@ alphabet_in:
 - MECH_REQUEST_DONE
 - NONE
 - NO_MAJORITY
+- OFFCHAIN_DEPOSIT_DONE
 - REALITIO_WITHDRAW_BONDS_TX_DONE
 - ROUND_TIMEOUT
 - SKIP
@@ -19,6 +20,7 @@ final_states:
 - FinishedWithFundsForwarderPostTxRound
 - FinishedWithMechPollRound
 - FinishedWithMechRequestRound
+- FinishedWithOffchainDepositPostTxRound
 - FinishedWithRealitioWithdrawBondsPostTxRound
 label: MarketResolutionManagerAbciApp
 start_states:
@@ -35,6 +37,7 @@ states:
 - FinishedWithFundsForwarderPostTxRound
 - FinishedWithMechPollRound
 - FinishedWithMechRequestRound
+- FinishedWithOffchainDepositPostTxRound
 - FinishedWithRealitioWithdrawBondsPostTxRound
 - PostTransactionRound
 - ScanMarketsRound
@@ -56,6 +59,7 @@ transition_func:
     (PostTransactionRound, MECH_REQUEST_DONE): FinishedWithMechPollRound
     (PostTransactionRound, NONE): FinishedResolutionRound
     (PostTransactionRound, NO_MAJORITY): FinishedResolutionRound
+    (PostTransactionRound, OFFCHAIN_DEPOSIT_DONE): FinishedWithOffchainDepositPostTxRound
     (PostTransactionRound, REALITIO_WITHDRAW_BONDS_TX_DONE): FinishedWithRealitioWithdrawBondsPostTxRound
     (PostTransactionRound, ROUND_TIMEOUT): FinishedResolutionRound
     (ScanMarketsRound, DONE): EvaluateAnswersRound

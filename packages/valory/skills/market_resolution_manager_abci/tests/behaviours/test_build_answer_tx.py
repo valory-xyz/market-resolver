@@ -111,6 +111,18 @@ def _make_behaviour(
     )
     patcher.start()
     behaviour._sd_patcher = patcher
+
+    # The kv_store delivery-write is best-effort side-effect from the FSM's
+    # perspective; these tests focus on evaluation parsing + tx-building,
+    # so stub it out. Dispatch/wait/handler coverage lives elsewhere:
+    # KvStoreHandler nonce lookup in tests/test_handlers.py, and the
+    # _wait_for_kv_reply pop-on-timeout in
+    # tests/behaviours/test_base.py::TestWaitForKvReplyTimeout.
+    def _noop_gen(*_a: Any, **_k: Any):  # type: ignore[no-untyped-def]
+        if False:  # pragma: no cover -- keep this a generator
+            yield None
+
+    behaviour._buffer_mech_response_delivered = _noop_gen  # type: ignore[assignment]
     return behaviour
 
 

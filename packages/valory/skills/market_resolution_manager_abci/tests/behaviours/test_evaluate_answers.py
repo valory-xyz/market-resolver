@@ -57,6 +57,17 @@ def _make_behaviour(
     )
     patcher.start()
     behaviour._sd_patcher = patcher
+
+    # The kv_store fire-write is best-effort from the FSM's perspective;
+    # these tests cover retry-counter + payload logic, so stub it out.
+    # Handler dispatch and wait/timeout coverage live in
+    # tests/test_handlers.py::TestKvStoreHandlerDispatch and
+    # tests/behaviours/test_base.py::TestWaitForKvReplyTimeout.
+    def _noop_gen(*_a: Any, **_k: Any):  # type: ignore[no-untyped-def]
+        if False:  # pragma: no cover -- keep this a generator
+            yield None
+
+    behaviour._buffer_mech_request_fired = _noop_gen  # type: ignore[assignment]
     return behaviour
 
 
