@@ -10,35 +10,35 @@ fingerprint:
   README.md: bafybeicebua5cqf3pfr34hy5mmnr6i7m7wgxlkzbto6woi5dkuv4fqbymi
   __init__.py: bafybeiedhf4rirdachml54zzde7nl3nhuwz4c5xwskrc5udfphefbrdsfu
   behaviours/__init__.py: bafybeignnrbklzekhqurn6ptli5zhzsov2qtdzr5se4xe4hqdywt2vbtvu
-  behaviours/base.py: bafybeidkcsproj2itxjplr5emtd5mm775cbaewxfs2ax4cpsupxu2ssfle
-  behaviours/build_answer_tx.py: bafybeigzazw4vv37wjuxnihvezyrelotihvkrhzv6ovdtgujx5hr2dk73q
-  behaviours/evaluate_answers.py: bafybeie2htenmx2fpyt67cvbj6s2ih4dciejlfju2q2y6slzysm2xkrqr4
+  behaviours/base.py: bafybeibgl6q7njxzty4xcvnwyrpsxae256ebk6z5nv2bn73ntf7h3ixw44
+  behaviours/build_answer_tx.py: bafybeihw6f65k5d357bk6jyhx65ldb6mnxicq6yq4a5vefzihytimiumde
+  behaviours/evaluate_answers.py: bafybeidre6uwpowhahcug42h5pchvml6s4y47m2dbe6b3n3ybzi3vkfjou
   behaviours/post_transaction.py: bafybeig7wndmyilfbwshtr2wmeluzr4rzl3uri656tu5if4ar7dta6wnei
   behaviours/round_behaviour.py: bafybeiecxju6t7zsojnrhrefy4a7c75lkbveoxcayntw6heacao2qqkfdm
-  behaviours/scan_markets.py: bafybeias6emiuptj7iyslpl3shpci2yw2vo3lshho6uw46ovzqe67y5724
+  behaviours/scan_markets.py: bafybeihw7eahm36y4jsb5siabfoa7vqykcudmaxde7e3fq6hcdrfhe2rqy
   dialogues.py: bafybeihoudfbpl4zj6de34rpagbzjrfh3nvjmdwnm2v4dkhnkxvvp77ta4
   fsm_specification.yaml: bafybeidel6ahx7syvu37eu22y4udmdtgjc6ra5auo5bujjiiclpcfgf4n4
   handlers.py: bafybeibqutcanxc3fto7l62btwk77np4xykd6rguobg4nqai7hzstja47a
-  mech_cache.py: bafybeieryi7ve3r4qvyanf7awpwb7yzuvu7abpjed3uavrhhyv2pjnfshe
-  models.py: bafybeihaow367ag72adyby7nny5pxb2a7wuoqfobi5gk5zautxad6dmvku
+  mech_cache.py: bafybeidnk3s2y4pfsxgbb6gv4gfkjppclcukmrs24mv6iupefhjhi4qaue
+  models.py: bafybeicc44j2jrziq6ltpsagzis3wt5iamhb3yatyh4w3t3v6lt36s574m
   payloads.py: bafybeih6zkrc5mnkpifctn4cg3myqr3qrdw5v42hg7ldfbuzw7gjbgeoja
   rounds.py: bafybeiarus542z5wbpgthn4bgxuyqyqediby7eli24uccck6ro6e5isymu
   states/__init__.py: bafybeiho5s4sehwxmgtp4ddgntnkxhjks5cflihdtag7zqy6btjrhzcyti
   states/base.py: bafybeibmobpd7u2zgca6ztjkhehbdzstuqts7lavjsd52gkqt6yglieo74
   tests/__init__.py: bafybeidpf4le7kmwrvl6u3s4yl2mrlznnu7scha3hvcpd3s2omwo7bdwkq
   tests/behaviours/__init__.py: bafybeierpqlj4wjvfsa2acmkibioivviqudq4ulu5ifuqwcvdcfewzdgau
-  tests/behaviours/conftest.py: bafybeidkqr5ockrncp2a25dsop2azlwcvdkjgmp6nd4poov4i6fpj4vy64
-  tests/behaviours/test_base.py: bafybeid7gawrind476ipu4gn32xf2n7uffyfupsucp5543mbj5j47b4hpi
+  tests/behaviours/conftest.py: bafybeigvvrqoq4lbfx67x2yuicyqlwdh3faxh2lubolxiy6odhnndyxd4m
+  tests/behaviours/test_base.py: bafybeifu2i3wox47cpievxm5rvpvylz55shyhxvqprqh6vjkpgat2esqta
   tests/behaviours/test_build_answer_tx.py: bafybeifzl2msolxllv4y54qaiv3ibpsslg6nxafujv2eisgnbuajpxcqru
-  tests/behaviours/test_evaluate_answers.py: bafybeig6zi54zqviv36ceagtod52ycvi7543eueoqzh4thet22vypcilha
+  tests/behaviours/test_evaluate_answers.py: bafybeig2myh6ca3xotqoqz2osrjjfemrdmn64jjlnocs6bxkfjygla3y7e
   tests/behaviours/test_post_transaction.py: bafybeibihvgozgvlrfyrkpq7gg3hpvzp5h7g633oggqnu5auqtnfyakbcy
   tests/behaviours/test_round_behaviour.py: bafybeifcvxp5vlshg4xbego4frjsahvvvmjebj5s27l5ba7eyijsxry7ka
   tests/behaviours/test_scan_markets.py: bafybeibtq3fno5xobfpwukipl3sqbgugavavbjxvpgu3wi6nsp3j2znbre
   tests/conftest.py: bafybeiaemzro7plaeklgfk5kvsw62kzgf5uym4e4xqcxwfwzqfcpnct4eq
   tests/test_dialogues.py: bafybeiaue4klz37jrmqlu46xj442v3mazx3fqmuay7thbakeyfy4ohrac4
   tests/test_handlers.py: bafybeib7pwsixawfob5razwu7cdek6npsri2zkqjwicsawehz2bqmt7bna
-  tests/test_mech_cache.py: bafybeig5botuorl2qncuyd44od6gotjcyvbwcwiauqnsoibgn3pbxvwqwi
-  tests/test_models.py: bafybeifi73pinx7c4znt7arsd3x72glowulvfcakia6yfa6c7jtwasokx4
+  tests/test_mech_cache.py: bafybeifgb6nirji45km7owtxbf4h2dwedhdrs2etl3ed5eeswuwfkrfsgi
+  tests/test_models.py: bafybeigv3plblcxdpqv4c2kx6qwagdbsxdw4cjqydihn4xt3ddnnm5wcbm
   tests/test_payloads.py: bafybeiakjhvniimjyynaeq3n3udkdnjcvm4tuzafyrirsvwjgwwqkxb5j4
   tests/test_rounds.py: bafybeicyvamo4xohu6zsrnbawe4secam6c7pirftapfwpqobmutfmjk45i
 fingerprint_ignore_patterns: []
@@ -112,6 +112,18 @@ models:
   kv_store_dialogues:
     args: {}
     class_name: KvStoreDialogues
+  mech_gnosis_subgraph:
+    args:
+      api_id: mech_gnosis
+      headers:
+        Content-Type: application/json
+      method: POST
+      parameters: {}
+      response_key: data:requests
+      response_type: list
+      retries: 5
+      url: https://api.subgraph.autonolas.tech/api/proxy/marketplace-gnosis
+    class_name: MechGnosisSubgraph
   params:
     args:
       watched_creator_addresses: []

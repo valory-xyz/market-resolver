@@ -56,6 +56,9 @@ def _make_context(questions_db: Any = None) -> MagicMock:
     context.params.watched_creator_addresses = ["0xCreator"]
     context.params.realitio_contract = "0x" + "11" * 20
     context.params.multisend_address = "0x" + "22" * 20
+    context.params.mech_cache_key_prefix = "market_resolver/"
+    context.params.mech_cache_list_page_size = 100
+    context.params.mech_cache_kv_request_timeout = 5.0
     context.omen_subgraph = MagicMock()
     context.omen_subgraph.get_spec.return_value = {
         "method": "POST",
@@ -66,6 +69,12 @@ def _make_context(questions_db: Any = None) -> MagicMock:
     context.realitio_subgraph.get_spec.return_value = {
         "method": "POST",
         "url": "https://api.thegraph.com/realitio",
+        "headers": {},
+    }
+    context.mech_gnosis_subgraph = MagicMock()
+    context.mech_gnosis_subgraph.get_spec.return_value = {
+        "method": "POST",
+        "url": "https://api.subgraph.autonolas.tech/api/proxy/marketplace-gnosis",
         "headers": {},
     }
     context.benchmark_tool = MagicMock()

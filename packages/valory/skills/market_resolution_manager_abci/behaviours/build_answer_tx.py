@@ -148,8 +148,8 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
             questions_db[market_id] = entry
             self.questions_db = questions_db
 
-        # Durable "delivered" side of the kv_store row. Ships dark
-        # alongside the subgraph query until Phase 3 removes it. Only
+        # Durable "delivered" side of the kv_store row -- the source of
+        # truth the next scan cycle reads instead of the subgraph. Only
         # runs when we actually matched a response this cycle -- the
         # non-match path leaves the row's ``result``/``delivered_at``
         # null so the next scan sees "asked but not delivered yet".

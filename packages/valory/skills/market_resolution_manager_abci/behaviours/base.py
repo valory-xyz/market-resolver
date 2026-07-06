@@ -22,7 +22,7 @@
 import json
 import time
 from abc import ABC
-from typing import Any, Dict, Generator, Optional, cast
+from typing import Any, Dict, Generator, List, Optional, Tuple, cast
 
 from packages.valory.connections.kv_store.connection import (
     PUBLIC_ID as KV_STORE_CONNECTION_PUBLIC_ID,
@@ -45,6 +45,60 @@ HTTP_OK = 200
 ANSWER_YES = "0x0000000000000000000000000000000000000000000000000000000000000000"
 ANSWER_NO = "0x0000000000000000000000000000000000000000000000000000000000000001"
 ANSWER_INVALID = "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+
+# GraphQL query template: prior Mech requests from our Safe for a given
+# prompt, scoped to blocks after the market closed (openingTimestamp).
+# Variables are inlined because the base helper only posts the `query` field.
+#
+# Used only for the one-time lazy seeding of the kv_store cache: when a
+# (safe, market) pair has no seed marker yet, the historical on-chain
+# requests are pulled from the subgraph and copied into the kv cache so
+# in-flight markets keep their retry budget across the migration. Live
+# reads come from the kv cache, not from this query.
+#
+# NOTE: the Mech Marketplace Gnosis subgraph stores the market question in
+# ``parsedRequest.prompt``, NOT in ``parsedRequest.questionTitle`` (which is
+# always empty for our requests). We filter on ``prompt`` accordingly.
+#
+# ``parsedRequest`` has no ``nonce`` field on this subgraph. Selecting it
+# makes the whole query error with ``data: null`` -- a previous version of
+# this template did exactly that, which silently disabled the retry-budget
+# gate (the extractor walked ``data.sender.requests`` against ``null`` and
+# got ``[]``, so ``len(requests) == 0`` every cycle no matter how many
+# requests had really been fired). Keep the projection to ``prompt`` and
+# ``tool`` only.
+#
+# Top-level ``requests`` (with ``sender:`` in the ``where`` clause) is
+# equivalent to ``sender(id) { requests(...) }`` on this subgraph -- both
+# return the same rows -- but the top-level form matches the pattern used
+# by watchdog and trader, and is what the framework's ``response_key:
+# data:requests`` walks.
+MECH_CACHE_QUERY_TEMPLATE = """
+{{
+  requests(
+    where: {{
+      sender: "{sender}"
+      parsedRequest_: {{ prompt: {prompt} }}
+      blockTimestamp_gt: "{block_timestamp_gt}"
+    }}
+    orderBy: blockTimestamp
+    orderDirection: asc
+    first: 1000
+  ) {{
+    id
+    blockTimestamp
+    parsedRequest {{
+      prompt
+      tool
+    }}
+    deliveries(orderBy: blockTimestamp, orderDirection: asc) {{
+      id
+      blockTimestamp
+      toolResponse
+    }}
+  }}
+}}
+"""
 
 
 def parse_mech_response(  # pylint: disable=too-many-return-statements
@@ -283,32 +337,83 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
             )
             return None
 
+    def get_mech_gnosis_subgraph_result(
+        self,
+        query: str,
+    ) -> Generator[None, None, Optional[List[Dict[str, Any]]]]:
+        """Query the Mech Marketplace Gnosis subgraph.
+
+        Only used to seed the kv_store cache once per (safe, market) pair;
+        see ``fetch_mech_requests_for_market``.
+
+        :param query: the GraphQL query string.
+        :yield: None
+        :return: the parsed + key-walked response, or None on error.
+        """
+        subgraph = self.context.mech_gnosis_subgraph
+        response = yield from self.get_http_response(
+            content=to_content(query),
+            **subgraph.get_spec(),
+        )
+
+        if response is None:
+            self.context.logger.error(
+                "Could not retrieve response from Mech Gnosis subgraph. "
+                "Response was None."
+            )
+            return None
+        if response.status_code != HTTP_OK:
+            self.context.logger.error(
+                f"Could not retrieve response from Mech Gnosis subgraph. "
+                f"Received status code {response.status_code}.\n{response}"
+            )
+            return None
+
+        return subgraph.process_response(response)
+
     def fetch_mech_requests_for_market(
         self, entry: Dict[str, Any]
     ) -> Generator[None, None, Optional[list]]:
         """Fetch prior Mech fires + deliveries for this market from kv_store.
 
-        Under the on-chain path this used to query the Mech Marketplace
-        Gnosis subgraph. Under the off-chain path the subgraph's
+        Under the on-chain path this queried the Mech Marketplace Gnosis
+        subgraph directly. Under the off-chain path the subgraph's
         ``parsedRequest.prompt`` and ``deliveries[].toolResponse`` go empty
         (the mech no longer publishes to IPFS), so the subgraph stops
-        answering "have I already asked this market?". The kv_store cache
-        (written by ``evaluate_answers._buffer_mech_request_fired`` and
-        updated by ``build_answer_tx._buffer_mech_response_delivered``)
-        replaces it. Same behaviour, both onchain and offchain: mech-interact
-        internally decides which mode to use and hides that from us.
+        answering "have I already asked this market?" for new requests.
+        The kv_store cache (written by
+        ``evaluate_answers._buffer_mech_request_fired`` and updated by
+        ``build_answer_tx._buffer_mech_response_delivered``) replaces it.
+        Same behaviour, both onchain and offchain: mech-interact internally
+        decides which mode to use and hides that from us.
+
+        The subgraph keeps one job: on the first read for a (safe, market)
+        pair (no seed marker row yet), its historical on-chain rows are
+        copied into the kv cache so an in-flight market keeps its retry
+        budget across the migration instead of being re-fired as a fresh
+        paid request. The marker is written only after every row upsert
+        succeeded, so a crash mid-seed re-seeds on the next cycle (the
+        upserts are idempotent: seeded keys are derived from immutable
+        subgraph request ids).
 
         Returns the same list-of-dicts shape the previous subgraph result
         did, so ``_earliest_valid_evaluation`` and the ``mech_retries``
         counter in ``scan_markets`` need zero changes.
 
         :param entry: the per-market state dict.
-        :yield: control to the FSM while LIST_REQUEST pages complete.
+        :yield: control to the FSM while kv_store and subgraph requests
+            complete.
         :return: rehydrated list of rows for this (safe, market) pair, or
-            ``None`` on kv_store error.
+            ``None`` on kv_store or subgraph error.
         """
         market_id = entry.get("market_id") or ""
         safe_address = self.synchronized_data.safe_contract_address or ""
+
+        seeded = yield from self._ensure_market_seeded(
+            entry, safe_address, str(market_id)
+        )
+        if not seeded:
+            return None
 
         prefix = mech_cache.list_prefix(
             prefix=self.params.mech_cache_key_prefix,
@@ -335,6 +440,102 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
             if (req.get("parsedRequest") or {}).get("tool") == expected_tool
             and (req.get("parsedRequest") or {}).get("prompt") == expected_prompt
         ]
+
+    def _ensure_market_seeded(
+        self,
+        entry: Dict[str, Any],
+        safe_address: str,
+        market_id: str,
+    ) -> Generator[None, None, bool]:
+        """Seed the kv cache from the subgraph once per (safe, market) pair.
+
+        Exactly-once is keyed on the seed marker row, not on "is the kv
+        namespace empty": an empty namespace is also the normal state of
+        a brand-new market that has no history anywhere, and treating it
+        as "needs seeding" would re-query the subgraph on every scan of
+        every fresh market forever.
+
+        Order matters: rows first, marker last. If the process dies
+        mid-seed the marker is absent on the next cycle and the whole
+        pass re-runs; row upserts are idempotent because seeded keys are
+        derived from immutable subgraph request ids.
+
+        :param entry: the per-market state dict.
+        :param safe_address: the requester Safe address.
+        :param market_id: the Omen market id.
+        :yield: control to the FSM while kv_store and subgraph requests
+            complete.
+        :return: True if the cache is known to be seeded, False on any
+            kv_store or subgraph error (callers must treat the cache as
+            unreadable this cycle rather than risk a duplicate paid fire).
+        """
+        marker_key = mech_cache.seed_marker_key(
+            prefix=self.params.mech_cache_key_prefix,
+            safe_address=safe_address,
+            market_id=market_id,
+        )
+        marker = yield from self._send_kv_read((marker_key,))
+        if marker is None:
+            return False
+        if marker_key in marker:
+            return True
+
+        title = entry.get("title") or ""
+        closing_ts = entry.get("market_closing_timestamp") or 0
+        query = MECH_CACHE_QUERY_TEMPLATE.format(
+            sender=safe_address.lower(),
+            prompt=json.dumps(title),
+            block_timestamp_gt=int(closing_ts),
+        )
+        historical = yield from self.get_mech_gnosis_subgraph_result(query)
+        if historical is None:
+            return False
+
+        written = 0
+        for row in historical:
+            converted = mech_cache.subgraph_row_to_cache_row(row)
+            if converted is None:
+                self.context.logger.warning(
+                    f"Skipping unusable subgraph row while seeding market "
+                    f"{market_id}: {row!r}"
+                )
+                continue
+            key = mech_cache.cache_key(
+                prefix=self.params.mech_cache_key_prefix,
+                safe_address=safe_address,
+                market_id=market_id,
+                nonce=converted["nonce"],
+            )
+            value = mech_cache.serialize_row(
+                safe_address=safe_address,
+                market_id=market_id,
+                **converted,
+            )
+            ok = yield from self._send_kv_write(key, value)
+            if not ok:
+                self.context.logger.error(
+                    f"kv_store write failed while seeding market {market_id}; "
+                    "marker not written, seeding will re-run next cycle."
+                )
+                return False
+            written += 1
+
+        marker_value = json.dumps(
+            {"seeded_at": self.last_synced_timestamp, "rows": written},
+            sort_keys=True,
+        )
+        ok = yield from self._send_kv_write(marker_key, marker_value)
+        if not ok:
+            self.context.logger.error(
+                f"kv_store write failed for the seed marker of market "
+                f"{market_id}; seeding will re-run next cycle."
+            )
+            return False
+        self.context.logger.info(
+            f"Seeded {written} historical mech request row(s) for market "
+            f"{market_id} from the Mech Gnosis subgraph."
+        )
+        return True
 
     def _wait_for_kv_reply(self, nonce: str) -> Generator[None, None, None]:
         """Block until the kv_store handler clears the single in-flight gate.
@@ -404,6 +605,42 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
         self.context.outbox.put_message(message=msg)
         yield from self._wait_for_kv_reply(nonce)
         return outcome["ok"]
+
+    def _send_kv_read(
+        self,
+        keys: Tuple[str, ...],
+    ) -> Generator[None, None, Optional[Dict[str, str]]]:
+        """READ kv_store keys and block until the reply lands.
+
+        The connection only returns rows that exist, so a missing key is
+        simply absent from the returned mapping. That keeps "key not
+        present" (absent from the dict) distinguishable from "read
+        failed" (``None``) -- callers gating on key existence must not
+        collapse the two.
+
+        :param keys: the fully-namespaced kv_store keys to read.
+        :yield: control to the FSM until the reply lands.
+        :return: mapping of existing keys to their values, or ``None``
+            on ERROR / no-reply.
+        """
+        result: Dict[str, Any] = {}
+
+        def _cb(reply: KvStoreMessage, _dlg: Any) -> None:
+            if reply.performative == KvStoreMessage.Performative.READ_RESPONSE:
+                result["data"] = dict(reply.data)
+
+        state = cast(SharedState, self.context.state)
+        msg, dlg = self.context.kv_store_dialogues.create(
+            counterparty=str(KV_STORE_CONNECTION_PUBLIC_ID),
+            performative=KvStoreMessage.Performative.READ_REQUEST,
+            keys=keys,
+        )
+        nonce = dlg.dialogue_label.dialogue_reference[0]
+        state.req_to_callback[nonce] = (_cb, {})
+        state.in_flight_req = True
+        self.context.outbox.put_message(message=msg)
+        yield from self._wait_for_kv_reply(nonce)
+        return result.get("data")
 
     def _send_kv_list(
         self,

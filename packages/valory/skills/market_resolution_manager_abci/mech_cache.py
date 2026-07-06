@@ -33,6 +33,16 @@ Propel-provisioned PVC). Writes happen at fire time
 Reads happen once per scan cycle (``scan_markets``) via a prefixed
 ``LIST_REQUEST``.
 
+**Migration seeding.** The kv store starts empty on the first deploy of
+the off-chain path, but in-flight markets may already have on-chain
+request history that only the subgraph knows about. To avoid re-firing
+paid requests for those markets, ``fetch_mech_requests_for_market``
+lazily seeds the cache once per (safe, market) pair: if no seed marker
+row exists (``seed_marker_key``), the historical rows are pulled from
+the subgraph, converted with ``subgraph_row_to_cache_row``, upserted,
+and the marker written last. The marker key lives outside the row LIST
+prefix so it never shows up in row listings.
+
 The row schema mirrors the fields the downstream code
 (``_earliest_valid_evaluation`` and the retry counter) already expects
 from the old subgraph return shape, so callers don't need to change:
@@ -89,6 +99,80 @@ def list_prefix(prefix: str, safe_address: str, market_id: str) -> str:
     :return: the prefix suitable for LIST_REQUEST.key_prefix.
     """
     return f"{prefix}{safe_address.lower()}/{market_id}/"
+
+
+def seed_marker_key(prefix: str, safe_address: str, market_id: str) -> str:
+    """Return the kv_store key of the one-time seed marker for a market.
+
+    Presence of this key means "the subgraph history for this
+    (safe, market) pair has already been copied into the kv cache";
+    its value is informational only. The key is deliberately outside
+    the ``list_prefix`` namespace (``{prefix}{safe}/{market_id}/``) so
+    a row LIST never returns it: ``seeded`` can't collide with a safe
+    address segment because addresses are ``0x``-prefixed hex.
+
+    :param prefix: operator-configured key namespace.
+    :param safe_address: the requester Safe address; normalised to lowercase.
+    :param market_id: the Omen market id.
+    :return: the fully-namespaced marker key.
+    """
+    return f"{prefix}seeded/{safe_address.lower()}/{market_id}"
+
+
+def subgraph_row_to_cache_row(row: Any) -> Optional[Dict[str, Any]]:
+    """Convert one verbatim subgraph request entry to cache-row fields.
+
+    Maps the subgraph request ``id`` to the row ``nonce`` (so seeded
+    rows and kv-native rows share a keyspace without collisions --
+    subgraph ids are tx-hash-derived, live nonces are uuid4), and the
+    earliest delivery (the query orders deliveries ascending) to the
+    ``result`` / ``delivered_at`` pair. ``error`` is always ``None``:
+    the subgraph has no error field, and a garbage payload is handled
+    downstream by ``parse_mech_response`` exactly as it was on the
+    on-chain path.
+
+    Never raises. A malformed entry (missing id, non-numeric
+    timestamps) returns ``None`` so the seeding pass skips it instead
+    of crashing the scan cycle.
+
+    :param row: one entry from the subgraph ``requests`` list.
+    :return: kwargs for :func:`serialize_row` (minus ``safe_address``
+        and ``market_id``), or ``None`` if the entry is unusable.
+    """
+    if not isinstance(row, dict):
+        return None
+    nonce = row.get("id")
+    if not isinstance(nonce, str) or not nonce:
+        return None
+    parsed_request = row.get("parsedRequest") or {}
+    if not isinstance(parsed_request, dict):
+        return None
+    try:
+        fired_at = int(row.get("blockTimestamp"))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+    result: Optional[str] = None
+    delivered_at: Optional[int] = None
+    deliveries = row.get("deliveries") or []
+    if isinstance(deliveries, list) and deliveries:
+        delivery = deliveries[0]
+        if isinstance(delivery, dict):
+            try:
+                delivered_at = int(delivery.get("blockTimestamp"))  # type: ignore[arg-type]
+                result = delivery.get("toolResponse")
+            except (TypeError, ValueError):
+                delivered_at = None
+
+    return {
+        "nonce": nonce,
+        "tool": parsed_request.get("tool") or "",
+        "prompt": parsed_request.get("prompt") or "",
+        "fired_at": fired_at,
+        "result": result,
+        "error": None,
+        "delivered_at": delivered_at,
+    }
 
 
 def serialize_row(

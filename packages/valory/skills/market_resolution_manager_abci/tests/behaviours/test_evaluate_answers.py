@@ -22,17 +22,28 @@
 # pylint: disable=protected-access
 
 import json
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from unittest.mock import PropertyMock, patch
 
+from packages.valory.skills.market_resolution_manager_abci import mech_cache
 from packages.valory.skills.market_resolution_manager_abci.behaviours.base import (
     ANSWER_YES,
 )
 from packages.valory.skills.market_resolution_manager_abci.behaviours.evaluate_answers import (
     EvaluateAnswersBehaviour,
+    MAX_KV_WRITE_ATTEMPTS,
 )
 
-from .conftest import _make_context, _make_gen, _make_synced_data
+from .conftest import (
+    SAFE_ADDRESS,
+    _exhaust_gen,
+)
+from .conftest import _make_behaviour as _make_shared_behaviour
+from .conftest import (
+    _make_context,
+    _make_gen,
+    _make_synced_data,
+)
 
 NOW = 1_700_000_000
 
@@ -336,3 +347,104 @@ class TestEvaluateAnswersBehaviour:
         # string -- the value itself is irrelevant to this test.
         assert isinstance(b.questions_db["0xM"]["pending_nonce"], str)
         assert b.questions_db["0xM"]["pending_nonce"] != ""
+
+
+class _FlakyKvWrite:
+    """kv-write double: scripted per-call outcomes, records each (key, value).
+
+    Stands in for ``_send_kv_write`` at the process boundary; the retry
+    loop, key derivation and row serialization under test all run for
+    real.
+    """
+
+    def __init__(self, outcomes: List[bool]) -> None:
+        self.outcomes = list(outcomes)
+        self.calls: List[Tuple[str, str]] = []
+
+    def __call__(self, key: str, value: str) -> Any:
+        """Record the write and return the next scripted outcome."""
+        self.calls.append((key, value))
+        return self.outcomes.pop(0)
+        yield  # noqa: unreachable -- makes this a generator function
+
+
+class TestBufferMechRequestFiredRetry:
+    """Tests for the retried fire-time kv write (spec 5.3)."""
+
+    _MARKET_ID = "0xM"
+    _NONCE = "n1"
+    _PROMPT = "Will X?"
+    _FIRED_AT = NOW
+
+    def _run(self, kv: _FlakyKvWrite) -> EvaluateAnswersBehaviour:
+        """Run ``_buffer_mech_request_fired`` against the kv double."""
+        # The shared factory does NOT stub _buffer_mech_request_fired
+        # (unlike this module's local one) -- the retry loop is the
+        # subject under test here.
+        b = _make_shared_behaviour(EvaluateAnswersBehaviour)
+        with (
+            patch.object(b, "_send_kv_write", new=kv),
+            patch.object(b, "sleep", new=_make_gen(None)),
+        ):
+            _exhaust_gen(
+                b._buffer_mech_request_fired(
+                    market_id=self._MARKET_ID,
+                    nonce=self._NONCE,
+                    prompt=self._PROMPT,
+                    fired_at=self._FIRED_AT,
+                )
+            )
+        return b
+
+    def _warning_messages(self, b: EvaluateAnswersBehaviour) -> List[str]:
+        return [c.args[0] for c in b.context.logger.warning.call_args_list]
+
+    def test_transient_failure_retries_until_success(self) -> None:
+        """Two failures then a success -> 3 identical writes, no give-up warning."""
+        kv = _FlakyKvWrite([False, False, True])
+
+        b = self._run(kv)
+
+        assert len(kv.calls) == MAX_KV_WRITE_ATTEMPTS
+        # Every attempt must retry the SAME row -- a drifting key or
+        # value would fragment the "have I asked this market?" record.
+        assert len(set(kv.calls)) == 1
+        key, value = kv.calls[0]
+        assert key == mech_cache.cache_key(
+            prefix="market_resolver/",
+            safe_address=SAFE_ADDRESS,
+            market_id=self._MARKET_ID,
+            nonce=self._NONCE,
+        )
+        row = json.loads(value)
+        assert row["nonce"] == self._NONCE
+        assert row["prompt"] == self._PROMPT
+        assert row["fired_at"] == self._FIRED_AT
+        assert row["delivered_at"] is None
+        warnings = self._warning_messages(b)
+        assert sum("retrying" in w for w in warnings) == 2
+        assert not any("failed after" in w for w in warnings)
+
+    def test_first_attempt_success_writes_once(self) -> None:
+        """A healthy store gets exactly one write and zero warnings."""
+        kv = _FlakyKvWrite([True])
+
+        b = self._run(kv)
+
+        assert len(kv.calls) == 1
+        assert self._warning_messages(b) == []
+
+    def test_all_attempts_fail_swallows_with_final_warning(self) -> None:
+        """All attempts fail -> bounded at MAX_KV_WRITE_ATTEMPTS, final warning, no raise.
+
+        The FSM must still transition into the mech request round; the
+        miss is bounded by max_mech_retries (see the production
+        docstring), so the loop swallows the failure instead of raising.
+        """
+        kv = _FlakyKvWrite([False] * MAX_KV_WRITE_ATTEMPTS)
+
+        b = self._run(kv)
+
+        assert len(kv.calls) == MAX_KV_WRITE_ATTEMPTS
+        warnings = self._warning_messages(b)
+        assert any("failed after" in w for w in warnings)

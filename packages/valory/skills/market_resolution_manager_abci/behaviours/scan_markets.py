@@ -180,17 +180,19 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             else:
                 questions_db[market_id] = self._new_entry(market, current_answerer, now)
 
-        # Step 5: Refresh mech_requests cache from the Mech Gnosis subgraph.
-        # We re-query every scan so that:
+        # Step 5: Refresh mech_requests from the kv_store cache (which is
+        # lazily seeded from the Mech Gnosis subgraph the first time each
+        # market is read; see ``fetch_mech_requests_for_market``).
+        # We re-read every scan so that:
         # 1. Late deliveries (responses that arrive after our in-process
         #    ``mech_response_round`` timed out) are still picked up.
         #    Otherwise a Mech that is slow but eventually responsive forces
         #    us to re-request the same market forever.
-        # 2. ``mech_retries`` converges to ``len(mech_requests)`` once the
-        #    subgraph catches up, so the exhaustion gate survives restarts.
-        #    The ``max()`` below guarantees the counter is monotonic: a brief
-        #    subgraph-indexing-lag right after ``evaluate_answers`` fires
-        #    a request can never lower the count back below the local value.
+        # 2. ``mech_retries`` converges to ``len(mech_requests)`` after a
+        #    restart, so the exhaustion gate survives losing in-memory
+        #    state. The ``max()`` below guarantees the counter is
+        #    monotonic: a fire whose kv write failed can never lower the
+        #    count back below the local value.
         for _, entry in questions_db.items():
             requests = yield from self.fetch_mech_requests_for_market(entry)
             if requests is None:
@@ -218,8 +220,8 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             # evaluation, skips the Mech request, and build_answer_tx
             # only re-sets retry_after -- the market never progresses
             # past 1 on-chain Mech request and gets stuck in a daily
-            # zombie loop. ``mech_requests`` is sourced from the subgraph
-            # each scan; do not mutate it here.
+            # zombie loop. ``mech_requests`` is sourced from the kv_store
+            # cache each scan; do not mutate it here.
             if evaluation is not None and mech_answer is None:
                 entry["evaluation"] = None
 

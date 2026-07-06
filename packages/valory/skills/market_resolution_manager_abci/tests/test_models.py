@@ -27,6 +27,7 @@ import pytest
 
 from packages.valory.skills.market_resolution_manager_abci.models import (
     MarketResolutionManagerParams,
+    MechGnosisSubgraph,
     SharedState,
 )
 
@@ -213,3 +214,11 @@ class TestSharedState:
         )
 
         assert RealitioWithdrawBondsSharedState in SharedState.__mro__
+
+
+class TestMechGnosisSubgraph:
+    """Tests for MechGnosisSubgraph."""
+
+    def test_import(self) -> None:
+        """Test that MechGnosisSubgraph can be imported."""
+        assert MechGnosisSubgraph is not None

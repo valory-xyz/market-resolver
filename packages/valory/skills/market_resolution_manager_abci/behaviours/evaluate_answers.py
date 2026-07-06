@@ -37,6 +37,11 @@ from packages.valory.skills.market_resolution_manager_abci.rounds import (
 )
 from packages.valory.skills.mech_interact_abci.states.base import MechMetadata
 
+# Fire-time kv writes guard against duplicate paid mech requests, so a
+# transient failure is retried a few times before being swallowed.
+MAX_KV_WRITE_ATTEMPTS = 3
+KV_WRITE_RETRY_SLEEP_SECONDS = 0.2
+
 
 class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
     """Behaviour to decide: request Mech or reuse existing evaluation data.
@@ -129,14 +134,12 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
         self.questions_db = questions_db
 
         # Durable record of this fire so the next scan cycle sees "yes, I
-        # already asked" without depending on the mech subgraph (which
-        # under the off-chain path stops carrying prompt / toolResponse).
-        # Best-effort: a kv_store failure here is logged but does not
-        # block the mech request itself -- the FSM would just fall back
-        # to the subgraph in Phase 1's coexistence window. Once the
-        # subgraph read is removed in Phase 3, this write becomes the
-        # single source of truth and a failure here means the next cycle
-        # would re-fire the request, bounded by max_mech_retries.
+        # already asked" without re-firing a paid request. The kv row is
+        # the single source of truth for fires made on the off-chain
+        # path (the subgraph is only consulted once per market, to seed
+        # pre-migration history), so the write is retried before giving
+        # up. If it still fails, the next cycle may re-fire this market,
+        # bounded by max_mech_retries.
         yield from self._buffer_mech_request_fired(
             market_id=market_id,
             nonce=nonce,
@@ -154,11 +157,14 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
         prompt: str,
         fired_at: int,
     ) -> Generator[None, None, None]:
-        """Write the "just fired" row into kv_store.
+        """Write the "just fired" row into kv_store, retrying before giving up.
 
-        Ships dark alongside the subgraph read until Phase 3 removes the
-        subgraph. Write failure is logged and swallowed so the FSM
-        transitions into the mech request round regardless.
+        This row is what stops the next scan cycle from re-firing a paid
+        request for the same market, so a transient failure (SQLite lock
+        contention, a dropped reply envelope) is worth retrying. After
+        ``MAX_KV_WRITE_ATTEMPTS`` failures the miss is logged and
+        swallowed so the FSM transitions into the mech request round
+        regardless; the damage is bounded by max_mech_retries.
 
         :param market_id: the Omen market id being asked about.
         :param nonce: the uuid4 generated at fire time; used as the row PK
@@ -166,7 +172,7 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
         :param prompt: the market title as sent to the mech.
         :param fired_at: epoch seconds; passed in rather than sampled here
             so the entry-side stash and the kv row share the same value.
-        :yield: control to the FSM while the kv write is in flight.
+        :yield: control to the FSM while the kv writes are in flight.
         """
         safe_address = self.synchronized_data.safe_contract_address or ""
         key = mech_cache.cache_key(
@@ -183,15 +189,28 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
             prompt=prompt,
             fired_at=fired_at,
         )
-        ok = yield from self._send_kv_write(key=key, value=value)
-        if not ok:
-            self.context.logger.warning(
-                "kv_store write for market=%s nonce=%s failed; the next "
-                "scan cycle may re-request this market. Bounded by "
-                "max_mech_retries.",
-                market_id,
-                nonce,
-            )
+        for attempt in range(1, MAX_KV_WRITE_ATTEMPTS + 1):
+            ok = yield from self._send_kv_write(key=key, value=value)
+            if ok:
+                return
+            if attempt < MAX_KV_WRITE_ATTEMPTS:
+                self.context.logger.warning(
+                    "kv_store write for market=%s nonce=%s failed "
+                    "(attempt %d/%d); retrying.",
+                    market_id,
+                    nonce,
+                    attempt,
+                    MAX_KV_WRITE_ATTEMPTS,
+                )
+                yield from self.sleep(KV_WRITE_RETRY_SLEEP_SECONDS)
+        self.context.logger.warning(
+            "kv_store write for market=%s nonce=%s failed after %d "
+            "attempts; the next scan cycle may re-request this market. "
+            "Bounded by max_mech_retries.",
+            market_id,
+            nonce,
+            MAX_KV_WRITE_ATTEMPTS,
+        )
 
     def _send_payload(
         self,
