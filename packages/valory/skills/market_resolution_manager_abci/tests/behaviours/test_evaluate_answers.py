@@ -325,7 +325,7 @@ class TestEvaluateAnswersBehaviour:
         Refactor: ``evaluate_answers`` no longer persists the full
         ``mech_request`` dict (tool / prompt / nonce) -- only the nonce
         via ``entry['pending_nonce']``. The canonical source for tool +
-        prompt is now the subgraph re-fetch in ``scan_markets`` (see
+        prompt is now the kv mech-cache re-read in ``scan_markets`` (see
         ``fetch_mech_requests_for_market`` -> ``mech_requests``).
         """
         entry = _base_entry()

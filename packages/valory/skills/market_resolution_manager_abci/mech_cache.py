@@ -49,9 +49,9 @@ from the old subgraph return shape, so callers don't need to change:
 ``rehydrate_to_subgraph_shape`` turns a batch of kv rows into a list of
 dicts identical in shape to what the removed subgraph query returned.
 
-**Rows are never pruned in this PR.** Nothing sends ``DELETE_REQUEST``
-today; the store grows on every fired mech request and only shrinks on a
-fresh redeploy (which starts from an empty PVC). Reads stay cheap
+**Rows are never pruned.** Nothing sends ``DELETE_REQUEST``; the store
+grows on every fired mech request and only shrinks on a fresh redeploy
+(which starts from an empty PVC). Reads stay cheap
 because ``LIST_REQUEST`` is scoped to a per-market prefix, but the raw
 size grows with the fleet's lifetime request volume. Pruning is a
 planned follow-up:

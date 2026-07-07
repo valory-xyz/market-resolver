@@ -373,7 +373,7 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
 
     def fetch_mech_requests_for_market(
         self, entry: Dict[str, Any]
-    ) -> Generator[None, None, Optional[list]]:
+    ) -> Generator[None, None, Optional[List[Dict[str, Any]]]]:
         """Fetch prior Mech fires + deliveries for this market from kv_store.
 
         Under the on-chain path this queried the Mech Marketplace Gnosis
@@ -490,6 +490,21 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
         historical = yield from self.get_mech_gnosis_subgraph_result(query)
         if historical is None:
             return False
+        # Shape-drift guard: ``ApiSpecs.process_response`` returns Any, so a
+        # ``response_key`` misconfiguration (or a subgraph replica shipping a
+        # dict envelope where we expect the list) would fall through to the
+        # for-loop below, iterate string keys, and every "row" would fail
+        # the isinstance check inside subgraph_row_to_cache_row -- writing
+        # a marker with ``rows: 0`` and permanently masking real history.
+        if not isinstance(historical, list):
+            self.context.logger.error(
+                "Subgraph result for market %s has unexpected shape "
+                "%s; expected list. Refusing to seed to avoid a bogus "
+                "zero-row marker.",
+                market_id,
+                type(historical).__name__,
+            )
+            return False
 
         written = 0
         for row in historical:
@@ -519,6 +534,28 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
                 )
                 return False
             written += 1
+
+        # If we saw non-empty historical rows but none of them were usable,
+        # writing the marker with ``rows: 0`` would permanently mask the
+        # market's real pre-migration history: every future scan would
+        # short-circuit at the marker check and never re-attempt seeding.
+        # That defeats the whole point of this feature (protecting an
+        # in-flight market's retry budget across the migration), so treat
+        # a total-loss row set as a seeding failure and skip the marker.
+        # The genuinely-fresh case (empty historical + rows==0) is still
+        # marked as seeded so we don't re-query the subgraph forever.
+        if written == 0 and len(historical) > 0:
+            self.context.logger.error(
+                "Subgraph returned %d historical rows for market %s but "
+                "none were usable (schema drift or garbage). Skipping the "
+                "seed marker so the next scan cycle retries; otherwise the "
+                "market's real fire history would be permanently invisible "
+                "and it could be re-requested (paid) up to "
+                "``max_mech_retries`` times.",
+                len(historical),
+                market_id,
+            )
+            return False
 
         marker_value = json.dumps(
             {"seeded_at": self.last_synced_timestamp, "rows": written},
@@ -605,6 +642,57 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
         self.context.outbox.put_message(message=msg)
         yield from self._wait_for_kv_reply(nonce)
         return outcome["ok"]
+
+    def _send_kv_write_with_retries(
+        self,
+        key: str,
+        value: str,
+        max_attempts: int,
+        sleep_seconds: float,
+        retry_label: str,
+    ) -> Generator[None, None, bool]:
+        """Upsert with a bounded retry loop over transient KV failures.
+
+        Both the fire-time and delivery-time cache writes protect against
+        the same failure class: a lost write can leave the "have I already
+        asked/answered this market?" cache stale, which risks a duplicate
+        paid mech request on the next scan. Sharing one helper keeps that
+        contract in one place -- per-attempt failures log at ``WARNING``,
+        the final give-up logs at ``ERROR`` so operators watching for
+        financial-loss signals see it without filtering retry chatter.
+
+        :param key: the fully-namespaced kv_store key.
+        :param value: the JSON-serialised row payload.
+        :param max_attempts: total attempts including the first one.
+        :param sleep_seconds: pause between attempts.
+        :param retry_label: prefix for the log messages so operators can
+            tell fire-time and delivery-time failures apart in prod logs.
+        :yield: control to the FSM while attempts are in flight.
+        :return: True if any attempt succeeded, False after all failed.
+        """
+        for attempt in range(1, max_attempts + 1):
+            ok = yield from self._send_kv_write(key=key, value=value)
+            if ok:
+                return True
+            if attempt < max_attempts:
+                self.context.logger.warning(
+                    "%s kv_store write for key=%s failed (attempt %d/%d); " "retrying.",
+                    retry_label,
+                    key,
+                    attempt,
+                    max_attempts,
+                )
+                yield from self.sleep(sleep_seconds)
+        # ERROR (not WARNING) because the give-up may cause a duplicate
+        # paid mech call on the next cycle -- a financial-loss signal
+        # that shouldn't sit at the same level as the retry chatter.
+        self.context.logger.error(
+            "%s kv_store write for key=%s failed after %d attempts.",
+            retry_label,
+            key,
+            max_attempts,
+        )
+        return False
 
     def _send_kv_read(
         self,

@@ -1099,6 +1099,73 @@ class TestEnsureMarketSeeded:
         assert result[0]["id"] == "0xreq-good"
         assert self._MARKER_KEY in kv.data
 
+    def test_all_rows_unusable_refuses_marker(self) -> None:
+        """Schema drift making every row unusable must NOT write a marker.
+
+        Regression for the "all-unusable + marker written" bug: if every
+        historical row fails ``subgraph_row_to_cache_row`` (rename,
+        indexer garbage, response_key drift), the pre-fix code wrote the
+        marker with ``rows: 0`` and future scans short-circuited on the
+        marker check. That would permanently mask the market's real
+        pre-migration retry history and re-expose it to duplicate paid
+        requests. The fix skips the marker so the next cycle retries.
+        """
+        kv = _FakeKvStore()
+        # Every row unusable -- missing 'id' fails the shape guard.
+        subgraph = _SubgraphStub(
+            [
+                {"id": None, "blockTimestamp": "x"},
+                {"id": None, "blockTimestamp": "y"},
+            ]
+        )
+        b, stack = self._wired_behaviour(kv, subgraph)
+        with stack:
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+
+        # Fail-closed: callers must treat the cache as unreadable.
+        assert result is None
+        # Crucially, the marker was NOT written -- next scan retries.
+        assert self._MARKER_KEY not in kv.data
+
+    def test_non_list_historical_refuses_marker(self) -> None:
+        """Shape-drift guard: dict-shaped subgraph response is refused.
+
+        ``ApiSpecs.process_response`` returns ``Any``. If a subgraph
+        replica or a ``response_key`` misconfiguration hands us back a
+        dict envelope instead of a list, the pre-fix code iterated its
+        string keys, every "row" failed the isinstance check, and the
+        empty-rows marker was written. The guard treats a non-list as a
+        seeding failure so the next cycle retries against a healthy
+        indexer.
+        """
+        kv = _FakeKvStore()
+        # A dict where a list was expected.
+        subgraph = _SubgraphStub({"errors": ["schema drift"]})  # type: ignore[arg-type]
+        b, stack = self._wired_behaviour(kv, subgraph)
+        with stack:
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+
+        assert result is None
+        assert self._MARKER_KEY not in kv.data
+
+    def test_empty_historical_still_marks_seeded(self) -> None:
+        """Distinguish "no history" from "all-unusable history".
+
+        Regression pair for ``test_all_rows_unusable_refuses_marker``:
+        the marker rejection must trigger ONLY when the subgraph
+        returned rows and all were unusable -- a legitimately fresh
+        market (empty history) still gets its marker so subsequent
+        scans don't re-query the subgraph forever for it.
+        """
+        kv = _FakeKvStore()
+        subgraph = _SubgraphStub([])  # legitimately empty history
+        b, stack = self._wired_behaviour(kv, subgraph)
+        with stack:
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+
+        assert result == []
+        assert self._MARKER_KEY in kv.data
+
 
 class TestSendKvRead:
     """Tests for ``_send_kv_read``."""

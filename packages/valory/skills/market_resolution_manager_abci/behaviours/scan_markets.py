@@ -193,9 +193,29 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         #    state. The ``max()`` below guarantees the counter is
         #    monotonic: a fire whose kv write failed can never lower the
         #    count back below the local value.
-        for _, entry in questions_db.items():
+        # Markets whose kv-cache read fails this cycle are held out of
+        # Steps 6-7 entirely: without a successful read, the entry keeps
+        # its fresh-restart defaults (``mech_retries: 0``,
+        # ``evaluation: None``), and Step 7's retry gate would classify
+        # the market as actionable regardless of any prior fires. On the
+        # first post-restart cycle this could re-fire a market whose
+        # real history is intact in the kv store but temporarily
+        # unreachable. Log which markets were skipped so the staleness
+        # is observable, then drop them from the working set for this
+        # cycle; the next scan re-populates ``questions_db`` from the
+        # fresh subgraph queries above and retries the cache read.
+        skipped_seed_markets: List[str] = []
+        for market_id, entry in questions_db.items():
             requests = yield from self.fetch_mech_requests_for_market(entry)
             if requests is None:
+                self.context.logger.warning(
+                    "Market %s: mech-cache read failed this scan cycle. "
+                    "Holding this market out of actionable classification "
+                    "so a fresh-look duplicate paid mech request is not "
+                    "fired; will retry the cache read on the next scan.",
+                    market_id,
+                )
+                skipped_seed_markets.append(market_id)
                 continue
             entry["mech_requests"] = requests
             if entry.get("evaluation") is None:
@@ -206,6 +226,8 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
                 int(entry.get("mech_retries") or 0),
                 len(requests),
             )
+        for skipped_id in skipped_seed_markets:
+            questions_db.pop(skipped_id, None)
 
         # Step 6: Classify statuses from current data
         for entry in questions_db.values():
@@ -399,9 +421,10 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         mech_requests: List[Dict[str, Any]],
     ) -> Optional[Dict[str, Any]]:
         """Earliest valid evaluation across requests + their deliveries."""
-        # ``base.py:69`` fetches deliveries unbounded by design; iterate
-        # ALL deliveries per request so a Mech-internal retry whose first
-        # delivery is garbage but a later one is valid still resolves.
+        # ``MECH_CACHE_QUERY_TEMPLATE`` in ``base.py`` fetches deliveries
+        # unbounded by design; iterate ALL deliveries per request so a
+        # Mech-internal retry whose first delivery is garbage but a later
+        # one is valid still resolves.
         for req in mech_requests:
             for delivery in req.get("deliveries") or []:
                 evaluation = parse_mech_response(delivery.get("toolResponse"))

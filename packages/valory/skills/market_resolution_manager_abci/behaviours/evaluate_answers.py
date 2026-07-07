@@ -70,8 +70,8 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
             yield from self._send_payload(None, None)
             return
 
-        # Reuse existing evaluation (populated by scan_markets from the
-        # Mech subgraph cache, or from a prior cycle's Mech response).
+        # Reuse existing evaluation (populated by scan_markets from the kv
+        # mech-cache, or from a prior cycle's Mech response).
         if entry.get("evaluation") is not None:
             self.context.logger.info(
                 f"Market {market_id}: reusing existing Mech evaluation "
@@ -116,12 +116,12 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
 
         # Increment retry counter immediately (local fact: we just fired a
         # request). scan_markets later does
-        # ``mech_retries = max(mech_retries, len(mech_requests_from_subgraph))``
-        # to converge once the subgraph indexes this request.
+        # ``mech_retries = max(mech_retries, len(mech_requests_from_cache))``
+        # so the counter converges once the fire-time kv row lands.
         entry["mech_retries"] = retries + 1
         # ``pending_nonce`` lets build_answer_tx match the in-process
         # MechInteract delivery (``SynchronizedData.mech_responses``) back to
-        # this market before the subgraph has indexed the new request.
+        # this market before the delivery-time kv write lands.
         entry["pending_nonce"] = nonce
         # Stashed so the delivery-side kv_store write (build_answer_tx)
         # can preserve fired_at without a READ round-trip. In-cycle only:
@@ -189,31 +189,21 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
             prompt=prompt,
             fired_at=fired_at,
         )
-        for attempt in range(1, MAX_KV_WRITE_ATTEMPTS + 1):
-            ok = yield from self._send_kv_write(key=key, value=value)
-            if ok:
-                return
-            if attempt < MAX_KV_WRITE_ATTEMPTS:
-                self.context.logger.warning(
-                    "kv_store write for market=%s nonce=%s failed "
-                    "(attempt %d/%d); retrying.",
-                    market_id,
-                    nonce,
-                    attempt,
-                    MAX_KV_WRITE_ATTEMPTS,
-                )
-                yield from self.sleep(KV_WRITE_RETRY_SLEEP_SECONDS)
-        # ERROR (not WARNING) because a re-requested market is a paid mech
-        # call -- surface this at a level operators filter for financial-loss
-        # signals rather than losing it in the per-attempt retry chatter.
-        self.context.logger.error(
-            "kv_store write for market=%s nonce=%s failed after %d "
-            "attempts; the next scan cycle may re-request this market. "
-            "Bounded by max_mech_retries.",
-            market_id,
-            nonce,
-            MAX_KV_WRITE_ATTEMPTS,
+        ok = yield from self._send_kv_write_with_retries(
+            key=key,
+            value=value,
+            max_attempts=MAX_KV_WRITE_ATTEMPTS,
+            sleep_seconds=KV_WRITE_RETRY_SLEEP_SECONDS,
+            retry_label=(
+                f"fire-time (market={market_id} nonce={nonce}); the next "
+                "scan cycle may re-request this market (bounded by "
+                "max_mech_retries)"
+            ),
         )
+        # Swallow the failure regardless of outcome: the FSM must
+        # transition into the mech request round, the give-up event was
+        # already surfaced at ERROR by the helper.
+        _ = ok
 
     def _send_payload(
         self,

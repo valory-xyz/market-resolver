@@ -35,6 +35,10 @@ from packages.valory.skills.market_resolution_manager_abci.behaviours.base impor
     jury_error_discriminator,
     parse_mech_response,
 )
+from packages.valory.skills.market_resolution_manager_abci.behaviours.evaluate_answers import (
+    KV_WRITE_RETRY_SLEEP_SECONDS,
+    MAX_KV_WRITE_ATTEMPTS,
+)
 from packages.valory.skills.market_resolution_manager_abci.payloads import (
     BuildAnswerTxPayload,
 )
@@ -98,14 +102,15 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
             return
 
         # Check if we have fresh Mech responses (from MechInteract).
-        # Skip if the evaluation was already populated by the subgraph
-        # cache path -- MechInteract didn't run in that case.
+        # Skip if the evaluation was already populated by the kv mech-cache
+        # (see ``fetch_mech_requests_for_market``) -- MechInteract didn't
+        # run in that case.
         #
         # ``pending_nonce`` is set by evaluate_answers when it fires a Mech
         # request; the in-process MechInteract delivery is matched by nonce.
-        # The next scan_markets cycle will re-source ``mech_requests`` from
-        # the subgraph once it indexes this delivery, so we only need to
-        # populate ``evaluation`` here.
+        # The delivery-time kv write in ``_buffer_mech_response_delivered``
+        # below persists the answer into the row the next scan cycle will
+        # pick up, so we only need to populate ``evaluation`` here.
         expected_nonce = entry.get("pending_nonce")
         if entry.get("evaluation") is None and expected_nonce:
             mech_responses = self.synchronized_data.mech_responses
@@ -601,11 +606,17 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
         does not affect the "have I asked?" cache -- the row simply
         exists with ``delivered_at`` set.
 
-        Best-effort: kv failure here is logged and swallowed. A future
-        cycle will still see ``synchronized_data.mech_responses`` empty
-        (because build_answer_tx already consumed it via the FSM), and
-        the market will be re-fired only if the cache miss persists past
-        the retry cooldown.
+        Retry policy mirrors the fire-time write in
+        ``_buffer_mech_request_fired``: both writes protect against the
+        same class of duplicate-paid-mech regression. If the delivery-
+        time write is lost, the row permanently stays "fired but
+        undelivered" -- harmless in the current run (the in-memory
+        ``evaluation`` was already consumed) but after an agent restart
+        ``questions_db`` is rebuilt from the cache with ``deliveries``
+        empty, ``evaluation`` back to ``None``, and ``mech_retries=1``
+        below ``max_mech_retries=10`` -- fires a fresh paid mech
+        request for a market whose answer was already received. Bounded
+        retries + ERROR-on-give-up close that window.
 
         :param market_id: the Omen market id being answered.
         :param entry: the questions_db entry, needed for
@@ -634,12 +645,19 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
             error=resp.error,
             delivered_at=int(time.time()),
         )
-        ok = yield from self._send_kv_write(key=key, value=value)
-        if not ok:
-            self.context.logger.warning(
-                "kv_store delivery update for market=%s nonce=%s failed. "
-                "Cache miss on the next cycle would re-fire this market "
-                "unless another agent's row landed.",
-                market_id,
-                nonce,
-            )
+        ok = yield from self._send_kv_write_with_retries(
+            key=key,
+            value=value,
+            max_attempts=MAX_KV_WRITE_ATTEMPTS,
+            sleep_seconds=KV_WRITE_RETRY_SLEEP_SECONDS,
+            retry_label=(
+                f"delivery-time (market={market_id} nonce={nonce}); a "
+                "restart would rebuild questions_db from the cache with "
+                "the delivery missing and could re-fire this market (paid) "
+                "unless another agent's row landed"
+            ),
+        )
+        # Swallow the failure regardless of outcome: the give-up event
+        # was already surfaced at ERROR by the helper, and the FSM must
+        # transition into the reset-and-pause round.
+        _ = ok
