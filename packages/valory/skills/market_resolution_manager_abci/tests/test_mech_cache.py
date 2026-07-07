@@ -186,12 +186,11 @@ class TestSubgraphRowToCacheRow:
     def test_custom_selector_none_return_leaves_row_undelivered(self) -> None:
         """A selector that returns ``None`` degrades to 'asked but not delivered'.
 
-        Preserves the fire event on ``mech_requests`` (so
-        ``mech_retries`` still counts it) while leaving
-        ``result``/``delivered_at`` empty. The seeded row rehydrates
-        into a request with ``deliveries: []`` and scan_markets
-        classifies the market as unanswered -- correct when the
-        selector genuinely can't find a usable delivery.
+        Leaves ``result``/``delivered_at`` empty; the row is still
+        written (``fired_at`` comes from the request body). The seeded
+        row rehydrates into a request with ``deliveries: []`` and
+        scan_markets classifies the market as unanswered -- correct
+        when the selector genuinely can't find a usable delivery.
         """
         deliveries = [
             {"id": "0xdel1", "blockTimestamp": "1690000100", "toolResponse": "junk"}

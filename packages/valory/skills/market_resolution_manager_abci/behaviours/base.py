@@ -217,31 +217,39 @@ def is_cached_evaluation_valid(evaluation: Optional[dict]) -> bool:
 
 
 def pick_earliest_usable_seed_delivery(
-    deliveries: List[Dict[str, Any]],
+    deliveries: List[Any],
 ) -> Optional[Dict[str, Any]]:
     """Delivery selector for :func:`mech_cache.subgraph_row_to_cache_row`.
 
-    Two-phase pick that preserves the "iterate all deliveries" contract
-    that ``_earliest_valid_evaluation`` documents at scan time (see the
+    Preserves the "iterate all deliveries" contract that
+    ``_earliest_valid_evaluation`` documents at scan time (see the
     comment on that helper): a mech-internal retry whose first delivery
     is garbage but a later one is valid must still resolve on the
     seeded cache row, even though the row schema only has slots for
     one ``result`` / ``delivered_at`` pair.
 
-    1. Scan every delivery in order and return the first one whose
-       ``toolResponse`` parses into a cache-valid evaluation. That is
-       the "would resolve" delivery; keeping it here means the seeded
-       row rehydrates into a single-delivery request that
-       ``_earliest_valid_evaluation`` will still classify as answered.
-    2. If no delivery yields a valid evaluation, fall back to the
-       earliest with a numeric ``blockTimestamp`` so ``mech_retries``
-       still counts the fire event. The market will get reclassified
-       as unanswered and a fresh mech request will fire — which is
-       correct in that case (we genuinely have no valid delivery).
-    3. If none of the deliveries have a numeric timestamp, return
-       ``None`` so the row is seeded without delivery info; scan will
-       still see the fire on ``mech_requests`` and count it towards
-       the retry budget.
+    Intent, in order of preference:
+
+    1. Return the earliest delivery with both a cache-valid evaluation
+       (``parse_mech_response`` + ``is_cached_evaluation_valid``) AND
+       a numeric ``blockTimestamp`` -- the numeric-ts requirement is
+       load-bearing here because the row schema stores ``result`` and
+       ``delivered_at`` as one atomic unit
+       (see :data:`mech_cache.DeliverySelector`), so a valid response
+       without a persistable timestamp can't be kept.
+    2. Failing that, fall back to the earliest delivery with a numeric
+       ``blockTimestamp`` (regardless of ``toolResponse`` validity).
+       Delegated to :func:`mech_cache.default_delivery_selector` so
+       the "earliest numeric-ts" policy stays in one place. This
+       degraded row rehydrates into a request whose one delivery
+       won't validate downstream, so the market classifies unanswered
+       and a fresh mech request will fire on the next scan.
+    3. If nothing matches either phase, return ``None``. The seeded
+       row still gets written (``fired_at`` comes from the request
+       body, not the deliveries) so the fire itself stays visible on
+       ``mech_requests``; the retry budget is preserved by that
+       row-level accounting regardless of which phase produces the
+       delivery.
 
     :param deliveries: subgraph ``deliveries`` list (ascending order).
     :return: the chosen delivery, or ``None`` if none can be used.
@@ -563,6 +571,25 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
 
         written = 0
         for row in historical:
+            # Shape-drift log for nested deliveries. The top-level
+            # ``historical`` list is guarded above; a peer drift in
+            # ``row["deliveries"]`` -- string entries, nulls,
+            # unexpected envelope -- would otherwise silently seed the
+            # row delivery-less and look identical to "genuinely
+            # undelivered" in the store.
+            if isinstance(row, dict):
+                raw_deliveries = row.get("deliveries") or []
+                if isinstance(raw_deliveries, list) and any(
+                    not isinstance(d, dict) for d in raw_deliveries
+                ):
+                    self.context.logger.warning(
+                        "Non-dict entries in subgraph deliveries for "
+                        "market %s; ignoring the drifted entries. "
+                        "row_id=%r",
+                        market_id,
+                        row.get("id"),
+                    )
+
             converted = mech_cache.subgraph_row_to_cache_row(
                 row,
                 delivery_selector=pick_earliest_usable_seed_delivery,
@@ -592,6 +619,40 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
                 )
                 return False
             written += 1
+
+            # Per-row seed-phase trace. The picker's three outcomes
+            # (phase 1 valid, phase 2 degraded, phase 3 delivery-less)
+            # all end up in the same "wrote a row, incremented
+            # ``written``" bucket. A duplicate paid mech request is
+            # the exact cost this feature exists to avoid, and both
+            # phase 2 and phase 3 leave the market classifiable as
+            # unanswered -- so an operator debugging a re-fire needs
+            # a log trail connecting it to the degraded seed. Cheap
+            # to derive here from the converted row: re-parse the
+            # kept ``result`` at seed time as a signal.
+            if converted.get("result") is None:
+                # Phase 3: picker returned ``None``.
+                self.context.logger.warning(
+                    "Seeded row %s for market %s carries no delivery "
+                    "(phase 3): scan will classify unanswered and may "
+                    "re-fire when retry_after expires.",
+                    converted["nonce"],
+                    market_id,
+                )
+            elif not is_cached_evaluation_valid(
+                parse_mech_response(converted.get("result"))
+            ):
+                # Phase 2: picker returned an earliest-numeric-ts
+                # delivery whose ``toolResponse`` does not validate.
+                self.context.logger.warning(
+                    "Seeded row %s for market %s carries a degraded "
+                    "delivery (phase 2): no delivery across the "
+                    "subgraph row yielded a valid evaluation; scan "
+                    "will classify unanswered and may re-fire next "
+                    "cycle.",
+                    converted["nonce"],
+                    market_id,
+                )
 
         # If we saw non-empty historical rows but none of them were usable,
         # writing the marker with ``rows: 0`` would permanently mask the

@@ -72,7 +72,15 @@ from __future__ import annotations
 import json
 from typing import Any, Callable, Dict, List, Optional
 
-DeliverySelector = Callable[[List[Dict[str, Any]]], Optional[Dict[str, Any]]]
+# Deliveries as they come from the subgraph are untrusted (see the
+# ``row: Any`` convention on :func:`subgraph_row_to_cache_row`); every
+# implementation guards with ``isinstance(delivery, dict)`` at the
+# entry to each frame. Type as ``List[Any]`` to match. Invariant a
+# selector must honour: the returned delivery, if any, must carry a
+# numeric ``blockTimestamp``, else ``subgraph_row_to_cache_row`` seeds
+# the row without delivery info (both ``result`` and ``delivered_at``
+# get dropped as one atomic unit).
+DeliverySelector = Callable[[List[Any]], Optional[Dict[str, Any]]]
 
 
 def cache_key(prefix: str, safe_address: str, market_id: str, nonce: str) -> str:
@@ -122,7 +130,7 @@ def seed_marker_key(prefix: str, safe_address: str, market_id: str) -> str:
 
 
 def default_delivery_selector(
-    deliveries: List[Dict[str, Any]],
+    deliveries: List[Any],
 ) -> Optional[Dict[str, Any]]:
     """Return the earliest delivery whose ``blockTimestamp`` parses as int.
 

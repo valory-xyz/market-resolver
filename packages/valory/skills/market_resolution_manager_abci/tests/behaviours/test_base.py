@@ -456,12 +456,15 @@ class TestPickEarliestUsableSeedDelivery:
         assert result is deliveries[1]
 
     def test_no_valid_falls_back_to_earliest_numeric_ts(self) -> None:
-        """Phase-2 fallback preserves the fire count when no delivery validates.
+        """Phase-2 fallback returns the earliest delivery with a numeric ts.
 
-        The row still gets seeded with a delivery so ``mech_retries``
-        counts the fire; scan_markets classifies the market as
-        unanswered and a fresh mech request fires -- correct here
-        because no delivery actually resolves.
+        The seeded row rehydrates to a single-delivery request whose
+        ``toolResponse`` won't validate downstream, so scan_markets
+        classifies the market as unanswered and a fresh mech request
+        fires next scan -- correct here because no delivery actually
+        resolves. Retry-budget accounting is orthogonal: the row
+        itself is written regardless of the phase (see the intent
+        note in the picker docstring).
         """
         deliveries = [
             {"id": "d1", "blockTimestamp": "100", "toolResponse": "garbage"},
@@ -473,10 +476,11 @@ class TestPickEarliestUsableSeedDelivery:
     def test_no_numeric_ts_anywhere_returns_none(self) -> None:
         """If nothing has a numeric ts, the row gets seeded delivery-less.
 
-        ``fired_at`` still comes from the request-level
-        ``blockTimestamp`` so the fire is not lost.
+        Row-level ``fired_at`` (from the request body, not the
+        deliveries) is what ``mech_retries`` counts in the caller, so
+        the fire itself stays visible regardless of the phase.
         """
-        deliveries: List[Dict[str, Any]] = [
+        deliveries: List[Any] = [
             {"id": "d1", "blockTimestamp": "bad", "toolResponse": self._VALID},
             {"id": "d2", "blockTimestamp": None, "toolResponse": self._VALID},
         ]
