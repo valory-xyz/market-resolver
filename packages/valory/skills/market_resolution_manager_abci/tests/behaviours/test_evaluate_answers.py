@@ -22,20 +22,21 @@
 # pylint: disable=protected-access
 
 import json
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 from unittest.mock import PropertyMock, patch
 
 from packages.valory.skills.market_resolution_manager_abci import mech_cache
 from packages.valory.skills.market_resolution_manager_abci.behaviours.base import (
     ANSWER_YES,
+    MAX_KV_WRITE_ATTEMPTS,
 )
 from packages.valory.skills.market_resolution_manager_abci.behaviours.evaluate_answers import (
     EvaluateAnswersBehaviour,
-    MAX_KV_WRITE_ATTEMPTS,
 )
 
 from .conftest import (
     SAFE_ADDRESS,
+    _FlakyKvWrite,
     _exhaust_gen,
 )
 from .conftest import _make_behaviour as _make_shared_behaviour
@@ -347,25 +348,6 @@ class TestEvaluateAnswersBehaviour:
         # string -- the value itself is irrelevant to this test.
         assert isinstance(b.questions_db["0xM"]["pending_nonce"], str)
         assert b.questions_db["0xM"]["pending_nonce"] != ""
-
-
-class _FlakyKvWrite:
-    """kv-write double: scripted per-call outcomes, records each (key, value).
-
-    Stands in for ``_send_kv_write`` at the process boundary; the retry
-    loop, key derivation and row serialization under test all run for
-    real.
-    """
-
-    def __init__(self, outcomes: List[bool]) -> None:
-        self.outcomes = list(outcomes)
-        self.calls: List[Tuple[str, str]] = []
-
-    def __call__(self, key: str, value: str) -> Any:
-        """Record the write and return the next scripted outcome."""
-        self.calls.append((key, value))
-        return self.outcomes.pop(0)
-        yield  # noqa: unreachable -- makes this a generator function
 
 
 class TestBufferMechRequestFiredRetry:

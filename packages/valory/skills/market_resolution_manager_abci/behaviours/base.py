@@ -41,6 +41,12 @@ from packages.valory.skills.market_resolution_manager_abci.rounds import (
 
 HTTP_OK = 200
 
+# Both fire-time and delivery-time kv writes guard against duplicate paid
+# mech requests, so a transient failure is retried a few times before
+# being swallowed by ``_send_kv_write_with_retries``.
+MAX_KV_WRITE_ATTEMPTS = 3
+KV_WRITE_RETRY_SLEEP_SECONDS = 0.2
+
 # Realitio answer encoding (outcome index for binary Yes/No markets).
 ANSWER_YES = "0x0000000000000000000000000000000000000000000000000000000000000000"
 ANSWER_NO = "0x0000000000000000000000000000000000000000000000000000000000000001"
@@ -665,8 +671,10 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
         :param value: the JSON-serialised row payload.
         :param max_attempts: total attempts including the first one.
         :param sleep_seconds: pause between attempts.
-        :param retry_label: prefix for the log messages so operators can
-            tell fire-time and delivery-time failures apart in prod logs.
+        :param retry_label: short prefix ("fire-time" / "delivery-time")
+            so operators can tell the two failure classes apart in prod
+            logs. Keep it short: it is stitched into every per-attempt
+            WARNING line, not just the final ERROR.
         :yield: control to the FSM while attempts are in flight.
         :return: True if any attempt succeeded, False after all failed.
         """
@@ -676,7 +684,7 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
                 return True
             if attempt < max_attempts:
                 self.context.logger.warning(
-                    "%s kv_store write for key=%s failed (attempt %d/%d); " "retrying.",
+                    "%s kv_store write for key=%s failed (attempt %d/%d); retrying.",
                     retry_label,
                     key,
                     attempt,

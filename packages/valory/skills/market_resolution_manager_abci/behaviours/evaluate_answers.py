@@ -27,6 +27,8 @@ from uuid import uuid4
 
 from packages.valory.skills.market_resolution_manager_abci import mech_cache
 from packages.valory.skills.market_resolution_manager_abci.behaviours.base import (
+    KV_WRITE_RETRY_SLEEP_SECONDS,
+    MAX_KV_WRITE_ATTEMPTS,
     MarketResolutionManagerBaseBehaviour,
 )
 from packages.valory.skills.market_resolution_manager_abci.payloads import (
@@ -36,11 +38,6 @@ from packages.valory.skills.market_resolution_manager_abci.rounds import (
     EvaluateAnswersRound,
 )
 from packages.valory.skills.mech_interact_abci.states.base import MechMetadata
-
-# Fire-time kv writes guard against duplicate paid mech requests, so a
-# transient failure is retried a few times before being swallowed.
-MAX_KV_WRITE_ATTEMPTS = 3
-KV_WRITE_RETRY_SLEEP_SECONDS = 0.2
 
 
 class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
@@ -189,20 +186,21 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
             prompt=prompt,
             fired_at=fired_at,
         )
+        # A give-up here (all attempts fail) means the fire-time row is
+        # missing from the cache. The next scan cycle rebuilds
+        # ``questions_db`` from the cache and can re-fire this market
+        # (bounded by ``max_mech_retries``); the ERROR line from the
+        # helper is the operator-facing financial-loss signal.
         ok = yield from self._send_kv_write_with_retries(
             key=key,
             value=value,
             max_attempts=MAX_KV_WRITE_ATTEMPTS,
             sleep_seconds=KV_WRITE_RETRY_SLEEP_SECONDS,
-            retry_label=(
-                f"fire-time (market={market_id} nonce={nonce}); the next "
-                "scan cycle may re-request this market (bounded by "
-                "max_mech_retries)"
-            ),
+            retry_label="fire-time",
         )
-        # Swallow the failure regardless of outcome: the FSM must
-        # transition into the mech request round, the give-up event was
-        # already surfaced at ERROR by the helper.
+        # Swallow the outcome regardless: the FSM must transition into
+        # the mech request round, and the give-up ERROR was already
+        # surfaced by the helper.
         _ = ok
 
     def _send_payload(

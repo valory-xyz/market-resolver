@@ -40,7 +40,13 @@ from packages.valory.skills.market_resolution_manager_abci.states.base import (
     AnswerStatus,
 )
 
-from .conftest import _exhaust_gen, _make_context, _make_gen, _make_synced_data
+from .conftest import (
+    _FlakyKvWrite,
+    _exhaust_gen,
+    _make_context,
+    _make_gen,
+    _make_synced_data,
+)
 
 NOW = 1_700_000_000
 QUESTION_ID = "0x" + "a1" * 32  # 32-byte hex
@@ -1264,25 +1270,6 @@ class TestSendPayload:
 # ---------------------------------------------------------------------------
 
 
-class _FlakyKvWrite:
-    """Scripted _send_kv_write double: per-call outcomes.
-
-    Mirrors the same double in ``test_evaluate_answers`` for the
-    fire-time retry loop. Exposes ``calls`` so a test can assert the
-    key/value that landed on each attempt is stable.
-    """
-
-    def __init__(self, outcomes: List[bool]) -> None:
-        self._outcomes = list(outcomes)
-        self.calls: List[Any] = []
-
-    def __call__(self, key: str, value: str) -> Any:
-        self.calls.append((key, value))
-        outcome = self._outcomes.pop(0) if self._outcomes else False
-        return outcome
-        yield  # noqa: unreachable -- keeps this a generator
-
-
 class TestBufferMechResponseDeliveredRetry:
     """Delivery-side write mirrors the fire-time retry contract.
 
@@ -1299,14 +1286,24 @@ class TestBufferMechResponseDeliveredRetry:
     _RESP = MagicMock(result="dummy-result", error=None)
 
     def _drive(self, kv: _FlakyKvWrite) -> Any:
-        """Wire the double onto a real behaviour and drive delivery."""
+        """Wire the double onto a real behaviour and drive delivery.
+
+        ``sleep`` is patched to a no-op generator so the retry loop's
+        ``KV_WRITE_RETRY_SLEEP_SECONDS`` pauses do not burn real
+        wall-clock time -- mirrors the fire-time ``_run`` in
+        ``test_evaluate_answers.py`` and matches the repo's
+        deterministic-test convention.
+        """
         b = _make_behaviour()
         # ``_make_behaviour`` stubs delivery-side out as a no-op for
         # unrelated tests; drop the instance override so the class
         # method (the code under test) runs.
         del b._buffer_mech_response_delivered
         entry = {"title": "Will X happen?", "mech_fired_at": 1_700_000_000}
-        with patch.object(b, "_send_kv_write", new=kv):
+        with (
+            patch.object(b, "_send_kv_write", new=kv),
+            patch.object(b, "sleep", new=_make_gen(None)),
+        ):
             _exhaust_gen(
                 b._buffer_mech_response_delivered(
                     market_id=self._MARKET_ID,

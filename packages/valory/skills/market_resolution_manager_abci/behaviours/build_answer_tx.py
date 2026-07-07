@@ -31,13 +31,11 @@ from packages.valory.contracts.realitio.contract import RealitioContract
 from packages.valory.protocols.contract_api import ContractApiMessage
 from packages.valory.skills.market_resolution_manager_abci import mech_cache
 from packages.valory.skills.market_resolution_manager_abci.behaviours.base import (
+    KV_WRITE_RETRY_SLEEP_SECONDS,
+    MAX_KV_WRITE_ATTEMPTS,
     MarketResolutionManagerBaseBehaviour,
     jury_error_discriminator,
     parse_mech_response,
-)
-from packages.valory.skills.market_resolution_manager_abci.behaviours.evaluate_answers import (
-    KV_WRITE_RETRY_SLEEP_SECONDS,
-    MAX_KV_WRITE_ATTEMPTS,
 )
 from packages.valory.skills.market_resolution_manager_abci.payloads import (
     BuildAnswerTxPayload,
@@ -645,19 +643,22 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
             error=resp.error,
             delivered_at=int(time.time()),
         )
+        # A give-up here (all attempts fail) leaves the delivery row
+        # missing from the cache. If the agent restarts before another
+        # agent's row lands, ``questions_db`` is rebuilt with the
+        # delivery missing and could re-fire this market (paid); the
+        # ERROR line from the helper is the operator-facing
+        # financial-loss signal.
         ok = yield from self._send_kv_write_with_retries(
             key=key,
             value=value,
             max_attempts=MAX_KV_WRITE_ATTEMPTS,
             sleep_seconds=KV_WRITE_RETRY_SLEEP_SECONDS,
-            retry_label=(
-                f"delivery-time (market={market_id} nonce={nonce}); a "
-                "restart would rebuild questions_db from the cache with "
-                "the delivery missing and could re-fire this market (paid) "
-                "unless another agent's row landed"
-            ),
+            retry_label="delivery-time",
         )
-        # Swallow the failure regardless of outcome: the give-up event
-        # was already surfaced at ERROR by the helper, and the FSM must
-        # transition into the reset-and-pause round.
+        # Swallow the outcome regardless: on the no-evaluation sub-path
+        # (Event.NONE -> FinishedResolutionRound -> reset-and-pause) the
+        # FSM has to reach the transition, and on the success path
+        # (Event.DONE -> FinishedWithAnswerTxRound) settlement continues
+        # independent of the buffer write.
         _ = ok

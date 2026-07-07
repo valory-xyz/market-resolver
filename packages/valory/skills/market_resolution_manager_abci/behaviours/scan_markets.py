@@ -20,7 +20,7 @@
 """This module contains the ScanMarketsBehaviour."""
 
 from string import Template
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Dict, Generator, List, Optional, Set
 
 from packages.valory.skills.market_resolution_manager_abci.behaviours.base import (
     MarketResolutionManagerBaseBehaviour,
@@ -194,17 +194,21 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         #    monotonic: a fire whose kv write failed can never lower the
         #    count back below the local value.
         # Markets whose kv-cache read fails this cycle are held out of
-        # Steps 6-7 entirely: without a successful read, the entry keeps
-        # its fresh-restart defaults (``mech_retries: 0``,
-        # ``evaluation: None``), and Step 7's retry gate would classify
-        # the market as actionable regardless of any prior fires. On the
-        # first post-restart cycle this could re-fire a market whose
-        # real history is intact in the kv store but temporarily
-        # unreachable. Log which markets were skipped so the staleness
-        # is observable, then drop them from the working set for this
-        # cycle; the next scan re-populates ``questions_db`` from the
-        # fresh subgraph queries above and retries the cache read.
-        skipped_seed_markets: List[str] = []
+        # Step 7's actionable-selection: without a successful read, the
+        # fields sourced from the cache (``mech_requests``, and via
+        # them ``mech_retries`` / ``evaluation``) are stale for this
+        # cycle, so classifying and selecting on them could re-fire a
+        # market whose real history is intact in the kv store but
+        # temporarily unreachable.
+        #
+        # We deliberately do NOT delete the entry: ``retry_after`` and
+        # ``pending_tx`` (with ``escalation_count``, ``timestamp``) have
+        # no other source of truth. Popping the entry would let Step 4
+        # recreate it via ``_new_entry()`` on the next cycle with those
+        # fields reset to defaults, bypassing the undeterminable-
+        # evaluation cooldown gate and the challenge cooldown -- either
+        # of which is a duplicate paid action.
+        skipped_seed_markets: Set[str] = set()
         for market_id, entry in questions_db.items():
             requests = yield from self.fetch_mech_requests_for_market(entry)
             if requests is None:
@@ -215,7 +219,7 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
                     "fired; will retry the cache read on the next scan.",
                     market_id,
                 )
-                skipped_seed_markets.append(market_id)
+                skipped_seed_markets.add(market_id)
                 continue
             entry["mech_requests"] = requests
             if entry.get("evaluation") is None:
@@ -226,8 +230,6 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
                 int(entry.get("mech_retries") or 0),
                 len(requests),
             )
-        for skipped_id in skipped_seed_markets:
-            questions_db.pop(skipped_id, None)
 
         # Step 6: Classify statuses from current data
         for entry in questions_db.values():
@@ -269,6 +271,11 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
 
         actionable: List[Dict[str, Any]] = []
         for market_id, entry in questions_db.items():
+            # Held out of this cycle because seeding / cache read failed;
+            # entry survives so cooldown fields (``retry_after``,
+            # ``pending_tx``) are preserved for the next scan.
+            if market_id in skipped_seed_markets:
+                continue
             status = entry["status"]
             if status in (AnswerStatus.TRUSTED_ANSWER, AnswerStatus.VERIFIED):
                 continue

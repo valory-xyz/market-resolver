@@ -22,7 +22,7 @@
 # pylint: disable=protected-access,unused-argument
 
 from contextlib import contextmanager
-from typing import Any, Iterator
+from typing import Any, Iterator, List, Tuple
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
@@ -117,6 +117,33 @@ def _make_gen(return_value: Any) -> Any:
         yield  # noqa: unreachable -- makes this a generator function
 
     return gen
+
+
+class _FlakyKvWrite:
+    """kv-write double: scripted per-call outcomes, records each ``(key, value)``.
+
+    Stands in for ``_send_kv_write`` at the process boundary; the retry
+    loop, key derivation and row serialization under test all run for
+    real. Shared between fire-time (``test_evaluate_answers``) and
+    delivery-time (``test_build_answer_tx``) retry tests so both loops
+    exercise the same contract.
+
+    Fail-loud on exhaustion: ``pop(0)`` raises ``IndexError`` if the
+    test scripted fewer outcomes than the code under test actually
+    consumes -- a silent fallback to ``False`` would let future edits
+    to ``_send_kv_write_with_retries`` (e.g. an extra attempt) drift
+    without breaking the tests.
+    """
+
+    def __init__(self, outcomes: List[bool]) -> None:
+        self.outcomes = list(outcomes)
+        self.calls: List[Tuple[str, str]] = []
+
+    def __call__(self, key: str, value: str) -> Any:
+        """Record the write and return the next scripted outcome."""
+        self.calls.append((key, value))
+        return self.outcomes.pop(0)
+        yield  # noqa: unreachable -- makes this a generator function
 
 
 def _make_behaviour(
