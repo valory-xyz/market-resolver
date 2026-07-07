@@ -70,7 +70,9 @@ Neither is in scope here. Tracking issue TBD; see
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
+
+DeliverySelector = Callable[[List[Dict[str, Any]]], Optional[Dict[str, Any]]]
 
 
 def cache_key(prefix: str, safe_address: str, market_id: str, nonce: str) -> str:
@@ -119,23 +121,61 @@ def seed_marker_key(prefix: str, safe_address: str, market_id: str) -> str:
     return f"{prefix}seeded/{safe_address.lower()}/{market_id}"
 
 
-def subgraph_row_to_cache_row(row: Any) -> Optional[Dict[str, Any]]:
+def _default_delivery_selector(
+    deliveries: List[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """Return the earliest delivery whose ``blockTimestamp`` parses as int.
+
+    Default policy for :func:`subgraph_row_to_cache_row` when the caller
+    does not supply an evaluation-aware selector. Callers on the seeding
+    path should pass a selector built from
+    ``parse_mech_response`` + ``is_cached_evaluation_valid`` to preserve
+    the "earliest usable across all deliveries" contract that
+    ``_earliest_valid_evaluation`` documents at scan time; without it,
+    a mech-internal retry whose first delivery is garbage but a later
+    one is valid would be silently collapsed to the garbage row.
+
+    :param deliveries: subgraph ``deliveries`` list (ascending order).
+    :return: earliest delivery with a numeric ``blockTimestamp``, or
+        ``None`` if none of them parse.
+    """
+    for delivery in deliveries:
+        if not isinstance(delivery, dict):
+            continue
+        try:
+            int(delivery.get("blockTimestamp"))  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            continue
+        return delivery
+    return None
+
+
+def subgraph_row_to_cache_row(
+    row: Any,
+    delivery_selector: Optional[DeliverySelector] = None,
+) -> Optional[Dict[str, Any]]:
     """Convert one verbatim subgraph request entry to cache-row fields.
 
     Maps the subgraph request ``id`` to the row ``nonce`` (so seeded
     rows and kv-native rows share a keyspace without collisions --
-    subgraph ids are tx-hash-derived, live nonces are uuid4), and the
-    earliest delivery (the query orders deliveries ascending) to the
-    ``result`` / ``delivered_at`` pair. ``error`` is always ``None``:
-    the subgraph has no error field, and a garbage payload is handled
-    downstream by ``parse_mech_response`` exactly as it was on the
-    on-chain path.
+    subgraph ids are tx-hash-derived, live nonces are uuid4), and one
+    delivery to the ``result`` / ``delivered_at`` pair. Which delivery
+    is chosen depends on ``delivery_selector``: seeding passes an
+    evaluation-aware picker so a mech-internal retry whose first
+    delivery is garbage but a later one is valid still resolves;
+    callers that don't care fall through to
+    :func:`_default_delivery_selector` (earliest with numeric
+    timestamp). ``error`` is always ``None``: the subgraph has no error
+    field, and a garbage payload is handled downstream by
+    ``parse_mech_response`` exactly as it was on the on-chain path.
 
     Never raises. A malformed entry (missing id, non-numeric
     timestamps) returns ``None`` so the seeding pass skips it instead
     of crashing the scan cycle.
 
     :param row: one entry from the subgraph ``requests`` list.
+    :param delivery_selector: optional callable that picks which
+        delivery to persist. Defaults to the earliest-numeric-ts one.
     :return: kwargs for :func:`serialize_row` (minus ``safe_address``
         and ``market_id``), or ``None`` if the entry is unusable.
     """
@@ -156,7 +196,8 @@ def subgraph_row_to_cache_row(row: Any) -> Optional[Dict[str, Any]]:
     delivered_at: Optional[int] = None
     deliveries = row.get("deliveries") or []
     if isinstance(deliveries, list) and deliveries:
-        delivery = deliveries[0]
+        selector = delivery_selector or _default_delivery_selector
+        delivery = selector(deliveries)
         if isinstance(delivery, dict):
             try:
                 delivered_at = int(delivery.get("blockTimestamp"))  # type: ignore[arg-type]

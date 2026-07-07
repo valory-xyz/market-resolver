@@ -39,6 +39,7 @@ from packages.valory.skills.market_resolution_manager_abci.behaviours.base impor
     is_cached_evaluation_valid,
     jury_error_discriminator,
     parse_mech_response,
+    pick_earliest_usable_seed_delivery,
     to_content,
 )
 from packages.valory.skills.market_resolution_manager_abci.behaviours.scan_markets import (
@@ -379,6 +380,117 @@ class TestIsCachedEvaluationValid:
     def test_answer_invalid_returns_true(self) -> None:
         """Evaluation with ANSWER_INVALID is valid."""
         assert is_cached_evaluation_valid({"answer": ANSWER_INVALID}) is True
+
+
+# ---------------------------------------------------------------------------
+# pick_earliest_usable_seed_delivery -- issue #42
+# ---------------------------------------------------------------------------
+
+
+class TestPickEarliestUsableSeedDelivery:
+    """Tests for the seed-time delivery picker.
+
+    Regression for issue #42: the pre-fix seeding path collapsed a
+    multi-delivery request into ``deliveries[0]`` and lost the "iterate
+    all deliveries" contract documented on
+    ``_earliest_valid_evaluation``. This picker restores it by making a
+    two-phase pick at seed time and letting the row schema stay
+    single-delivery.
+    """
+
+    _VALID = json.dumps(
+        {
+            "is_valid": True,
+            "is_determinable": True,
+            "has_occurred": True,
+            "agreement_ratio": 0.9,
+            "judge_reasoning": "clear yes",
+        }
+    )
+    _UNDET = json.dumps(
+        {
+            "is_valid": True,
+            "is_determinable": False,
+            "has_occurred": None,
+            "agreement_ratio": 0.5,
+            "judge_reasoning": "unclear",
+        }
+    )
+
+    def test_empty_deliveries_returns_none(self) -> None:
+        """No deliveries -> nothing to pick."""
+        assert pick_earliest_usable_seed_delivery([]) is None
+
+    def test_single_valid_delivery_returned(self) -> None:
+        """One delivery that validates -> that delivery is returned."""
+        deliveries = [
+            {"id": "d1", "blockTimestamp": "100", "toolResponse": self._VALID}
+        ]
+        assert pick_earliest_usable_seed_delivery(deliveries) is deliveries[0]
+
+    def test_garbage_first_valid_second_picks_second(self) -> None:
+        """The canonical issue-#42 case: earliest usable across ALL deliveries."""
+        deliveries = [
+            {"id": "d1", "blockTimestamp": "100", "toolResponse": "not json"},
+            {"id": "d2", "blockTimestamp": "200", "toolResponse": self._VALID},
+        ]
+        result = pick_earliest_usable_seed_delivery(deliveries)
+        assert result is deliveries[1]
+
+    def test_undeterminable_first_valid_second_picks_second(self) -> None:
+        """Undeterminable evaluation isn't a "resolves" delivery; keep scanning."""
+        deliveries = [
+            {"id": "d1", "blockTimestamp": "100", "toolResponse": self._UNDET},
+            {"id": "d2", "blockTimestamp": "200", "toolResponse": self._VALID},
+        ]
+        result = pick_earliest_usable_seed_delivery(deliveries)
+        assert result is deliveries[1]
+
+    def test_non_numeric_ts_on_first_falls_through(self) -> None:
+        """Sub-case from the issue: non-numeric ``blockTimestamp`` on first."""
+        deliveries = [
+            {"id": "d1", "blockTimestamp": "bad", "toolResponse": self._VALID},
+            {"id": "d2", "blockTimestamp": "200", "toolResponse": self._VALID},
+        ]
+        result = pick_earliest_usable_seed_delivery(deliveries)
+        assert result is deliveries[1]
+
+    def test_no_valid_falls_back_to_earliest_numeric_ts(self) -> None:
+        """Phase-2 fallback preserves the fire count when no delivery validates.
+
+        The row still gets seeded with a delivery so ``mech_retries``
+        counts the fire; scan_markets classifies the market as
+        unanswered and a fresh mech request fires -- correct here
+        because no delivery actually resolves.
+        """
+        deliveries = [
+            {"id": "d1", "blockTimestamp": "100", "toolResponse": "garbage"},
+            {"id": "d2", "blockTimestamp": "200", "toolResponse": self._UNDET},
+        ]
+        result = pick_earliest_usable_seed_delivery(deliveries)
+        assert result is deliveries[0]
+
+    def test_no_numeric_ts_anywhere_returns_none(self) -> None:
+        """If nothing has a numeric ts, the row gets seeded delivery-less.
+
+        ``fired_at`` still comes from the request-level
+        ``blockTimestamp`` so the fire is not lost.
+        """
+        deliveries = [
+            {"id": "d1", "blockTimestamp": "bad", "toolResponse": self._VALID},
+            {"id": "d2", "blockTimestamp": None, "toolResponse": self._VALID},
+        ]
+        assert pick_earliest_usable_seed_delivery(deliveries) is None
+
+    def test_non_dict_deliveries_are_skipped(self) -> None:
+        """Malformed delivery entries don't crash the picker."""
+        deliveries = [
+            "not-a-dict",
+            None,
+            {"id": "d1", "blockTimestamp": "200", "toolResponse": self._VALID},
+        ]
+        result = pick_earliest_usable_seed_delivery(deliveries)  # type: ignore[arg-type]
+        assert result is deliveries[2]
 
 
 # ---------------------------------------------------------------------------

@@ -10,7 +10,7 @@ fingerprint:
   README.md: bafybeicebua5cqf3pfr34hy5mmnr6i7m7wgxlkzbto6woi5dkuv4fqbymi
   __init__.py: bafybeiedhf4rirdachml54zzde7nl3nhuwz4c5xwskrc5udfphefbrdsfu
   behaviours/__init__.py: bafybeignnrbklzekhqurn6ptli5zhzsov2qtdzr5se4xe4hqdywt2vbtvu
-  behaviours/base.py: bafybeibuer5heosrl3wawtuk3yfntj5ytzhb6akcdgbb77i2cufxh4qdlu
+  behaviours/base.py: bafybeifllc2gky44znwwotrxvfrno4zdtdrc3f23eowglohsvybdxdvgja
   behaviours/build_answer_tx.py: bafybeiccdfi2gcehgfsc6cjvcak553glg4wxdvp66fhggcirbg6rjsvzdq
   behaviours/evaluate_answers.py: bafybeialx4peb7tyby63i6dfz6prtfs4dl2ppgnaffcjadzrksntr5yd5m
   behaviours/post_transaction.py: bafybeig7wndmyilfbwshtr2wmeluzr4rzl3uri656tu5if4ar7dta6wnei
@@ -19,7 +19,7 @@ fingerprint:
   dialogues.py: bafybeihoudfbpl4zj6de34rpagbzjrfh3nvjmdwnm2v4dkhnkxvvp77ta4
   fsm_specification.yaml: bafybeidel6ahx7syvu37eu22y4udmdtgjc6ra5auo5bujjiiclpcfgf4n4
   handlers.py: bafybeibqutcanxc3fto7l62btwk77np4xykd6rguobg4nqai7hzstja47a
-  mech_cache.py: bafybeiegov2ip3bx3kinx3bjibhyti4zv5r33g2exwp4bmdj5kreofa4dm
+  mech_cache.py: bafybeianksgmkkgxrt2t6emxv3xcmb2jgbfvf3yxcwiw7y2dcw7bccbm6u
   models.py: bafybeicc44j2jrziq6ltpsagzis3wt5iamhb3yatyh4w3t3v6lt36s574m
   payloads.py: bafybeih6zkrc5mnkpifctn4cg3myqr3qrdw5v42hg7ldfbuzw7gjbgeoja
   rounds.py: bafybeiarus542z5wbpgthn4bgxuyqyqediby7eli24uccck6ro6e5isymu
@@ -28,7 +28,7 @@ fingerprint:
   tests/__init__.py: bafybeidpf4le7kmwrvl6u3s4yl2mrlznnu7scha3hvcpd3s2omwo7bdwkq
   tests/behaviours/__init__.py: bafybeierpqlj4wjvfsa2acmkibioivviqudq4ulu5ifuqwcvdcfewzdgau
   tests/behaviours/conftest.py: bafybeifh7u3ainpqkznsjogr4ktmrzgyvtv3uw7td4o7inhx636pe462xm
-  tests/behaviours/test_base.py: bafybeihgj4n5gdthwm2ulubikcafgukb7ce65ty43yjaliqiev2eoqywmm
+  tests/behaviours/test_base.py: bafybeiet6wrjkip52uhuej3tb4ltzblyzyjkc4q3lrzqr5hfnkrimgbn7m
   tests/behaviours/test_build_answer_tx.py: bafybeib4isqzcd6x7owdusekcgtnmgebfjlw5banmbzxyamu2wmw4e6doe
   tests/behaviours/test_evaluate_answers.py: bafybeido4yvemwvq7somzas4cgjtjv7nqs3ib2h56r5otqmlj7sgpar5ru
   tests/behaviours/test_post_transaction.py: bafybeibihvgozgvlrfyrkpq7gg3hpvzp5h7g633oggqnu5auqtnfyakbcy
@@ -37,7 +37,7 @@ fingerprint:
   tests/conftest.py: bafybeiaemzro7plaeklgfk5kvsw62kzgf5uym4e4xqcxwfwzqfcpnct4eq
   tests/test_dialogues.py: bafybeiaue4klz37jrmqlu46xj442v3mazx3fqmuay7thbakeyfy4ohrac4
   tests/test_handlers.py: bafybeib7pwsixawfob5razwu7cdek6npsri2zkqjwicsawehz2bqmt7bna
-  tests/test_mech_cache.py: bafybeifgb6nirji45km7owtxbf4h2dwedhdrs2etl3ed5eeswuwfkrfsgi
+  tests/test_mech_cache.py: bafybeibcal3lt7q6gysf22kyju4izjpz67gr2t3eqciqbzkydpfzrwecd4
   tests/test_models.py: bafybeigv3plblcxdpqv4c2kx6qwagdbsxdw4cjqydihn4xt3ddnnm5wcbm
   tests/test_payloads.py: bafybeiakjhvniimjyynaeq3n3udkdnjcvm4tuzafyrirsvwjgwwqkxb5j4
   tests/test_rounds.py: bafybeicyvamo4xohu6zsrnbawe4secam6c7pirftapfwpqobmutfmjk45i

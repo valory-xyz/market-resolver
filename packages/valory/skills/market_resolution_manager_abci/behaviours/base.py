@@ -216,6 +216,60 @@ def is_cached_evaluation_valid(evaluation: Optional[dict]) -> bool:
     return evaluation.get("answer") is not None
 
 
+def pick_earliest_usable_seed_delivery(
+    deliveries: List[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """Delivery selector for :func:`mech_cache.subgraph_row_to_cache_row`.
+
+    Two-phase pick that preserves the "iterate all deliveries" contract
+    that ``_earliest_valid_evaluation`` documents at scan time (see the
+    comment on that helper): a mech-internal retry whose first delivery
+    is garbage but a later one is valid must still resolve on the
+    seeded cache row, even though the row schema only has slots for
+    one ``result`` / ``delivered_at`` pair.
+
+    1. Scan every delivery in order and return the first one whose
+       ``toolResponse`` parses into a cache-valid evaluation. That is
+       the "would resolve" delivery; keeping it here means the seeded
+       row rehydrates into a single-delivery request that
+       ``_earliest_valid_evaluation`` will still classify as answered.
+    2. If no delivery yields a valid evaluation, fall back to the
+       earliest with a numeric ``blockTimestamp`` so ``mech_retries``
+       still counts the fire event. The market will get reclassified
+       as unanswered and a fresh mech request will fire — which is
+       correct in that case (we genuinely have no valid delivery).
+    3. If none of the deliveries have a numeric timestamp, return
+       ``None`` so the row is seeded without delivery info; scan will
+       still see the fire on ``mech_requests`` and count it towards
+       the retry budget.
+
+    :param deliveries: subgraph ``deliveries`` list (ascending order).
+    :return: the chosen delivery, or ``None`` if none can be used.
+    """
+    for delivery in deliveries:
+        if not isinstance(delivery, dict):
+            continue
+        evaluation = parse_mech_response(delivery.get("toolResponse"))
+        if evaluation is None:
+            continue
+        if not is_cached_evaluation_valid(evaluation):
+            continue
+        try:
+            int(delivery.get("blockTimestamp"))  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            continue
+        return delivery
+    for delivery in deliveries:
+        if not isinstance(delivery, dict):
+            continue
+        try:
+            int(delivery.get("blockTimestamp"))  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            continue
+        return delivery
+    return None
+
+
 def to_content(query: str) -> bytes:
     """Convert the given query string to payload content."""
     finalized_query = {"query": query}
@@ -514,7 +568,10 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
 
         written = 0
         for row in historical:
-            converted = mech_cache.subgraph_row_to_cache_row(row)
+            converted = mech_cache.subgraph_row_to_cache_row(
+                row,
+                delivery_selector=pick_earliest_usable_seed_delivery,
+            )
             if converted is None:
                 self.context.logger.warning(
                     f"Skipping unusable subgraph row while seeding market "
