@@ -12,7 +12,7 @@ fingerprint:
   behaviours/__init__.py: bafybeignnrbklzekhqurn6ptli5zhzsov2qtdzr5se4xe4hqdywt2vbtvu
   behaviours/base.py: bafybeibgl6q7njxzty4xcvnwyrpsxae256ebk6z5nv2bn73ntf7h3ixw44
   behaviours/build_answer_tx.py: bafybeihw6f65k5d357bk6jyhx65ldb6mnxicq6yq4a5vefzihytimiumde
-  behaviours/evaluate_answers.py: bafybeidre6uwpowhahcug42h5pchvml6s4y47m2dbe6b3n3ybzi3vkfjou
+  behaviours/evaluate_answers.py: bafybeianl5v27wbeppn3pq7xruth377c7s32khkp5vvgad6plwh7t7qs7y
   behaviours/post_transaction.py: bafybeig7wndmyilfbwshtr2wmeluzr4rzl3uri656tu5if4ar7dta6wnei
   behaviours/round_behaviour.py: bafybeiecxju6t7zsojnrhrefy4a7c75lkbveoxcayntw6heacao2qqkfdm
   behaviours/scan_markets.py: bafybeihw7eahm36y4jsb5siabfoa7vqykcudmaxde7e3fq6hcdrfhe2rqy
@@ -30,7 +30,7 @@ fingerprint:
   tests/behaviours/conftest.py: bafybeigvvrqoq4lbfx67x2yuicyqlwdh3faxh2lubolxiy6odhnndyxd4m
   tests/behaviours/test_base.py: bafybeifu2i3wox47cpievxm5rvpvylz55shyhxvqprqh6vjkpgat2esqta
   tests/behaviours/test_build_answer_tx.py: bafybeifzl2msolxllv4y54qaiv3ibpsslg6nxafujv2eisgnbuajpxcqru
-  tests/behaviours/test_evaluate_answers.py: bafybeig2myh6ca3xotqoqz2osrjjfemrdmn64jjlnocs6bxkfjygla3y7e
+  tests/behaviours/test_evaluate_answers.py: bafybeiekwobs4okoc4bu4y6gvhqbx5rsivn4m2ifptbzheg5ruaate3epi
   tests/behaviours/test_post_transaction.py: bafybeibihvgozgvlrfyrkpq7gg3hpvzp5h7g633oggqnu5auqtnfyakbcy
   tests/behaviours/test_round_behaviour.py: bafybeifcvxp5vlshg4xbego4frjsahvvvmjebj5s27l5ba7eyijsxry7ka
   tests/behaviours/test_scan_markets.py: bafybeibtq3fno5xobfpwukipl3sqbgugavavbjxvpgu3wi6nsp3j2znbre

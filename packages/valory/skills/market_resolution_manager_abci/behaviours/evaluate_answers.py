@@ -203,7 +203,10 @@ class EvaluateAnswersBehaviour(MarketResolutionManagerBaseBehaviour):
                     MAX_KV_WRITE_ATTEMPTS,
                 )
                 yield from self.sleep(KV_WRITE_RETRY_SLEEP_SECONDS)
-        self.context.logger.warning(
+        # ERROR (not WARNING) because a re-requested market is a paid mech
+        # call -- surface this at a level operators filter for financial-loss
+        # signals rather than losing it in the per-attempt retry chatter.
+        self.context.logger.error(
             "kv_store write for market=%s nonce=%s failed after %d "
             "attempts; the next scan cycle may re-request this market. "
             "Bounded by max_mech_retries.",

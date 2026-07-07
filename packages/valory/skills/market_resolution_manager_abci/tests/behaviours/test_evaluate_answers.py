@@ -399,6 +399,9 @@ class TestBufferMechRequestFiredRetry:
     def _warning_messages(self, b: EvaluateAnswersBehaviour) -> List[str]:
         return [c.args[0] for c in b.context.logger.warning.call_args_list]
 
+    def _error_messages(self, b: EvaluateAnswersBehaviour) -> List[str]:
+        return [c.args[0] for c in b.context.logger.error.call_args_list]
+
     def test_transient_failure_retries_until_success(self) -> None:
         """Two failures then a success -> 3 identical writes, no give-up warning."""
         kv = _FlakyKvWrite([False, False, True])
@@ -434,17 +437,23 @@ class TestBufferMechRequestFiredRetry:
         assert len(kv.calls) == 1
         assert self._warning_messages(b) == []
 
-    def test_all_attempts_fail_swallows_with_final_warning(self) -> None:
-        """All attempts fail -> bounded at MAX_KV_WRITE_ATTEMPTS, final warning, no raise.
+    def test_all_attempts_fail_swallows_with_final_error(self) -> None:
+        """All attempts fail -> bounded at MAX_KV_WRITE_ATTEMPTS, final error, no raise.
 
         The FSM must still transition into the mech request round; the
         miss is bounded by max_mech_retries (see the production
         docstring), so the loop swallows the failure instead of raising.
+        The give-up event goes through ``logger.error`` (not
+        ``logger.warning``) so operators watching for financial-loss
+        signals see the potential re-request without filtering per-attempt
+        retry chatter.
         """
         kv = _FlakyKvWrite([False] * MAX_KV_WRITE_ATTEMPTS)
 
         b = self._run(kv)
 
         assert len(kv.calls) == MAX_KV_WRITE_ATTEMPTS
+        errors = self._error_messages(b)
+        assert any("failed after" in msg for msg in errors)
         warnings = self._warning_messages(b)
-        assert any("failed after" in w for w in warnings)
+        assert not any("failed after" in w for w in warnings)
