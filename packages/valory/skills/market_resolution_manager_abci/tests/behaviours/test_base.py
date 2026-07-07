@@ -1193,6 +1193,63 @@ class TestEnsureMarketSeeded:
         assert result is None
         assert self._MARKER_KEY not in kv.data
 
+    def test_garbage_first_valid_second_delivery_seeds_valid(self) -> None:
+        """End-to-end wiring test for issue #42.
+
+        A pre-migration market with two deliveries -- garbage first,
+        valid second -- must be seeded with the valid delivery so
+        ``_earliest_valid_evaluation`` classifies the rehydrated
+        request as answered. Without the ``delivery_selector`` wiring
+        in ``_ensure_market_seeded``, the default earliest-numeric-ts
+        picker would happily seed the garbage delivery (it has a
+        numeric ``blockTimestamp`` too) and the market would classify
+        unanswered, triggering a duplicate paid mech request. This
+        test is what pins that wiring; the picker unit tests can't.
+        """
+        valid_response = json.dumps(
+            {
+                "is_valid": True,
+                "is_determinable": True,
+                "has_occurred": True,
+                "agreement_ratio": 0.9,
+                "judge_reasoning": "clear yes",
+            }
+        )
+        row: Dict[str, Any] = {
+            "id": "0xreq-multi",
+            "blockTimestamp": "1690000100",
+            "parsedRequest": {
+                "prompt": self._TITLE,
+                "tool": "resolve-market-jury-v1",
+            },
+            "deliveries": [
+                {
+                    "id": "0xreq-multi-del-garbage",
+                    "blockTimestamp": "1690000200",
+                    "toolResponse": "not-a-json-payload",
+                },
+                {
+                    "id": "0xreq-multi-del-valid",
+                    "blockTimestamp": "1690000300",
+                    "toolResponse": valid_response,
+                },
+            ],
+        }
+        kv = _FakeKvStore()
+        subgraph = _SubgraphStub([row])
+        b, stack = self._wired_behaviour(kv, subgraph)
+        with stack:
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+
+        assert result is not None
+        assert len(result) == 1
+        # The seeded row now carries the valid delivery, not the garbage
+        # one -- so ``_earliest_valid_evaluation`` resolves and the
+        # market classifies as answered on the next scan.
+        evaluation = ScanMarketsBehaviour._earliest_valid_evaluation(result)
+        assert evaluation is not None
+        assert evaluation["answer"] == ANSWER_YES
+
     def test_unusable_subgraph_row_skipped_good_row_seeded(self) -> None:
         """A drifted subgraph row is skipped; the usable one still seeds."""
         kv = _FakeKvStore()

@@ -259,15 +259,10 @@ def pick_earliest_usable_seed_delivery(
         except (TypeError, ValueError):
             continue
         return delivery
-    for delivery in deliveries:
-        if not isinstance(delivery, dict):
-            continue
-        try:
-            int(delivery.get("blockTimestamp"))  # type: ignore[arg-type]
-        except (TypeError, ValueError):
-            continue
-        return delivery
-    return None
+    # Phase 2 -- "earliest with numeric ts" is the mech_cache module's
+    # default policy already; delegate so the fallback semantics stay
+    # in one place and can't drift between the two callers.
+    return mech_cache.default_delivery_selector(deliveries)
 
 
 def to_content(query: str) -> bytes:

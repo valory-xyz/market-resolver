@@ -121,7 +121,7 @@ def seed_marker_key(prefix: str, safe_address: str, market_id: str) -> str:
     return f"{prefix}seeded/{safe_address.lower()}/{market_id}"
 
 
-def _default_delivery_selector(
+def default_delivery_selector(
     deliveries: List[Dict[str, Any]],
 ) -> Optional[Dict[str, Any]]:
     """Return the earliest delivery whose ``blockTimestamp`` parses as int.
@@ -134,6 +134,11 @@ def _default_delivery_selector(
     ``_earliest_valid_evaluation`` documents at scan time; without it,
     a mech-internal retry whose first delivery is garbage but a later
     one is valid would be silently collapsed to the garbage row.
+
+    Public so evaluation-aware selectors (see
+    ``base.pick_earliest_usable_seed_delivery``) can delegate their
+    "fall back to earliest numeric timestamp" phase here and keep the
+    fallback semantics in one place.
 
     :param deliveries: subgraph ``deliveries`` list (ascending order).
     :return: earliest delivery with a numeric ``blockTimestamp``, or
@@ -164,7 +169,7 @@ def subgraph_row_to_cache_row(
     evaluation-aware picker so a mech-internal retry whose first
     delivery is garbage but a later one is valid still resolves;
     callers that don't care fall through to
-    :func:`_default_delivery_selector` (earliest with numeric
+    :func:`default_delivery_selector` (earliest with numeric
     timestamp). ``error`` is always ``None``: the subgraph has no error
     field, and a garbage payload is handled downstream by
     ``parse_mech_response`` exactly as it was on the on-chain path.
@@ -196,7 +201,7 @@ def subgraph_row_to_cache_row(
     delivered_at: Optional[int] = None
     deliveries = row.get("deliveries") or []
     if isinstance(deliveries, list) and deliveries:
-        selector = delivery_selector or _default_delivery_selector
+        selector = delivery_selector or default_delivery_selector
         delivery = selector(deliveries)
         if isinstance(delivery, dict):
             try:
