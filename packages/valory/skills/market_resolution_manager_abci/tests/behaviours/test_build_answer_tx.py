@@ -1293,6 +1293,11 @@ class TestBufferMechResponseDeliveredRetry:
         wall-clock time -- mirrors the fire-time ``_run`` in
         ``test_evaluate_answers.py`` and matches the repo's
         deterministic-test convention.
+
+        :param kv: scripted ``_send_kv_write`` double whose per-call
+            outcomes drive the retry loop's success/failure path.
+        :return: the fully-driven behaviour instance so tests can
+            inspect ``context.logger`` call args.
         """
         b = _make_behaviour()
         # ``_make_behaviour`` stubs delivery-side out as a no-op for
