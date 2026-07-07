@@ -476,7 +476,7 @@ class TestPickEarliestUsableSeedDelivery:
         ``fired_at`` still comes from the request-level
         ``blockTimestamp`` so the fire is not lost.
         """
-        deliveries = [
+        deliveries: List[Dict[str, Any]] = [
             {"id": "d1", "blockTimestamp": "bad", "toolResponse": self._VALID},
             {"id": "d2", "blockTimestamp": None, "toolResponse": self._VALID},
         ]
@@ -484,12 +484,12 @@ class TestPickEarliestUsableSeedDelivery:
 
     def test_non_dict_deliveries_are_skipped(self) -> None:
         """Malformed delivery entries don't crash the picker."""
-        deliveries = [
+        deliveries: List[Any] = [
             "not-a-dict",
             None,
             {"id": "d1", "blockTimestamp": "200", "toolResponse": self._VALID},
         ]
-        result = pick_earliest_usable_seed_delivery(deliveries)  # type: ignore[arg-type]
+        result = pick_earliest_usable_seed_delivery(deliveries)
         assert result is deliveries[2]
 
 

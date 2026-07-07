@@ -28,7 +28,7 @@ fingerprint:
   tests/__init__.py: bafybeidpf4le7kmwrvl6u3s4yl2mrlznnu7scha3hvcpd3s2omwo7bdwkq
   tests/behaviours/__init__.py: bafybeierpqlj4wjvfsa2acmkibioivviqudq4ulu5ifuqwcvdcfewzdgau
   tests/behaviours/conftest.py: bafybeifh7u3ainpqkznsjogr4ktmrzgyvtv3uw7td4o7inhx636pe462xm
-  tests/behaviours/test_base.py: bafybeiet6wrjkip52uhuej3tb4ltzblyzyjkc4q3lrzqr5hfnkrimgbn7m
+  tests/behaviours/test_base.py: bafybeibptav3hnwupxq7p63dprgbfdng4n4tdgvwanuh3c23loxfbf34lu
   tests/behaviours/test_build_answer_tx.py: bafybeib4isqzcd6x7owdusekcgtnmgebfjlw5banmbzxyamu2wmw4e6doe
   tests/behaviours/test_evaluate_answers.py: bafybeido4yvemwvq7somzas4cgjtjv7nqs3ib2h56r5otqmlj7sgpar5ru
   tests/behaviours/test_post_transaction.py: bafybeibihvgozgvlrfyrkpq7gg3hpvzp5h7g633oggqnu5auqtnfyakbcy
