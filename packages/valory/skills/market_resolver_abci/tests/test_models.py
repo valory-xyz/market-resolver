@@ -35,6 +35,7 @@ from packages.valory.skills.market_resolver_abci.models import (
     ConditionalTokensSubgraph,
     MARGIN,
     MULTIPLIER,
+    MechGnosisSubgraph,
     MechResponseSpecs,
     MechToolsSpecs,
     MechsSubgraph,
@@ -236,6 +237,14 @@ class TestReExports:
         )
 
         assert MechsSubgraph is BaseMechsSubgraph
+
+    def test_mech_gnosis_subgraph_re_export(self) -> None:
+        """Check that MechGnosisSubgraph is re-exported from market_resolution_manager_abci."""
+        from packages.valory.skills.market_resolution_manager_abci.models import (
+            MechGnosisSubgraph as BaseMechGnosisSubgraph,
+        )
+
+        assert MechGnosisSubgraph is BaseMechGnosisSubgraph
 
 
 class TestConstants:

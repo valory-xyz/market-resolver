@@ -104,6 +104,7 @@ Description of selected variables to configure the service:
 | `ON_CHAIN_SERVICE_ID` | `null` | Olas registry service id. |
 | `REALITIO_SUBGRAPH_URL` | `https://gateway.thegraph.com/api/api-key/subgraphs/id/E7ymrCnNcQdAAgLbdFWzGE5mvr5Mb5T9VfT43FqA7bNh` | Realitio subgraph. |
 | `SAFE_CONTRACT_ADDRESS` | `0x0000000000000000000000000000000000000000` | Gnosis Safe multisig controlled by the agents. |
+| `STORE_PATH` | `/data` | Directory for the kv_store SQLite database that tracks fired mech requests ("have I already asked about this market?"). **Must be a persistent volume**: if the store is wiped, every market's request history is re-seeded from the subgraph, and requests fired after the migration to the off-chain path are not in the subgraph, so those markets would be re-requested (paid) up to `max_mech_retries` times. On Propel the default `/data` is a PVC and works as-is. On bare metal, point it at a persisted directory the agent user can write to; the agent creates the directory on first run and fails with `PermissionError` if it can't. |
 | `TRUSTED_ADDRESSES` | `[]` (fill in) | Answerers whose answers we treat as authoritative. |
 | `WATCHED_CREATOR_ADDRESSES` | `[]` (fill in) | Market creators whose markets we scan. |
 
