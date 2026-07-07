@@ -571,24 +571,32 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
 
         written = 0
         for row in historical:
+            # Extract ``deliveries`` once so both the shape-drift log
+            # below and the phase-3 gate further down can consult it
+            # without re-walking the row. A malformed row (non-dict or
+            # non-list deliveries) collapses to ``[]`` for logging
+            # purposes; ``subgraph_row_to_cache_row`` still gets the
+            # verbatim row and handles the malformed case itself.
+            raw_deliveries: list = (
+                row.get("deliveries") if isinstance(row, dict) else None
+            ) or []
+            if not isinstance(raw_deliveries, list):
+                raw_deliveries = []
+
             # Shape-drift log for nested deliveries. The top-level
             # ``historical`` list is guarded above; a peer drift in
             # ``row["deliveries"]`` -- string entries, nulls,
             # unexpected envelope -- would otherwise silently seed the
             # row delivery-less and look identical to "genuinely
             # undelivered" in the store.
-            if isinstance(row, dict):
-                raw_deliveries = row.get("deliveries") or []
-                if isinstance(raw_deliveries, list) and any(
-                    not isinstance(d, dict) for d in raw_deliveries
-                ):
-                    self.context.logger.warning(
-                        "Non-dict entries in subgraph deliveries for "
-                        "market %s; ignoring the drifted entries. "
-                        "row_id=%r",
-                        market_id,
-                        row.get("id"),
-                    )
+            if any(not isinstance(d, dict) for d in raw_deliveries):
+                self.context.logger.warning(
+                    "Non-dict entries in subgraph deliveries for "
+                    "market %s; ignoring the drifted entries. "
+                    "row_id=%r",
+                    market_id,
+                    row.get("id") if isinstance(row, dict) else None,
+                )
 
             converted = mech_cache.subgraph_row_to_cache_row(
                 row,
@@ -631,14 +639,25 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
             # to derive here from the converted row: re-parse the
             # kept ``result`` at seed time as a signal.
             if converted.get("result") is None:
-                # Phase 3: picker returned ``None``.
-                self.context.logger.warning(
-                    "Seeded row %s for market %s carries no delivery "
-                    "(phase 3): scan will classify unanswered and may "
-                    "re-fire when retry_after expires.",
-                    converted["nonce"],
-                    market_id,
-                )
+                # Phase 3: picker returned ``None``. Gate on
+                # "the row actually had deliveries" so a healthy
+                # in-flight market with ``deliveries: []`` doesn't
+                # log the phase-3 warning on every seed cycle -- an
+                # empty deliveries list is the normal shape for
+                # "asked but mech hasn't answered yet", not a
+                # picker-failed-to-find-usable-delivery signal.
+                if raw_deliveries:
+                    self.context.logger.warning(
+                        "Seeded row %s for market %s carries no "
+                        "delivery (phase 3): the row had %d "
+                        "deliveries but none carried a numeric "
+                        "blockTimestamp; scan will classify "
+                        "unanswered and may re-fire when retry_after "
+                        "expires.",
+                        converted["nonce"],
+                        market_id,
+                        len(raw_deliveries),
+                    )
             elif not is_cached_evaluation_valid(
                 parse_mech_response(converted.get("result"))
             ):

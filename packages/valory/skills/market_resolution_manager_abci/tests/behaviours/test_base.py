@@ -1254,6 +1254,65 @@ class TestEnsureMarketSeeded:
         assert evaluation is not None
         assert evaluation["answer"] == ANSWER_YES
 
+    def test_empty_deliveries_does_not_log_phase_3_warning(self) -> None:
+        """Healthy in-flight market (deliveries: []) must not trigger the phase-3 log.
+
+        The phase-3 WARNING was added to trace picker-can't-find-a-
+        usable-delivery cases, but an ``asked-but-mech-has-not-
+        answered-yet`` request also stores ``result: None``. Without
+        the "row actually had deliveries" gate, every healthy
+        in-flight market would log a re-fire signal at seed time --
+        noise in exactly the channel this log adds. This test pins
+        the guard so a regression can't re-introduce the noise.
+        """
+        kv = _FakeKvStore()
+        # Row with no deliveries at all -- normal in-flight shape.
+        subgraph = _SubgraphStub([self._subgraph_row("0xreq-in-flight")])
+        b, stack = self._wired_behaviour(kv, subgraph)
+        with stack:
+            _ = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+
+        phase_3_warnings = [
+            call
+            for call in b.context.logger.warning.call_args_list
+            if "phase 3" in str(call)
+        ]
+        assert phase_3_warnings == [], phase_3_warnings
+
+    def test_all_deliveries_bad_ts_logs_phase_3_warning(self) -> None:
+        """Row with deliveries but no numeric ts -> phase-3 log fires with count.
+
+        Regression pair for
+        ``test_empty_deliveries_does_not_log_phase_3_warning``: the
+        guard on the phase-3 log must trigger ONLY when the picker
+        can't find a usable delivery, but the row HAD deliveries to
+        begin with -- that's the actual re-fire signal.
+        """
+        row: Dict[str, Any] = {
+            "id": "0xreq-bad-ts",
+            "blockTimestamp": "1690000100",
+            "parsedRequest": {
+                "prompt": self._TITLE,
+                "tool": "resolve-market-jury-v1",
+            },
+            "deliveries": [
+                {"id": "d1", "blockTimestamp": "bad", "toolResponse": "x"},
+                {"id": "d2", "blockTimestamp": None, "toolResponse": "y"},
+            ],
+        }
+        kv = _FakeKvStore()
+        subgraph = _SubgraphStub([row])
+        b, stack = self._wired_behaviour(kv, subgraph)
+        with stack:
+            _ = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+
+        phase_3_warnings = [
+            call
+            for call in b.context.logger.warning.call_args_list
+            if "phase 3" in str(call)
+        ]
+        assert len(phase_3_warnings) == 1
+
     def test_unusable_subgraph_row_skipped_good_row_seeded(self) -> None:
         """A drifted subgraph row is skipped; the usable one still seeds."""
         kv = _FakeKvStore()
