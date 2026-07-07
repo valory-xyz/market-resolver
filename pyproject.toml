@@ -60,6 +60,10 @@ dev = [
 [tool.uv]
 default-groups = "all"
 prerelease = "allow"
+# cffi 2.1.0 (transitive via cryptography << open-aea-ledger-solana)
+# reports its license as MIT-0, which tomte's PARANOID liccheck rejects.
+# Constrain to the previous minor until the tomte allowlist covers MIT-0.
+override-dependencies = ["cffi<2.1"]
 
 [tool.tomte]
 # Third-party packages on disk are synced from open-autonomy + open-aea
@@ -68,9 +72,9 @@ prerelease = "allow"
 # omen_* resolution skills, and genai for the llm protocol + openai
 # connection.
 upstream_pins = [
-    "valory-xyz/mech-interact@v0.32.4-rc2",
+    "valory-xyz/mech-interact@v0.32.4",
     # mech ships the `valory/balance_tracker` contract that
-    # mech_interact_abci (v0.32.4-rc2+) references via YAML.
+    # mech_interact_abci (v0.32.4+) references via YAML.
     "valory-xyz/mech@v0.34.2-rc2",
     "valory-xyz/omen-protocol@v0.1.3",
     "valory-xyz/genai@v7.2.2",
