@@ -20,7 +20,7 @@
 """This module contains the ScanMarketsBehaviour."""
 
 from string import Template
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Dict, Generator, List, Optional, Set
 
 from packages.valory.skills.market_resolution_manager_abci.behaviours.base import (
     MarketResolutionManagerBaseBehaviour,
@@ -180,20 +180,46 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             else:
                 questions_db[market_id] = self._new_entry(market, current_answerer, now)
 
-        # Step 5: Refresh mech_requests cache from the Mech Gnosis subgraph.
-        # We re-query every scan so that:
+        # Step 5: Refresh mech_requests from the kv_store cache (which is
+        # lazily seeded from the Mech Gnosis subgraph the first time each
+        # market is read; see ``fetch_mech_requests_for_market``).
+        # We re-read every scan so that:
         # 1. Late deliveries (responses that arrive after our in-process
         #    ``mech_response_round`` timed out) are still picked up.
         #    Otherwise a Mech that is slow but eventually responsive forces
         #    us to re-request the same market forever.
-        # 2. ``mech_retries`` converges to ``len(mech_requests)`` once the
-        #    subgraph catches up, so the exhaustion gate survives restarts.
-        #    The ``max()`` below guarantees the counter is monotonic: a brief
-        #    subgraph-indexing-lag right after ``evaluate_answers`` fires
-        #    a request can never lower the count back below the local value.
-        for _, entry in questions_db.items():
+        # 2. ``mech_retries`` converges to ``len(mech_requests)`` after a
+        #    restart, so the exhaustion gate survives losing in-memory
+        #    state. The ``max()`` below guarantees the counter is
+        #    monotonic: a fire whose kv write failed can never lower the
+        #    count back below the local value.
+        # Markets whose kv-cache read fails this cycle are held out of
+        # Step 7's actionable-selection: without a successful read, the
+        # fields sourced from the cache (``mech_requests``, and via
+        # them ``mech_retries`` / ``evaluation``) are stale for this
+        # cycle, so classifying and selecting on them could re-fire a
+        # market whose real history is intact in the kv store but
+        # temporarily unreachable.
+        #
+        # We deliberately do NOT delete the entry: ``retry_after`` and
+        # ``pending_tx`` (with ``escalation_count``, ``timestamp``) have
+        # no other source of truth. Popping the entry would let Step 4
+        # recreate it via ``_new_entry()`` on the next cycle with those
+        # fields reset to defaults, bypassing the undeterminable-
+        # evaluation cooldown gate and the challenge cooldown -- either
+        # of which is a duplicate paid action.
+        skipped_seed_markets: Set[str] = set()
+        for market_id, entry in questions_db.items():
             requests = yield from self.fetch_mech_requests_for_market(entry)
             if requests is None:
+                self.context.logger.warning(
+                    "Market %s: mech-cache read failed this scan cycle. "
+                    "Holding this market out of actionable classification "
+                    "so a fresh-look duplicate paid mech request is not "
+                    "fired; will retry the cache read on the next scan.",
+                    market_id,
+                )
+                skipped_seed_markets.add(market_id)
                 continue
             entry["mech_requests"] = requests
             if entry.get("evaluation") is None:
@@ -218,8 +244,8 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
             # evaluation, skips the Mech request, and build_answer_tx
             # only re-sets retry_after -- the market never progresses
             # past 1 on-chain Mech request and gets stuck in a daily
-            # zombie loop. ``mech_requests`` is sourced from the subgraph
-            # each scan; do not mutate it here.
+            # zombie loop. ``mech_requests`` is sourced from the kv_store
+            # cache each scan; do not mutate it here.
             if evaluation is not None and mech_answer is None:
                 entry["evaluation"] = None
 
@@ -245,6 +271,11 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
 
         actionable: List[Dict[str, Any]] = []
         for market_id, entry in questions_db.items():
+            # Held out of this cycle because seeding / cache read failed;
+            # entry survives so cooldown fields (``retry_after``,
+            # ``pending_tx``) are preserved for the next scan.
+            if market_id in skipped_seed_markets:
+                continue
             status = entry["status"]
             if status in (AnswerStatus.TRUSTED_ANSWER, AnswerStatus.VERIFIED):
                 continue
@@ -397,9 +428,10 @@ class ScanMarketsBehaviour(MarketResolutionManagerBaseBehaviour):
         mech_requests: List[Dict[str, Any]],
     ) -> Optional[Dict[str, Any]]:
         """Earliest valid evaluation across requests + their deliveries."""
-        # ``base.py:69`` fetches deliveries unbounded by design; iterate
-        # ALL deliveries per request so a Mech-internal retry whose first
-        # delivery is garbage but a later one is valid still resolves.
+        # ``MECH_CACHE_QUERY_TEMPLATE`` in ``base.py`` fetches deliveries
+        # unbounded by design; iterate ALL deliveries per request so a
+        # Mech-internal retry whose first delivery is garbage but a later
+        # one is valid still resolves.
         for req in mech_requests:
             for delivery in req.get("deliveries") or []:
                 evaluation = parse_mech_response(delivery.get("toolResponse"))

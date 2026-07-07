@@ -50,6 +50,9 @@ packages/valory/skills/omen_fpmm_remove_liquidity_abci
 packages/valory/skills/omen_realitio_withdraw_bonds_abci
 packages/valory/contracts/staking_token
 packages/valory/contracts/fpmm
+packages/valory/contracts/balance_tracker
+packages/valory/contracts/balance_tracker_fixed_price_native
+packages/valory/contracts/mech_marketplace
 
 leak_report
 data/

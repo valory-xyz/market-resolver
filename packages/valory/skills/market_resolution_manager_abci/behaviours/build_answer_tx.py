@@ -19,7 +19,8 @@
 
 """This module contains the BuildAnswerTxBehaviour."""
 
-from typing import Generator, Optional, Tuple, cast
+import time
+from typing import Any, Generator, Optional, Tuple, cast
 
 from packages.valory.contracts.gnosis_safe.contract import GnosisSafeContract
 from packages.valory.contracts.multisend.contract import (
@@ -28,7 +29,10 @@ from packages.valory.contracts.multisend.contract import (
 )
 from packages.valory.contracts.realitio.contract import RealitioContract
 from packages.valory.protocols.contract_api import ContractApiMessage
+from packages.valory.skills.market_resolution_manager_abci import mech_cache
 from packages.valory.skills.market_resolution_manager_abci.behaviours.base import (
+    KV_WRITE_RETRY_SLEEP_SECONDS,
+    MAX_KV_WRITE_ATTEMPTS,
     MarketResolutionManagerBaseBehaviour,
     jury_error_discriminator,
     parse_mech_response,
@@ -96,23 +100,26 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
             return
 
         # Check if we have fresh Mech responses (from MechInteract).
-        # Skip if the evaluation was already populated by the subgraph
-        # cache path -- MechInteract didn't run in that case.
+        # Skip if the evaluation was already populated by the kv mech-cache
+        # (see ``fetch_mech_requests_for_market``) -- MechInteract didn't
+        # run in that case.
         #
         # ``pending_nonce`` is set by evaluate_answers when it fires a Mech
         # request; the in-process MechInteract delivery is matched by nonce.
-        # The next scan_markets cycle will re-source ``mech_requests`` from
-        # the subgraph once it indexes this delivery, so we only need to
-        # populate ``evaluation`` here.
+        # The delivery-time kv write in ``_buffer_mech_response_delivered``
+        # below persists the answer into the row the next scan cycle will
+        # pick up, so we only need to populate ``evaluation`` here.
         expected_nonce = entry.get("pending_nonce")
         if entry.get("evaluation") is None and expected_nonce:
             mech_responses = self.synchronized_data.mech_responses
         else:
             mech_responses = []
+        matched_resp: Optional[Any] = None
         if mech_responses and expected_nonce:
             # Find the response matching our request (by nonce)
             for resp in mech_responses:
                 if resp.nonce == expected_nonce:
+                    matched_resp = resp
                     self.context.logger.info(
                         f"Market {market_id}: received Mech response -- "
                         f"result={resp.result}, error={resp.error}"
@@ -143,6 +150,19 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
             # Save DB with evaluation if matched
             questions_db[market_id] = entry
             self.questions_db = questions_db
+
+        # Durable "delivered" side of the kv_store row -- the source of
+        # truth the next scan cycle reads instead of the subgraph. Only
+        # runs when we actually matched a response this cycle -- the
+        # non-match path leaves the row's ``result``/``delivered_at``
+        # null so the next scan sees "asked but not delivered yet".
+        if matched_resp is not None:
+            yield from self._buffer_mech_response_delivered(
+                market_id=market_id,
+                entry=entry,
+                nonce=expected_nonce,
+                resp=matched_resp,
+            )
 
         evaluation = entry.get("evaluation")
         now = int(self.last_synced_timestamp)
@@ -565,3 +585,80 @@ class BuildAnswerTxBehaviour(MarketResolutionManagerBaseBehaviour):
         yield from self.send_a2a_transaction(payload)
         yield from self.wait_until_round_end()
         self.set_done()
+
+    def _buffer_mech_response_delivered(
+        self,
+        market_id: str,
+        entry: dict,
+        nonce: str,
+        resp: Any,
+    ) -> Generator[None, None, None]:
+        """Update the kv_store row for this nonce with the delivered response.
+
+        kv_store's CREATE_OR_UPDATE_REQUEST overwrites the whole value,
+        so we rebuild the full row from what we have on hand. ``entry``
+        was set at fire time by ``evaluate_answers`` with ``mech_fired_at``
+        stashed; on the post-restart path (agent restarted between fire
+        and delivery) that stash is gone and we fall back to ``now``, which
+        makes the delivery row's ``fired_at`` slightly less accurate but
+        does not affect the "have I asked?" cache -- the row simply
+        exists with ``delivered_at`` set.
+
+        Retry policy mirrors the fire-time write in
+        ``_buffer_mech_request_fired``: both writes protect against the
+        same class of duplicate-paid-mech regression. If the delivery-
+        time write is lost, the row permanently stays "fired but
+        undelivered" -- harmless in the current run (the in-memory
+        ``evaluation`` was already consumed) but after an agent restart
+        ``questions_db`` is rebuilt from the cache with ``deliveries``
+        empty, ``evaluation`` back to ``None``, and ``mech_retries=1``
+        below ``max_mech_retries=10`` -- fires a fresh paid mech
+        request for a market whose answer was already received. Bounded
+        retries + ERROR-on-give-up close that window.
+
+        :param market_id: the Omen market id being answered.
+        :param entry: the questions_db entry, needed for
+            ``mech_fired_at`` and ``title``.
+        :param nonce: the fire-time uuid4, also the row PK.
+        :param resp: the MechInteractionResponse matched by nonce.
+        :yield: control to the FSM while the kv write is in flight.
+        """
+        safe_address = self.synchronized_data.safe_contract_address or ""
+        fired_at = int(entry.get("mech_fired_at") or time.time())
+        prompt = str(entry.get("title") or "")
+        key = mech_cache.cache_key(
+            prefix=self.params.mech_cache_key_prefix,
+            safe_address=safe_address,
+            market_id=market_id,
+            nonce=nonce,
+        )
+        value = mech_cache.serialize_row(
+            safe_address=safe_address,
+            market_id=market_id,
+            nonce=nonce,
+            tool=self.params.mech_tool_resolve_market,
+            prompt=prompt,
+            fired_at=fired_at,
+            result=resp.result,
+            error=resp.error,
+            delivered_at=int(time.time()),
+        )
+        # A give-up here (all attempts fail) leaves the delivery row
+        # missing from the cache. If the agent restarts before another
+        # agent's row lands, ``questions_db`` is rebuilt with the
+        # delivery missing and could re-fire this market (paid); the
+        # ERROR line from the helper is the operator-facing
+        # financial-loss signal.
+        ok = yield from self._send_kv_write_with_retries(
+            key=key,
+            value=value,
+            max_attempts=MAX_KV_WRITE_ATTEMPTS,
+            sleep_seconds=KV_WRITE_RETRY_SLEEP_SECONDS,
+            retry_label="delivery-time",
+        )
+        # Swallow the outcome regardless: on the no-evaluation sub-path
+        # (Event.NONE -> FinishedResolutionRound -> reset-and-pause) the
+        # FSM has to reach the transition, and on the success path
+        # (Event.DONE -> FinishedWithAnswerTxRound) settlement continues
+        # independent of the buffer write.
+        _ = ok

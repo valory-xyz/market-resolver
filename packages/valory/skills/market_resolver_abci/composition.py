@@ -81,6 +81,7 @@ abci_app_transition_mapping: AbciAppTransitionMapping = {
     MarketResolutionManagerAbci.FinishedWithFpmmRemoveLiquidityPostTxRound: OmenCtRedeemTokensAbci.CtRedeemTokensRound,
     MarketResolutionManagerAbci.FinishedWithCtRedeemTokensPostTxRound: OmenRealitioWithdrawBondAbci.RealitioWithdrawBondsRound,
     MarketResolutionManagerAbci.FinishedWithRealitioWithdrawBondsPostTxRound: MarketResolutionManagerAbci.ScanMarketsRound,
+    MarketResolutionManagerAbci.FinishedWithOffchainDepositPostTxRound: MechRequestStates.MechRequestRound,
     # Core resolution flow (unchanged) ------------------------------------------
     MarketResolutionManagerAbci.FinishedWithMechRequestRound: MechVersionStates.MechVersionDetectionRound,
     MechFinalStates.FinishedMarketplaceLegacyDetectedRound: MechRequestStates.MechRequestRound,
@@ -92,6 +93,9 @@ abci_app_transition_mapping: AbciAppTransitionMapping = {
     MechFinalStates.FinishedMechResponseRound: MarketResolutionManagerAbci.BuildAnswerTxRound,
     MechFinalStates.FinishedMechRequestSkipRound: ResetAndPauseRound,
     MechFinalStates.FinishedMechResponseTimeoutRound: ResetAndPauseRound,
+    MechFinalStates.FinishedOffchainMechRequestRound: MechResponseStates.MechResponseRound,
+    MechFinalStates.FinishedOffchainMechDepositNeededRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
+    MechFinalStates.FailedOffchainMechRequestRound: ResetAndPauseRound,
     MarketResolutionManagerAbci.FinishedWithAnswerTxRound: TransactionSettlementAbci.RandomnessTransactionSubmissionRound,
     # TxSettlement -> PostTransactionRound (multiplexes by tx_submitter)
     TransactionSettlementAbci.FinishedTransactionSubmissionRound: MarketResolutionManagerAbci.PostTransactionRound,

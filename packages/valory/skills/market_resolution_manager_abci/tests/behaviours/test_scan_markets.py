@@ -264,8 +264,9 @@ class TestNewEntry:
         assert entry["mech_retries"] == 0
         assert entry["status"] is None
         # Refactor: ``mech_request`` / ``mech_response`` were dropped --
-        # the per-market Mech state is now sourced from the subgraph
-        # via ``mech_requests`` (list of subgraph request entries).
+        # the per-market Mech state is now sourced from the kv mech-cache
+        # via ``mech_requests`` (list of cache rows rehydrated to the
+        # legacy subgraph shape by ``fetch_mech_requests_for_market``).
         assert "mech_request" not in entry
         assert "mech_response" not in entry
 
@@ -987,7 +988,17 @@ class TestAsyncActIntegration:
         assert call_results == []
 
     def test_cache_lookup_returns_none_skipped(self) -> None:
-        """Subgraph error (cached=None) leaves entry untouched, no crash."""
+        """Cache-read failure -> entry preserved but held out of Step 7.
+
+        Updated for the fail-closed hardening: on a transient
+        kv/subgraph error, ``fetch_mech_requests_for_market`` returns
+        ``None`` and the market is held out of the actionable-selection
+        loop so it cannot be classified as fireable with its fresh-
+        restart defaults. The entry itself is preserved so cooldown
+        fields (``retry_after``, ``pending_tx``) survive the cycle;
+        see ``test_cache_read_failure_holds_market_out_of_actionable``
+        for the survival assertions. Here we just check it isn't fired.
+        """
         market = _make_market("0xMNone")
         b = _make_behaviour()
         patch.object(
@@ -997,17 +1008,25 @@ class TestAsyncActIntegration:
         patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
         patch.object(b, "fetch_mech_requests_for_market", new=_make_gen(None)).start()
 
+        payload_sent: List[Any] = []
+
+        def capture_send(payload: Any) -> Any:
+            payload_sent.append(payload)
+            return None
+            yield  # noqa
+
         with (
-            patch.object(b, "send_a2a_transaction", new=_make_gen(None)),
+            patch.object(b, "send_a2a_transaction", new=capture_send),
             patch.object(b, "wait_until_round_end", new=_make_gen(None)),
             patch.object(b, "set_done"),
         ):
             _run_async_act(b)
 
-        entry = b.questions_db.get("0xMNone")
-        assert entry is not None
-        assert entry["evaluation"] is None
-        assert entry["mech_retries"] == 0
+        # Not selected: no fresh mech fire even though the entry has
+        # fresh-restart defaults (mech_retries: 0).
+        assert payload_sent[0].selected_market_id is None
+        # Entry survives; the next scan retries the cache read.
+        assert "0xMNone" in b.questions_db
 
     def test_max_mech_retries_skipped(self) -> None:
         """Market with mech_retries >= max_mech_retries is not selected."""
@@ -1062,18 +1081,21 @@ class TestAsyncActIntegration:
     def test_mech_retries_monotonic_when_subgraph_empty(
         self, subgraph_returns: Any
     ) -> None:
-        """Regression on retry-counter monotonicity.
+        """Regression on retry-counter monotonicity + fail-closed skip.
 
-        ``mech_retries`` must NOT collapse to 0 when the subgraph helper
-        returns ``None`` or ``[]``. The original retry-budget bug shipped
-        because ``mech_retries = max(prior, len(requests))`` silently
-        degraded to 0 when the broken cache query returned an empty list
-        (the ``nonce`` field error masquerading as zero results). The fix
-        preserves the prior counter -- this test pins that contract.
+        Two distinct contracts, one parametrised test:
 
-        Seeds the DB with ``mech_retries=3``, makes the subgraph helper
-        return ``None`` / ``[]``, then asserts the counter is unchanged
-        after a full scan.
+        * ``fetch returns []`` -- healthy empty result. ``mech_retries``
+          must NOT collapse to 0 (the original nonce-field bug shipped
+          because ``max(prior, len(requests))`` silently degraded to 0
+          on a subgraph shape drift masquerading as zero results). The
+          entry stays in ``questions_db`` with the seeded counter.
+        * ``fetch returns None`` -- transient kv/subgraph error. The
+          market is held out of Step 7 so it cannot be re-fired with
+          fresh-restart defaults, but the entry is preserved so
+          ``mech_retries`` and any cooldown fields carry over -- per
+          the fail-closed hardening covered by
+          ``test_cache_read_failure_holds_market_out_of_actionable``.
 
         :param subgraph_returns: the value ``fetch_mech_requests_for_market``
             is mocked to return (``None`` or empty list).
@@ -1127,10 +1149,18 @@ class TestAsyncActIntegration:
         ):
             _run_async_act(b)
 
-        # Counter must be preserved (max of prior=3 and the empty/None
-        # subgraph result). A regression to the buggy behaviour would
-        # collapse this to 0 and let the market be re-selected indefinitely.
-        assert b.questions_db[market_id]["mech_retries"] == 3
+        if subgraph_returns is None:
+            # Fail-closed: entry preserved, counter carries over from the
+            # prior scan (line 220's ``max()`` is bypassed by the
+            # ``continue`` at line 219). Market not selected because it's
+            # in ``skipped_seed_markets`` when Step 7 runs.
+            assert b.questions_db[market_id]["mech_retries"] == 3
+            assert payload_sent[0].selected_market_id is None
+        else:
+            # Healthy empty result: counter must be preserved. A
+            # regression to the buggy behaviour would collapse this to
+            # 0 and let the market be re-selected indefinitely.
+            assert b.questions_db[market_id]["mech_retries"] == 3
 
     def test_none_mech_retries_normalizes_to_zero_on_empty_subgraph(self) -> None:
         """``None`` mech_retries normalizes to ``0`` via the line-204 max() expression."""
@@ -1210,13 +1240,17 @@ class TestAsyncActIntegration:
         ).start()
         patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
         patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
-        # Returning ``None`` here triggers the ``continue`` skip on
-        # line 196, leaving ``mech_retries`` un-normalized so the
-        # downstream gate sees the seeded ``None``.
+        # A healthy fetch (empty list) exercises the retry-cap gate's
+        # tolerance for the pre-existing ``mech_retries: None`` sentinel
+        # without coupling to the None-fetch skip path (which holds the
+        # market out of Step 7 -- covered by
+        # ``test_cache_read_failure_holds_market_out_of_actionable``).
+        # After the max() normalisation on line ~205, mech_retries is 0
+        # and the gate passes.
         patch.object(
             b,
             "fetch_mech_requests_for_market",
-            new=_make_gen(None),
+            new=_make_gen([]),
         ).start()
 
         payload_sent = []
@@ -1628,3 +1662,106 @@ class TestAsyncActIntegration:
 
         assert len(payload_sent) == 1
         assert payload_sent[0].selected_market_id == "0xSelected"
+
+    def test_cache_read_failure_holds_market_out_of_actionable(self) -> None:
+        """Fetch failure this cycle -> market skipped, cooldown fields survive.
+
+        Regression: on a transient kv/subgraph error,
+        ``fetch_mech_requests_for_market`` returns None. The fix must:
+
+        1. Hold the market out of Step 7's actionable-selection so a
+           duplicate paid mech fire (or premature challenge bond) is
+           not triggered on stale data.
+        2. Preserve the entry -- and specifically ``retry_after`` and
+           ``pending_tx.escalation_count`` / ``timestamp``, which have
+           no source of truth outside the entry dict. An earlier
+           iteration of the fix ``pop``ed the entry; Step 4's
+           ``_new_entry()`` on the next cycle then reset those fields
+           to defaults, bypassing the undeterminable-evaluation
+           cooldown and the challenge cooldown -- both of which are
+           duplicate paid actions.
+        3. Log a warning naming the market so operators see the
+           staleness.
+        """
+        # A market that is already mid-escalation (challenge bond has
+        # been posted once already) with a fresh undeterminable-eval
+        # cooldown in effect. Both cooldown fields would gate the market
+        # out of Step 7 if preserved, and both are unrecoverable if
+        # dropped.
+        market = _make_market(
+            "0xSkipMe",
+            current_answer=ANSWER_NO,
+            current_answer_bond="1000000000000000000",
+            current_answer_timestamp=str(NOW - 100),
+        )
+        seeded_db = {
+            "0xSkipMe": {
+                "status": None,
+                "market_id": "0xSkipMe",
+                "title": "?",
+                "question_id": "0xQ",
+                "detected_at": NOW,
+                "on_chain_answer": ANSWER_NO,
+                "on_chain_bond": "1000000000000000000",
+                "last_answerer": "0xOther",
+                "last_answer_timestamp": str(NOW - 100),
+                "market_closing_timestamp": 1_699_000_000,
+                "realitio_timeout": 86400,
+                "mech_request": None,
+                "mech_response": None,
+                "evaluation": {"answer": ANSWER_YES},
+                "pending_tx": {
+                    "escalation_count": 1,
+                    "timestamp": NOW - 100,
+                },
+                "retry_after": NOW + 3600,
+                "mech_retries": 2,
+            }
+        }
+        b = _make_behaviour(questions_db=seeded_db)
+        patch.object(
+            b, "_fetch_pending_and_finalizing_markets", new=_make_gen([market])
+        ).start()
+        patch.object(b, "_fetch_current_answerers", new=_make_gen({})).start()
+        patch.object(b, "get_native_balance", new=_make_gen(10 * 10**18)).start()
+        # Simulate the failure: fetch returns None instead of a list.
+        patch.object(b, "fetch_mech_requests_for_market", new=_make_gen(None)).start()
+
+        payload_sent: List[Any] = []
+
+        def capture_send(payload: Any) -> Any:
+            payload_sent.append(payload)
+            return None
+            yield  # noqa
+
+        with (
+            patch.object(b, "send_a2a_transaction", new=capture_send),
+            patch.object(b, "wait_until_round_end", new=_make_gen(None)),
+            patch.object(b, "set_done"),
+        ):
+            _run_async_act(b)
+
+        # The failed-fetch market was NOT selected -- no fresh mech fire,
+        # no premature challenge bond.
+        assert len(payload_sent) == 1
+        assert payload_sent[0].selected_market_id is None
+        # The entry survives so cooldown fields are preserved across the
+        # transient failure. Both fields have no other source of truth;
+        # a ``pop`` here would let ``_new_entry()`` recreate them at
+        # defaults on the next cycle and bypass the cooldown gates.
+        surviving = b.questions_db["0xSkipMe"]
+        assert surviving["retry_after"] == NOW + 3600
+        assert surviving["pending_tx"]["escalation_count"] == 1
+        assert surviving["pending_tx"]["timestamp"] == NOW - 100
+        # ``mech_retries`` also carries over from the prior scan since we
+        # ``continue``d before the ``max()`` refresh -- neither reset nor
+        # spuriously bumped.
+        assert surviving["mech_retries"] == 2
+        # A warning named the specific market so the staleness is observable.
+        warning_calls = b.context.logger.warning.call_args_list
+        matched = [
+            call
+            for call in warning_calls
+            if "mech-cache read failed" in call.args[0] and "0xSkipMe" in call.args
+        ]
+        assert matched, warning_calls

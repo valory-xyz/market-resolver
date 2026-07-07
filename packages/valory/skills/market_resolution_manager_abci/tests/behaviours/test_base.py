@@ -23,15 +23,19 @@
 # pylint: disable=unsubscriptable-object,unsupported-membership-test
 
 import json
-from typing import Any, Dict, List
+from contextlib import ExitStack
+from types import SimpleNamespace
+from typing import Any, Dict, List, Optional, Tuple
 from unittest.mock import MagicMock, PropertyMock, patch
 
+from packages.valory.protocols.kv_store.message import KvStoreMessage
 from packages.valory.protocols.ledger_api import LedgerApiMessage
+from packages.valory.skills.market_resolution_manager_abci import mech_cache
 from packages.valory.skills.market_resolution_manager_abci.behaviours.base import (
     ANSWER_INVALID,
     ANSWER_NO,
     ANSWER_YES,
-    MECH_CACHE_QUERY_TEMPLATE,
+    KV_STORE_CONNECTION_PUBLIC_ID,
     is_cached_evaluation_valid,
     jury_error_discriminator,
     parse_mech_response,
@@ -551,7 +555,7 @@ class TestGetOmenSubgraphResult:
 class TestGetMechGnosisSubgraphResult:
     """Tests for get_mech_gnosis_subgraph_result.
 
-    The helper now delegates to ``ApiSpecs.process_response`` so the
+    The helper delegates to ``ApiSpecs.process_response`` so the
     configured ``response_key`` (``data:requests``) is walked by the
     framework. These tests stub ``process_response`` per case to assert
     that its return value is propagated and that the wrapping error
@@ -654,223 +658,673 @@ class TestGetRealitioSubgraphResult:
 
 
 class TestFetchMechRequestsForMarket:
-    """Tests for ``fetch_mech_requests_for_market``.
+    """Tests for ``fetch_mech_requests_for_market`` (kv_store-backed).
 
-    Returns the raw filtered list of subgraph request entries (matching
-    tool + title for the Safe), or ``None`` on subgraph error. The
-    earliest valid evaluation is derived separately by
-    ``ScanMarketsBehaviour._earliest_valid_evaluation`` -- not by this
-    function.
+    Reads its "have I asked this market?" state from the local
+    kv_store rather than the mech subgraph (see
+    ``docs/market_resolver_offchain_scope.md`` in autonolas-marketplace).
+    The return shape is unchanged so ``_earliest_valid_evaluation`` and
+    the ``mech_retries`` counter in ``scan_markets`` need no changes.
+    Callers who fed the return list into those pipelines still get the
+    same values; the only difference is the data source.
     """
 
+    _TITLE = "Will X happen?"
+    _MARKET_ID = "0xmarket"
+    _SAFE = "0xabc"
+
     def _make_entry(
-        self, title: str = "Will X happen?", closing_ts: int = 1_700_000_000
-    ) -> Dict[str, Any]:
-        return {"title": title, "market_closing_timestamp": closing_ts}
-
-    def _make_request_entry(
         self,
-        deliveries: Any = None,
-        tool: str = "resolve-market-jury-v1",
-        prompt: str = "Will X happen?",
-        req_id: str = "req1",
+        title: str = _TITLE,
+        market_id: str = _MARKET_ID,
     ) -> Dict[str, Any]:
-        return {
-            "id": req_id,
-            "blockTimestamp": "1700001000",
-            "parsedRequest": {"tool": tool, "prompt": prompt},
-            "deliveries": deliveries if deliveries is not None else [],
-        }
+        return {"title": title, "market_id": market_id}
 
-    def test_subgraph_error_returns_none(self) -> None:
-        """Returns ``None`` when subgraph call fails."""
-        b = _make_behaviour()
-        with patch.object(b, "get_mech_gnosis_subgraph_result", new=_make_gen(None)):
+    def _make_row_value(
+        self,
+        nonce: str = "nonce-1",
+        tool: str = "resolve-market-jury-v1",
+        prompt: str = _TITLE,
+        fired_at: int = 1_700_000_000,
+        result: Any = None,
+        error: Any = None,
+        delivered_at: Any = None,
+    ) -> str:
+        return json.dumps(
+            {
+                "safe": self._SAFE,
+                "market_id": self._MARKET_ID,
+                "nonce": nonce,
+                "tool": tool,
+                "prompt": prompt,
+                "fired_at": fired_at,
+                "result": result,
+                "error": error,
+                "delivered_at": delivered_at,
+            },
+            sort_keys=True,
+        )
+
+    def _patched_behaviour(self, kv_reply: Any):  # type: ignore[no-untyped-def]
+        """Return a behaviour whose ``_send_kv_list`` yields ``kv_reply``.
+
+        ``_ensure_market_seeded`` is stubbed to True (already seeded) so
+        these tests exercise only the LIST + rehydrate + filter pipeline.
+        Seeding has its own tests in ``TestEnsureMarketSeeded``.
+
+        :param kv_reply: the value the stubbed LIST returns.
+        :return: (behaviour, ExitStack) -- close the stack to unpatch.
+        """
+        # safe_contract_address is a read-only property on
+        # BaseSynchronizedData, so we thread it through the
+        # ``_make_synced_data`` factory rather than assign after
+        # construction.
+        b = _make_behaviour(synced_data=_make_synced_data(safe_address=self._SAFE))
+        stack = ExitStack()
+        stack.enter_context(
+            patch.object(b, "_ensure_market_seeded", new=_make_gen(True))
+        )
+        stack.enter_context(patch.object(b, "_send_kv_list", new=_make_gen(kv_reply)))
+        return b, stack
+
+    def test_kv_error_returns_none(self) -> None:
+        """Returns None when the kv_store LIST fails or times out."""
+        b, patcher = self._patched_behaviour(None)
+        with patcher:
             result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
         assert result is None
 
-    def test_empty_list_returns_empty_list(self) -> None:
-        """Empty list from subgraph helper -> empty list (no error)."""
-        b = _make_behaviour()
-        with patch.object(b, "get_mech_gnosis_subgraph_result", new=_make_gen([])):
+    def test_empty_kv_returns_empty_list(self) -> None:
+        """Empty LIST reply (never asked this market) -> empty list, not None."""
+        b, patcher = self._patched_behaviour({})
+        with patcher:
             result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
         assert result == []
 
-    def test_wrong_tool_filtered_out(self) -> None:
-        """Request with a non-matching tool is filtered out of the list."""
-        b = _make_behaviour()
-        requests = [
-            self._make_request_entry(
-                deliveries=[
-                    {
-                        "toolResponse": json.dumps(
-                            {
-                                "is_valid": True,
-                                "is_determinable": True,
-                                "has_occurred": True,
-                            }
-                        )
-                    }
-                ],
-                tool="wrong-tool",
+    def test_fired_but_undelivered_kept_in_list(self) -> None:
+        """A row with delivered_at=None is kept so it counts toward mech_retries."""
+        # Production uses ``len(mech_requests)`` to drive the retry-counter
+        # gate; unanswered fires must contribute even if no evaluation
+        # can be derived yet.
+        rows = {
+            f"market_resolver/{self._SAFE}/{self._MARKET_ID}/nonce-a": (
+                self._make_row_value(nonce="nonce-a")
             )
-        ]
-        with patch.object(
-            b, "get_mech_gnosis_subgraph_result", new=_make_gen(requests)
-        ):
+        }
+        b, patcher = self._patched_behaviour(rows)
+        with patcher:
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+        assert result is not None
+        assert len(result) == 1
+        assert result[0]["deliveries"] == []
+        assert result[0]["parsedRequest"]["prompt"] == self._TITLE
+        assert result[0]["parsedRequest"]["tool"] == "resolve-market-jury-v1"
+
+    def test_delivered_row_rehydrates_to_delivery_shape(self) -> None:
+        """A delivered row surfaces its toolResponse via deliveries[0]."""
+        tool_response = json.dumps(
+            {"is_valid": True, "is_determinable": True, "has_occurred": True}
+        )
+        rows = {
+            f"market_resolver/{self._SAFE}/{self._MARKET_ID}/nonce-b": (
+                self._make_row_value(
+                    nonce="nonce-b",
+                    result=tool_response,
+                    delivered_at=1_700_000_100,
+                )
+            )
+        }
+        b, patcher = self._patched_behaviour(rows)
+        with patcher:
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+        assert result is not None
+        assert len(result) == 1
+        # _earliest_valid_evaluation can still derive YES from the same shape.
+        evaluation = ScanMarketsBehaviour._earliest_valid_evaluation(result)
+        assert evaluation is not None
+        assert evaluation["answer"] == ANSWER_YES
+
+    def test_wrong_tool_filtered_out(self) -> None:
+        """A row with a non-matching tool is filtered out."""
+        rows = {
+            f"market_resolver/{self._SAFE}/{self._MARKET_ID}/nonce-c": (
+                self._make_row_value(nonce="nonce-c", tool="old-mech-tool")
+            )
+        }
+        b, patcher = self._patched_behaviour(rows)
+        with patcher:
             result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
         assert result == []
 
     def test_wrong_prompt_filtered_out(self) -> None:
-        """Request with a non-matching prompt is filtered out of the list."""
-        b = _make_behaviour()
-        request_entry = self._make_request_entry(
-            deliveries=[
+        """A row whose stored prompt doesn't match the entry title is filtered."""
+        rows = {
+            f"market_resolver/{self._SAFE}/{self._MARKET_ID}/nonce-d": (
+                self._make_row_value(nonce="nonce-d", prompt="Different question?")
+            )
+        }
+        b, patcher = self._patched_behaviour(rows)
+        with patcher:
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+        assert result == []
+
+    def test_malformed_row_silently_skipped(self) -> None:
+        """A row whose value isn't valid JSON is skipped, not raised."""
+        # Pinned because a poison-pill row would otherwise crash the scan
+        # loop and stall market-resolver until the row aged out. The
+        # mech_cache helpers must swallow bad rows.
+        rows = {
+            f"market_resolver/{self._SAFE}/{self._MARKET_ID}/nonce-e": (
+                "not-json-at-all"
+            ),
+            f"market_resolver/{self._SAFE}/{self._MARKET_ID}/nonce-f": (
+                self._make_row_value(nonce="nonce-f")
+            ),
+        }
+        b, patcher = self._patched_behaviour(rows)
+        with patcher:
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+        assert result is not None
+        assert len(result) == 1
+        assert result[0]["id"] == "nonce-f"
+
+    def test_seeding_failure_returns_none_and_skips_list(self) -> None:
+        """Seeding failure -> None, and the row LIST is never attempted.
+
+        Returning [] instead of None here would be read by scan_markets
+        as "never asked this market" and re-fire a paid mech request even
+        though the cache state is simply unknown this cycle.
+        """
+
+        def _list_must_not_run(*_a: Any, **_k: Any) -> Any:
+            raise AssertionError("LIST must not run when seeding failed")
+            yield  # noqa: unreachable -- makes this a generator function
+
+        b = _make_behaviour(synced_data=_make_synced_data(safe_address=self._SAFE))
+        with (
+            patch.object(b, "_ensure_market_seeded", new=_make_gen(False)),
+            patch.object(b, "_send_kv_list", new=_list_must_not_run),
+        ):
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+        assert result is None
+
+
+class _FakeKvStore:
+    """In-memory kv_store double for seeding tests.
+
+    Wired into a behaviour by patching ``_send_kv_read`` /
+    ``_send_kv_write`` / ``_send_kv_list`` with the bound generator
+    methods below, so ``_ensure_market_seeded`` runs its real logic
+    against a real (dict-backed) store. Mirrors the connection's
+    semantics: reads omit missing keys, LIST filters by prefix.
+    """
+
+    def __init__(
+        self,
+        data: Optional[Dict[str, str]] = None,
+        fail_reads: bool = False,
+        fail_writes: bool = False,
+    ) -> None:
+        self.data: Dict[str, str] = dict(data or {})
+        self.fail_reads = fail_reads
+        self.fail_writes = fail_writes
+        self.write_order: List[str] = []
+
+    def read(self, keys: Tuple[str, ...]) -> Any:
+        """READ double: omit missing keys; None when failing."""
+        if self.fail_reads:
+            return None
+        return {k: self.data[k] for k in keys if k in self.data}
+        yield  # noqa: unreachable -- makes this a generator function
+
+    def write(self, key: str, value: str) -> Any:
+        """WRITE double: upsert + record order; False when failing."""
+        if self.fail_writes:
+            return False
+        self.data[key] = value
+        self.write_order.append(key)
+        return True
+        yield  # noqa: unreachable -- makes this a generator function
+
+    def list(self, prefix: str) -> Any:
+        """LIST double: prefix filter over the stored rows."""
+        return {k: v for k, v in self.data.items() if k.startswith(prefix)}
+        yield  # noqa: unreachable -- makes this a generator function
+
+
+class _SubgraphStub:
+    """Stub for ``get_mech_gnosis_subgraph_result`` that counts calls."""
+
+    def __init__(self, rows: Optional[List[Dict[str, Any]]]) -> None:
+        self.rows = rows
+        self.calls = 0
+
+    def __call__(self, query: str) -> Any:
+        """Return the scripted rows (or None) and bump the call counter."""
+        self.calls += 1
+        return self.rows
+        yield  # noqa: unreachable -- makes this a generator function
+
+
+class TestEnsureMarketSeeded:
+    """Acceptance tests for the marker-gated lazy seeding (spec 5.2).
+
+    These run ``fetch_mech_requests_for_market`` end to end against a
+    real in-memory kv store (``_FakeKvStore``); only the process
+    boundaries (kv connection, subgraph HTTP) are stubbed.
+    """
+
+    _TITLE = "Will X happen?"
+    _MARKET_ID = "0xmarket"
+    _SAFE = "0xabc"
+    _PREFIX = "market_resolver/"
+    _MARKER_KEY = f"market_resolver/seeded/{_SAFE}/{_MARKET_ID}"
+
+    def _make_entry(self) -> Dict[str, Any]:
+        return {
+            "title": self._TITLE,
+            "market_id": self._MARKET_ID,
+            "market_closing_timestamp": 1_690_000_000,
+        }
+
+    def _subgraph_row(self, request_id: str, delivered: bool = False) -> Dict[str, Any]:
+        row: Dict[str, Any] = {
+            "id": request_id,
+            "blockTimestamp": "1690000100",
+            "parsedRequest": {
+                "prompt": self._TITLE,
+                "tool": "resolve-market-jury-v1",
+            },
+            "deliveries": [],
+        }
+        if delivered:
+            row["deliveries"] = [
                 {
+                    "id": f"{request_id}-del",
+                    "blockTimestamp": "1690000200",
                     "toolResponse": json.dumps(
                         {
                             "is_valid": True,
                             "is_determinable": True,
                             "has_occurred": True,
                         }
-                    )
-                }
-            ],
-            prompt="Different question?",
-        )
-        with patch.object(
-            b, "get_mech_gnosis_subgraph_result", new=_make_gen([request_entry])
-        ):
-            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
-        assert result == []
-
-    def test_no_deliveries_kept_in_list(self) -> None:
-        """A request with empty ``deliveries`` is still kept in the list.
-
-        Production uses ``len(mech_requests)`` to drive the retry-counter
-        gate, so unanswered requests must contribute even if no
-        evaluation can be derived from them.
-        """
-        b = _make_behaviour()
-        request_entry = self._make_request_entry(deliveries=[])
-        with patch.object(
-            b, "get_mech_gnosis_subgraph_result", new=_make_gen([request_entry])
-        ):
-            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
-        assert result == [request_entry]
-
-    def test_garbage_response_kept_in_list(self) -> None:
-        """A request with an unparseable ``toolResponse`` is still kept."""
-        b = _make_behaviour()
-        request_entry = self._make_request_entry(
-            deliveries=[{"toolResponse": "invalid json {{"}]
-        )
-        with patch.object(
-            b, "get_mech_gnosis_subgraph_result", new=_make_gen([request_entry])
-        ):
-            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
-        assert result == [request_entry]
-
-    def test_undeterminable_response_kept_in_list(self) -> None:
-        """A request whose verdict is undeterminable is still kept.
-
-        ``answer=None`` (Case B) fails ``is_cached_evaluation_valid`` so
-        no evaluation is derived, but the entry is retained for
-        retry-count purposes.
-        """
-        b = _make_behaviour()
-        request_entry = self._make_request_entry(
-            deliveries=[
-                {
-                    "toolResponse": json.dumps(
-                        {"is_valid": True, "is_determinable": False}
-                    )
+                    ),
                 }
             ]
+        return row
+
+    def _wired_behaviour(self, kv: _FakeKvStore, subgraph: _SubgraphStub) -> Any:
+        """Return a behaviour whose kv + subgraph boundaries hit the doubles."""
+        b = _make_behaviour(synced_data=_make_synced_data(safe_address=self._SAFE))
+        stack = ExitStack()
+        stack.enter_context(patch.object(b, "_send_kv_read", new=kv.read))
+        stack.enter_context(patch.object(b, "_send_kv_write", new=kv.write))
+        stack.enter_context(patch.object(b, "_send_kv_list", new=kv.list))
+        stack.enter_context(
+            patch.object(b, "get_mech_gnosis_subgraph_result", new=subgraph)
         )
-        with patch.object(
-            b, "get_mech_gnosis_subgraph_result", new=_make_gen([request_entry])
-        ):
-            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
-        assert result == [request_entry]
+        return b, stack
 
-    def test_valid_cache_hit_returns_request_in_list(self) -> None:
-        """A request with a valid YES verdict is returned in the list verbatim.
+    def test_cold_start_seeds_history_no_refire(self) -> None:
+        """Acceptance: empty kv + on-chain history -> full retry budget, no re-fire.
 
-        The verdict-extraction is the caller's responsibility (via
-        ``_earliest_valid_evaluation`` in scan_markets); this function
-        only filters + returns the raw request entries.
+        A market with 2 prior on-chain fires must come back as 2 rows on
+        the very first kv read, so ``mech_retries = max(., len(rows))``
+        sees the real budget instead of 0 (which would re-fire a paid
+        request for a market that was already asked).
         """
-        b = _make_behaviour()
-        tool_response = json.dumps(
-            {"is_valid": True, "is_determinable": True, "has_occurred": True}
+        kv = _FakeKvStore()
+        subgraph = _SubgraphStub(
+            [
+                self._subgraph_row("0xreq1", delivered=True),
+                self._subgraph_row("0xreq2"),
+            ]
         )
-        request_entry = self._make_request_entry(
-            deliveries=[{"toolResponse": tool_response}], req_id="req-abc"
-        )
-        with patch.object(
-            b, "get_mech_gnosis_subgraph_result", new=_make_gen([request_entry])
-        ):
+        b, stack = self._wired_behaviour(kv, subgraph)
+        with stack:
             result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
 
-        assert isinstance(result, list)
-        assert result == [request_entry]
-        # Verify the caller can derive YES from this list via the helper.
-        evaluation = ScanMarketsBehaviour._earliest_valid_evaluation(result)
-        assert evaluation is not None
-        assert evaluation["answer"] == ANSWER_YES
+        assert result is not None
+        assert len(result) == 2
+        assert subgraph.calls == 1
+        # Crash safety: the marker is the LAST write. If it were written
+        # first, a crash between marker and rows would leave a "seeded"
+        # market with an empty cache -- exactly the duplicate-fire bug
+        # the marker exists to prevent.
+        assert kv.write_order[-1] == self._MARKER_KEY
+        assert self._MARKER_KEY in kv.data
 
-    def test_helper_returns_list_directly_no_data_walk(self) -> None:
-        """Regression: helper returns the list directly (no ``data`` wrapper).
+    def test_marker_makes_seeding_exactly_once(self) -> None:
+        """A second fetch sees the marker and never re-queries the subgraph."""
+        kv = _FakeKvStore()
+        subgraph = _SubgraphStub([self._subgraph_row("0xreq1")])
+        b, stack = self._wired_behaviour(kv, subgraph)
+        with stack:
+            first = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+            second = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
 
-        After switching to ``ApiSpecs.process_response``, the configured
-        ``response_key: data:requests`` is walked by the framework, so
-        ``get_mech_gnosis_subgraph_result`` hands a list back -- not
-        a ``{"data": {"requests": [...]}}`` wrapper. This test pins
-        that contract so a regression to manual ``data.sender.requests``
-        walking would fail loudly.
+        assert first is not None and second is not None
+        assert len(first) == len(second) == 1
+        assert subgraph.calls == 1
+
+    def test_restart_preserves_kv_native_retry_budget(self) -> None:
+        """Acceptance: kv-native fires survive a restart without a subgraph re-read.
+
+        Requests fired after the migration exist only in the kv store
+        (the subgraph no longer sees them). After a process restart (new
+        behaviour instance, same store) the count must come from the kv
+        rows, and the marker must keep the subgraph out of the picture.
         """
-        b = _make_behaviour()
-        request_entry = self._make_request_entry(req_id="req-top-level")
-        with patch.object(
-            b, "get_mech_gnosis_subgraph_result", new=_make_gen([request_entry])
-        ):
+        kv = _FakeKvStore()
+        subgraph = _SubgraphStub([])  # no on-chain history for this market
+        b1, stack1 = self._wired_behaviour(kv, subgraph)
+        with stack1:
+            before = _exhaust_gen(b1.fetch_mech_requests_for_market(self._make_entry()))
+        assert before == []
+
+        # A kv-native fire lands (what _buffer_mech_request_fired writes).
+        key = mech_cache.cache_key(
+            prefix=self._PREFIX,
+            safe_address=self._SAFE,
+            market_id=self._MARKET_ID,
+            nonce="live-uuid-nonce",
+        )
+        kv.data[key] = mech_cache.serialize_row(
+            safe_address=self._SAFE,
+            market_id=self._MARKET_ID,
+            nonce="live-uuid-nonce",
+            tool="resolve-market-jury-v1",
+            prompt=self._TITLE,
+            fired_at=1_700_000_000,
+        )
+
+        # "Restart": fresh behaviour instance over the same store.
+        b2, stack2 = self._wired_behaviour(kv, subgraph)
+        with stack2:
+            after = _exhaust_gen(b2.fetch_mech_requests_for_market(self._make_entry()))
+
+        assert after is not None
+        assert len(after) == 1
+        assert after[0]["id"] == "live-uuid-nonce"
+        assert subgraph.calls == 1  # marker read pre-empted a second query
+
+    def test_subgraph_error_aborts_seeding_and_writes_nothing(self) -> None:
+        """Subgraph error -> None, no marker, no rows (seed re-runs next cycle)."""
+        kv = _FakeKvStore()
+        subgraph = _SubgraphStub(None)
+        b, stack = self._wired_behaviour(kv, subgraph)
+        with stack:
             result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+
+        assert result is None
+        assert kv.data == {}
+
+    def test_kv_read_error_short_circuits_before_subgraph(self) -> None:
+        """Marker read failure -> None without spending a subgraph query."""
+        kv = _FakeKvStore(fail_reads=True)
+        subgraph = _SubgraphStub([self._subgraph_row("0xreq1")])
+        b, stack = self._wired_behaviour(kv, subgraph)
+        with stack:
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+
+        assert result is None
+        assert subgraph.calls == 0
+
+    def test_row_write_failure_leaves_marker_absent(self) -> None:
+        """A failed row write aborts the pass and does NOT write the marker."""
+        kv = _FakeKvStore(fail_writes=True)
+        subgraph = _SubgraphStub([self._subgraph_row("0xreq1")])
+        b, stack = self._wired_behaviour(kv, subgraph)
+        with stack:
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+
+        assert result is None
+        assert self._MARKER_KEY not in kv.data
+
+    def test_unusable_subgraph_row_skipped_good_row_seeded(self) -> None:
+        """A drifted subgraph row is skipped; the usable one still seeds."""
+        kv = _FakeKvStore()
+        subgraph = _SubgraphStub(
+            [
+                {"id": None, "blockTimestamp": "x"},  # unusable
+                self._subgraph_row("0xreq-good"),
+            ]
+        )
+        b, stack = self._wired_behaviour(kv, subgraph)
+        with stack:
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+
         assert result is not None
         assert len(result) == 1
-        assert result[0]["id"] == "req-top-level"
+        assert result[0]["id"] == "0xreq-good"
+        assert self._MARKER_KEY in kv.data
 
-    def test_query_renders_top_level_request_form(self) -> None:
-        """The rendered query uses top-level ``requests(where:``.
+    def test_all_rows_unusable_refuses_marker(self) -> None:
+        """Schema drift making every row unusable must NOT write a marker.
 
-        Pins two invariants:
-
-        - ``parsedRequest { nonce }`` is NOT selected. ``nonce`` is not a
-          field on ``ParsedRequest`` in the marketplace-gnosis subgraph,
-          and selecting it makes the whole query error with ``data:
-          null`` -- which previously masqueraded as "zero matching
-          requests" and silently disabled the retry-budget gate.
-        - The query uses top-level ``requests(where:`` rather than the
-          older ``sender(id) { requests(where:) }`` traversal. The
-          top-level form is the canonical pattern used by watchdog and
-          trader and is what the ``response_key: data:requests`` config
-          walks.
-
-        Tool filtering is intentionally NOT in the where-clause -- the
-        Python post-filter at ``fetch_mech_requests_for_market`` is the
-        authoritative tool check, so a where-clause filter would only
-        duplicate it and create a coupling risk if the tool slug ever
-        gets renamed.
+        Regression for the "all-unusable + marker written" bug: if every
+        historical row fails ``subgraph_row_to_cache_row`` (rename,
+        indexer garbage, response_key drift), the pre-fix code wrote the
+        marker with ``rows: 0`` and future scans short-circuited on the
+        marker check. That would permanently mask the market's real
+        pre-migration retry history and re-expose it to duplicate paid
+        requests. The fix skips the marker so the next cycle retries.
         """
-        rendered = MECH_CACHE_QUERY_TEMPLATE.format(
-            sender="0xabc",
-            prompt=json.dumps("Will X?"),
-            block_timestamp_gt=123,
+        kv = _FakeKvStore()
+        # Every row unusable -- missing 'id' fails the shape guard.
+        subgraph = _SubgraphStub(
+            [
+                {"id": None, "blockTimestamp": "x"},
+                {"id": None, "blockTimestamp": "y"},
+            ]
         )
-        assert "requests(" in rendered
-        assert "sender(id:" not in rendered
-        assert "nonce" not in rendered
-        assert "tool:" not in rendered
+        b, stack = self._wired_behaviour(kv, subgraph)
+        with stack:
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+
+        # Fail-closed: callers must treat the cache as unreadable.
+        assert result is None
+        # Crucially, the marker was NOT written -- next scan retries.
+        assert self._MARKER_KEY not in kv.data
+
+    def test_non_list_historical_refuses_marker(self) -> None:
+        """Shape-drift guard: dict-shaped subgraph response is refused.
+
+        ``ApiSpecs.process_response`` returns ``Any``. If a subgraph
+        replica or a ``response_key`` misconfiguration hands us back a
+        dict envelope instead of a list, the pre-fix code iterated its
+        string keys, every "row" failed the isinstance check, and the
+        empty-rows marker was written. The guard treats a non-list as a
+        seeding failure so the next cycle retries against a healthy
+        indexer.
+        """
+        kv = _FakeKvStore()
+        # A dict where a list was expected.
+        subgraph = _SubgraphStub({"errors": ["schema drift"]})  # type: ignore[arg-type]
+        b, stack = self._wired_behaviour(kv, subgraph)
+        with stack:
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+
+        assert result is None
+        assert self._MARKER_KEY not in kv.data
+
+    def test_empty_historical_still_marks_seeded(self) -> None:
+        """Distinguish "no history" from "all-unusable history".
+
+        Regression pair for ``test_all_rows_unusable_refuses_marker``:
+        the marker rejection must trigger ONLY when the subgraph
+        returned rows and all were unusable -- a legitimately fresh
+        market (empty history) still gets its marker so subsequent
+        scans don't re-query the subgraph forever for it.
+        """
+        kv = _FakeKvStore()
+        subgraph = _SubgraphStub([])  # legitimately empty history
+        b, stack = self._wired_behaviour(kv, subgraph)
+        with stack:
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+
+        assert result == []
+        assert self._MARKER_KEY in kv.data
+
+
+class TestSendKvRead:
+    """Tests for ``_send_kv_read``."""
+
+    _NONCE = "kv-nonce-1"
+
+    def _make_behaviour_with_kv(self, reply: Any) -> Any:
+        """Behaviour with real callback state, a dialogues stub and a simulated handler.
+
+        The simulated handler stands in for ``KvStoreHandler``: it pops
+        the registered per-nonce callback, invokes it with ``reply`` and
+        clears the in-flight gate -- the exact contract the real handler
+        implements.
+
+        :param reply: the reply message the simulated handler delivers.
+        :return: the wired behaviour.
+        """
+        b = _make_behaviour()
+        b.context.state.req_to_callback = {}
+        b.context.state.in_flight_req = False
+        dlg = MagicMock()
+        dlg.dialogue_label.dialogue_reference = (self._NONCE, "")
+        b.context.kv_store_dialogues.create.return_value = (MagicMock(), dlg)
+
+        def _handler(nonce: str) -> Any:
+            cb, _kwargs = b.context.state.req_to_callback.pop(nonce)
+            cb(reply, None)
+            b.context.state.in_flight_req = False
+            return None
+            yield  # noqa: unreachable -- makes this a generator function
+
+        patch.object(b, "_wait_for_kv_reply", new=_handler).start()
+        return b
+
+    def test_missing_key_absent_from_result_not_none(self) -> None:
+        """A key the store doesn't have is ABSENT from the mapping.
+
+        The seeding gate relies on this distinction: ``marker_key in
+        reply`` means "already seeded", an absent key means "not seeded
+        yet", and only ``None`` means "read failed". Collapsing absent
+        into None would make every fresh market look like a kv failure.
+        """
+        reply = SimpleNamespace(
+            performative=KvStoreMessage.Performative.READ_RESPONSE,
+            data={"present-key": "value-1"},
+        )
+        b = self._make_behaviour_with_kv(reply)
+
+        result = _exhaust_gen(b._send_kv_read(("present-key", "missing-key")))
+
+        assert result == {"present-key": "value-1"}
+        assert "missing-key" not in result
+
+    def test_error_reply_returns_none(self) -> None:
+        """An ERROR performative reply yields None (read failed)."""
+        reply = SimpleNamespace(
+            performative=KvStoreMessage.Performative.ERROR,
+            data={},
+        )
+        b = self._make_behaviour_with_kv(reply)
+
+        result = _exhaust_gen(b._send_kv_read(("some-key",)))
+
+        assert result is None
+
+    def test_timeout_without_reply_returns_none(self) -> None:
+        """If the watchdog fires before any reply, the read returns None."""
+        b = _make_behaviour()
+        b.context.state.req_to_callback = {}
+        b.context.state.in_flight_req = False
+        dlg = MagicMock()
+        dlg.dialogue_label.dialogue_reference = (self._NONCE, "")
+        b.context.kv_store_dialogues.create.return_value = (MagicMock(), dlg)
+        # Wait returns without the callback ever firing (timeout path).
+        with patch.object(b, "_wait_for_kv_reply", new=_make_gen(None)):
+            result = _exhaust_gen(b._send_kv_read(("some-key",)))
+
+        assert result is None
+
+    def test_read_request_carries_keys_and_counterparty(self) -> None:
+        """The READ_REQUEST is created with the requested keys and sent."""
+        reply = SimpleNamespace(
+            performative=KvStoreMessage.Performative.READ_RESPONSE,
+            data={},
+        )
+        b = self._make_behaviour_with_kv(reply)
+
+        _exhaust_gen(b._send_kv_read(("k1", "k2")))
+
+        b.context.kv_store_dialogues.create.assert_called_once_with(
+            counterparty=str(KV_STORE_CONNECTION_PUBLIC_ID),
+            performative=KvStoreMessage.Performative.READ_REQUEST,
+            keys=("k1", "k2"),
+        )
+        b.context.outbox.put_message.assert_called_once()
+
+
+class TestWaitForKvReplyTimeout:
+    """Cover the pop-on-timeout behaviour of ``_wait_for_kv_reply``.
+
+    Regression pin for bennyjo's #1 comment on PR #36: without this pop,
+    a late reply for a timed-out nonce would trip the next kv request's
+    gate. The scan cycle would then read a partial result and false-
+    report "already asked", or false-report "never asked" and re-fire.
+    """
+
+    def _make_behaviour_with_real_state(self) -> Any:
+        """Return a behaviour whose context.state carries a real dict + bool."""
+        # The shared ``_make_context`` uses ``MagicMock()`` for state,
+        # which silently swallows dict writes to ``req_to_callback``.
+        # These tests need real values.
+        b = _make_behaviour()
+        b.context.state.req_to_callback = {}
+        b.context.state.in_flight_req = False
+        return b
+
+    def test_timeout_pops_nonce_from_req_to_callback(self) -> None:
+        """When the watchdog fires, the caller's callback is popped so a late reply is inert."""
+        b = self._make_behaviour_with_real_state()
+        # Squeeze the watchdog so the test runs in a few ms of wall clock.
+        b.context.params.mech_cache_kv_request_timeout = 0.05
+        # Simulate an op that was fired and never replied.
+        b.context.state.in_flight_req = True
+        b.context.state.req_to_callback["stuck-nonce"] = (
+            lambda *_a, **_k: None,
+            {},
+        )
+
+        _exhaust_gen(b._wait_for_kv_reply("stuck-nonce"))
+
+        # Gate cleared so the scan cycle can proceed.
+        assert b.context.state.in_flight_req is False
+        # Callback popped so a late reply arriving after this point is
+        # inert -- the handler will see ``req_to_callback.pop(nonce)``
+        # return ``None`` and fall through to ``super().handle()``.
+        assert "stuck-nonce" not in b.context.state.req_to_callback
+
+    def test_normal_reply_leaves_unrelated_callbacks_alone(self) -> None:
+        """A normal (handler-cleared) reply exits the wait without touching other entries."""
+        # Under the healthy path, the KvStoreHandler pops the callback
+        # and clears the gate BEFORE ``_wait_for_kv_reply`` observes the
+        # transition; the timeout branch never runs. This test pins that
+        # ``_wait_for_kv_reply`` doesn't pop unrelated nonces on the
+        # happy path -- otherwise concurrent kv users in other skills
+        # would lose their callbacks.
+        b = self._make_behaviour_with_real_state()
+        b.context.params.mech_cache_kv_request_timeout = 5.0
+        # Gate already cleared by the (simulated) handler.
+        b.context.state.in_flight_req = False
+        # Some UNRELATED nonce sitting in the map (e.g. left over from
+        # another skill's kv usage). It must not be touched.
+        b.context.state.req_to_callback["other-op"] = (
+            lambda *_a, **_k: None,
+            {},
+        )
+
+        _exhaust_gen(b._wait_for_kv_reply("nonce-that-was-just-served"))
+
+        assert "other-op" in b.context.state.req_to_callback
 
 
 # ---------------------------------------------------------------------------

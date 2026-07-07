@@ -22,17 +22,29 @@
 # pylint: disable=protected-access
 
 import json
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from unittest.mock import PropertyMock, patch
 
+from packages.valory.skills.market_resolution_manager_abci import mech_cache
 from packages.valory.skills.market_resolution_manager_abci.behaviours.base import (
     ANSWER_YES,
+    MAX_KV_WRITE_ATTEMPTS,
 )
 from packages.valory.skills.market_resolution_manager_abci.behaviours.evaluate_answers import (
     EvaluateAnswersBehaviour,
 )
 
-from .conftest import _make_context, _make_gen, _make_synced_data
+from .conftest import (
+    SAFE_ADDRESS,
+    _FlakyKvWrite,
+    _exhaust_gen,
+)
+from .conftest import _make_behaviour as _make_shared_behaviour
+from .conftest import (
+    _make_context,
+    _make_gen,
+    _make_synced_data,
+)
 
 NOW = 1_700_000_000
 
@@ -57,6 +69,17 @@ def _make_behaviour(
     )
     patcher.start()
     behaviour._sd_patcher = patcher
+
+    # The kv_store fire-write is best-effort from the FSM's perspective;
+    # these tests cover retry-counter + payload logic, so stub it out.
+    # Handler dispatch and wait/timeout coverage live in
+    # tests/test_handlers.py::TestKvStoreHandlerDispatch and
+    # tests/behaviours/test_base.py::TestWaitForKvReplyTimeout.
+    def _noop_gen(*_a: Any, **_k: Any):  # type: ignore[no-untyped-def]
+        if False:  # pragma: no cover -- keep this a generator
+            yield None
+
+    behaviour._buffer_mech_request_fired = _noop_gen  # type: ignore[assignment]
     return behaviour
 
 
@@ -303,7 +326,7 @@ class TestEvaluateAnswersBehaviour:
         Refactor: ``evaluate_answers`` no longer persists the full
         ``mech_request`` dict (tool / prompt / nonce) -- only the nonce
         via ``entry['pending_nonce']``. The canonical source for tool +
-        prompt is now the subgraph re-fetch in ``scan_markets`` (see
+        prompt is now the kv mech-cache re-read in ``scan_markets`` (see
         ``fetch_mech_requests_for_market`` -> ``mech_requests``).
         """
         entry = _base_entry()
@@ -325,3 +348,94 @@ class TestEvaluateAnswersBehaviour:
         # string -- the value itself is irrelevant to this test.
         assert isinstance(b.questions_db["0xM"]["pending_nonce"], str)
         assert b.questions_db["0xM"]["pending_nonce"] != ""
+
+
+class TestBufferMechRequestFiredRetry:
+    """Tests for the retried fire-time kv write (spec 5.3)."""
+
+    _MARKET_ID = "0xM"
+    _NONCE = "n1"
+    _PROMPT = "Will X?"
+    _FIRED_AT = NOW
+
+    def _run(self, kv: _FlakyKvWrite) -> EvaluateAnswersBehaviour:
+        """Run ``_buffer_mech_request_fired`` against the kv double."""
+        # The shared factory does NOT stub _buffer_mech_request_fired
+        # (unlike this module's local one) -- the retry loop is the
+        # subject under test here.
+        b = _make_shared_behaviour(EvaluateAnswersBehaviour)
+        with (
+            patch.object(b, "_send_kv_write", new=kv),
+            patch.object(b, "sleep", new=_make_gen(None)),
+        ):
+            _exhaust_gen(
+                b._buffer_mech_request_fired(
+                    market_id=self._MARKET_ID,
+                    nonce=self._NONCE,
+                    prompt=self._PROMPT,
+                    fired_at=self._FIRED_AT,
+                )
+            )
+        return b
+
+    def _warning_messages(self, b: EvaluateAnswersBehaviour) -> List[str]:
+        return [c.args[0] for c in b.context.logger.warning.call_args_list]
+
+    def _error_messages(self, b: EvaluateAnswersBehaviour) -> List[str]:
+        return [c.args[0] for c in b.context.logger.error.call_args_list]
+
+    def test_transient_failure_retries_until_success(self) -> None:
+        """Two failures then a success -> 3 identical writes, no give-up warning."""
+        kv = _FlakyKvWrite([False, False, True])
+
+        b = self._run(kv)
+
+        assert len(kv.calls) == MAX_KV_WRITE_ATTEMPTS
+        # Every attempt must retry the SAME row -- a drifting key or
+        # value would fragment the "have I asked this market?" record.
+        assert len(set(kv.calls)) == 1
+        key, value = kv.calls[0]
+        assert key == mech_cache.cache_key(
+            prefix="market_resolver/",
+            safe_address=SAFE_ADDRESS,
+            market_id=self._MARKET_ID,
+            nonce=self._NONCE,
+        )
+        row = json.loads(value)
+        assert row["nonce"] == self._NONCE
+        assert row["prompt"] == self._PROMPT
+        assert row["fired_at"] == self._FIRED_AT
+        assert row["delivered_at"] is None
+        warnings = self._warning_messages(b)
+        assert sum("retrying" in w for w in warnings) == 2
+        assert not any("failed after" in w for w in warnings)
+
+    def test_first_attempt_success_writes_once(self) -> None:
+        """A healthy store gets exactly one write and zero warnings."""
+        kv = _FlakyKvWrite([True])
+
+        b = self._run(kv)
+
+        assert len(kv.calls) == 1
+        assert self._warning_messages(b) == []
+
+    def test_all_attempts_fail_swallows_with_final_error(self) -> None:
+        """All attempts fail -> bounded at MAX_KV_WRITE_ATTEMPTS, final error, no raise.
+
+        The FSM must still transition into the mech request round; the
+        miss is bounded by max_mech_retries (see the production
+        docstring), so the loop swallows the failure instead of raising.
+        The give-up event goes through ``logger.error`` (not
+        ``logger.warning``) so operators watching for financial-loss
+        signals see the potential re-request without filtering per-attempt
+        retry chatter.
+        """
+        kv = _FlakyKvWrite([False] * MAX_KV_WRITE_ATTEMPTS)
+
+        b = self._run(kv)
+
+        assert len(kv.calls) == MAX_KV_WRITE_ATTEMPTS
+        errors = self._error_messages(b)
+        assert any("failed after" in msg for msg in errors)
+        warnings = self._warning_messages(b)
+        assert not any("failed after" in w for w in warnings)

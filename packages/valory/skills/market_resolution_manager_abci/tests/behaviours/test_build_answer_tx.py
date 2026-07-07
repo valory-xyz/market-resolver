@@ -40,7 +40,13 @@ from packages.valory.skills.market_resolution_manager_abci.states.base import (
     AnswerStatus,
 )
 
-from .conftest import _exhaust_gen, _make_context, _make_gen, _make_synced_data
+from .conftest import (
+    _FlakyKvWrite,
+    _exhaust_gen,
+    _make_context,
+    _make_gen,
+    _make_synced_data,
+)
 
 NOW = 1_700_000_000
 QUESTION_ID = "0x" + "a1" * 32  # 32-byte hex
@@ -111,6 +117,18 @@ def _make_behaviour(
     )
     patcher.start()
     behaviour._sd_patcher = patcher
+
+    # The kv_store delivery-write is best-effort side-effect from the FSM's
+    # perspective; these tests focus on evaluation parsing + tx-building,
+    # so stub it out. Dispatch/wait/handler coverage lives elsewhere:
+    # KvStoreHandler nonce lookup in tests/test_handlers.py, and the
+    # _wait_for_kv_reply pop-on-timeout in
+    # tests/behaviours/test_base.py::TestWaitForKvReplyTimeout.
+    def _noop_gen(*_a: Any, **_k: Any):  # type: ignore[no-untyped-def]
+        if False:  # pragma: no cover -- keep this a generator
+            yield None
+
+    behaviour._buffer_mech_response_delivered = _noop_gen  # type: ignore[assignment]
     return behaviour
 
 
@@ -1245,3 +1263,96 @@ class TestSendPayload:
 
         assert payload_sent[0].tx_submitter is None
         assert payload_sent[0].tx_hash is None
+
+
+# ---------------------------------------------------------------------------
+# Delivery-side KV write retry loop
+# ---------------------------------------------------------------------------
+
+
+class TestBufferMechResponseDeliveredRetry:
+    """Delivery-side write mirrors the fire-time retry contract.
+
+    Regression for the pre-fix asymmetry: fire-time had bounded retries
+    + logger.error on give-up, delivery-time was single-shot + warning
+    only. On restart a lost delivery write would rebuild questions_db
+    without the answer, mech_retries would sit below max_mech_retries,
+    and the FSM would fire a fresh paid mech request for a market whose
+    answer was already received.
+    """
+
+    _MARKET_ID = "0xM"
+    _NONCE = "d6e9d1a5-e77c-4ad5-a91d-380d17b7baa5"
+    _RESP = MagicMock(result="dummy-result", error=None)
+
+    def _drive(self, kv: _FlakyKvWrite) -> Any:
+        """Wire the double onto a real behaviour and drive delivery.
+
+        ``sleep`` is patched to a no-op generator so the retry loop's
+        ``KV_WRITE_RETRY_SLEEP_SECONDS`` pauses do not burn real
+        wall-clock time -- mirrors the fire-time ``_run`` in
+        ``test_evaluate_answers.py`` and matches the repo's
+        deterministic-test convention.
+
+        :param kv: scripted ``_send_kv_write`` double whose per-call
+            outcomes drive the retry loop's success/failure path.
+        :return: the fully-driven behaviour instance so tests can
+            inspect ``context.logger`` call args.
+        """
+        b = _make_behaviour()
+        # ``_make_behaviour`` stubs delivery-side out as a no-op for
+        # unrelated tests; drop the instance override so the class
+        # method (the code under test) runs.
+        del b._buffer_mech_response_delivered
+        entry = {"title": "Will X happen?", "mech_fired_at": 1_700_000_000}
+        with (
+            patch.object(b, "_send_kv_write", new=kv),
+            patch.object(b, "sleep", new=_make_gen(None)),
+        ):
+            _exhaust_gen(
+                b._buffer_mech_response_delivered(
+                    market_id=self._MARKET_ID,
+                    entry=entry,
+                    nonce=self._NONCE,
+                    resp=self._RESP,
+                )
+            )
+        return b
+
+    def test_first_attempt_success_writes_once(self) -> None:
+        """Healthy delivery store gets exactly one write and zero warnings."""
+        kv = _FlakyKvWrite([True])
+        b = self._drive(kv)
+        assert len(kv.calls) == 1
+        assert b.context.logger.warning.call_args_list == []
+        assert b.context.logger.error.call_args_list == []
+
+    def test_transient_failure_retries_then_succeeds(self) -> None:
+        """Two failures then a success -> 3 identical writes, no give-up."""
+        kv = _FlakyKvWrite([False, False, True])
+        b = self._drive(kv)
+        assert len(kv.calls) == 3
+        # Retries must overwrite the SAME row; drifting keys would
+        # fragment the "have I already delivered?" record.
+        assert len({call[0] for call in kv.calls}) == 1
+        # Two per-attempt warnings, no final error.
+        warnings = [c.args[0] for c in b.context.logger.warning.call_args_list]
+        assert sum("retrying" in w for w in warnings) == 2
+        errors = [c.args[0] for c in b.context.logger.error.call_args_list]
+        assert errors == []
+
+    def test_all_attempts_fail_final_line_is_error(self) -> None:
+        """All attempts fail -> give-up on the error channel, not warning.
+
+        The delivery-time give-up is a financial-loss signal on the same
+        contract as the fire-time give-up (post-restart cache miss could
+        re-fire a paid mech request), so it must land on ``logger.error``
+        to be filterable alongside fire-time failures.
+        """
+        kv = _FlakyKvWrite([False, False, False])
+        b = self._drive(kv)
+        assert len(kv.calls) == 3
+        errors = [c.args[0] for c in b.context.logger.error.call_args_list]
+        assert any("failed after" in msg for msg in errors)
+        warnings = [c.args[0] for c in b.context.logger.warning.call_args_list]
+        assert not any("failed after" in w for w in warnings)

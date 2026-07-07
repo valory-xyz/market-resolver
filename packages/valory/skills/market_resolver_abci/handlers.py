@@ -31,7 +31,11 @@ from aea.protocols.base import Message
 from packages.valory.connections.http_server.connection import (
     PUBLIC_ID as HTTP_SERVER_PUBLIC_ID,
 )
+from packages.valory.connections.kv_store.connection import (
+    PUBLIC_ID as _KV_STORE_CONNECTION_PUBLIC_ID,
+)
 from packages.valory.protocols.http import HttpMessage
+from packages.valory.protocols.kv_store.message import KvStoreMessage as _KvStoreMessage
 from packages.valory.skills.abstract_round_abci.handlers import (
     ABCIRoundHandler,
 )
@@ -53,6 +57,9 @@ from packages.valory.skills.abstract_round_abci.handlers import (
 from packages.valory.skills.abstract_round_abci.handlers import (
     TendermintHandler as BaseTendermintHandler,
 )
+from packages.valory.skills.market_resolution_manager_abci.handlers import (
+    KvStoreHandler as _InnerKvStoreHandler,
+)
 from packages.valory.skills.market_resolution_manager_abci.rounds import (
     SynchronizedData,
 )
@@ -62,12 +69,25 @@ from packages.valory.skills.market_resolver_abci.dialogues import (
 )
 from packages.valory.skills.market_resolver_abci.models import SharedState
 
+# The re-exports below wire the sub-skill handlers into the composed
+# ``market_resolver_abci`` context. Behaviours defined in
+# ``market_resolution_manager_abci`` execute bound to the *composed* skill's
+# context at runtime, so anything the inner behaviour reads off
+# ``self.context`` (dialogues, handlers) must exist on the composed skill or
+# it AttributeErrors on the first live cycle. Anchoring the kv_store
+# protocol/connection at module scope also satisfies AEA's package-usage
+# check, which refuses to load a skill that lists a dependency in its yaml
+# but doesn't import it from Python.
+_ = _KV_STORE_CONNECTION_PUBLIC_ID
+_ = _KvStoreMessage
+
 MarketResolverABCIRoundHandler = ABCIRoundHandler
 SigningHandler = BaseSigningHandler
 LedgerApiHandler = BaseLedgerApiHandler
 ContractApiHandler = BaseContractApiHandler
 TendermintHandler = BaseTendermintHandler
 IpfsHandler = BaseIpfsHandler
+KvStoreHandler = _InnerKvStoreHandler
 
 # Health thresholds (mirrored from the mech service for cross-service parity).
 LIVENESS_STALL_FACTOR = 3.0  # > 3x the expected pause means the FSM is "stuck"
