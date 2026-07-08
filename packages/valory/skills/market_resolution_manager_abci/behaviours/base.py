@@ -636,16 +636,22 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
             # phase 2 and phase 3 leave the market classifiable as
             # unanswered -- so an operator debugging a re-fire needs
             # a log trail connecting it to the degraded seed. Cheap
-            # to derive here from the converted row: re-parse the
-            # kept ``result`` at seed time as a signal.
-            if converted.get("result") is None:
-                # Phase 3: picker returned ``None``. Gate on
-                # "the row actually had deliveries" so a healthy
-                # in-flight market with ``deliveries: []`` doesn't
-                # log the phase-3 warning on every seed cycle -- an
-                # empty deliveries list is the normal shape for
-                # "asked but mech hasn't answered yet", not a
-                # picker-failed-to-find-usable-delivery signal.
+            # to derive here from the converted row: use
+            # ``delivered_at`` (set iff the picker returned a
+            # delivery) to disambiguate "picker returned None" from
+            # "picker kept a delivery whose ``toolResponse`` was
+            # null in the source" -- the second case is real under
+            # the offchain-epic slice of the subgraph, where the
+            # mech no longer uploads response content so every
+            # delivery arrives with ``toolResponse: null``.
+            if converted.get("delivered_at") is None:
+                # Phase 3: picker returned ``None`` -- either
+                # ``deliveries: []`` (normal in-flight; not a
+                # re-fire signal) or every delivery had a
+                # non-numeric ``blockTimestamp`` (shape drift).
+                # Gate on "the row actually had deliveries" so a
+                # healthy in-flight market doesn't log every seed
+                # cycle.
                 if raw_deliveries:
                     self.context.logger.warning(
                         "Seeded row %s for market %s carries no "
@@ -658,6 +664,23 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
                         market_id,
                         len(raw_deliveries),
                     )
+            elif converted.get("result") is None:
+                # Phase 2 sub-case: picker kept a delivery (numeric
+                # ts present) but its ``toolResponse`` was null in
+                # the source. Under the offchain-epic this is the
+                # default shape of every delivery in the subgraph,
+                # so a fresh Safe with post-migration-only history
+                # would hit this en masse. The market still won't
+                # classify as answered, so log at WARNING like the
+                # other degraded phases.
+                self.context.logger.warning(
+                    "Seeded row %s for market %s carries a delivery "
+                    "with null ``toolResponse`` (post-offchain-"
+                    "migration subgraph shape): scan will classify "
+                    "unanswered and may re-fire on the next scan.",
+                    converted["nonce"],
+                    market_id,
+                )
             elif not is_cached_evaluation_valid(
                 parse_mech_response(converted.get("result"))
             ):

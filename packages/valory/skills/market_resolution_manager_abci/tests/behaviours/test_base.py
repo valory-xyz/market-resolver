@@ -1279,6 +1279,58 @@ class TestEnsureMarketSeeded:
         ]
         assert phase_3_warnings == [], phase_3_warnings
 
+    def test_null_toolresponse_delivery_logs_offchain_shape(self) -> None:
+        """Delivered row whose toolResponse is null gets a specific log.
+
+        Regression: post-offchain-migration subgraph rows have
+        ``deliveries[].toolResponse: null`` by construction (the mech
+        stopped uploading response content). Before the fix, the
+        picker returned the delivery in phase 2 (numeric ts present),
+        ``converted["delivered_at"]`` got set, ``converted["result"]``
+        stayed None, and the seed-time log fired the phase-3 branch
+        with the incorrect "no numeric blockTimestamp" wording.
+        Verified against real subgraph data (last 1000 requests: 451
+        rows in this exact shape). Now emits its own WARNING calling
+        out the offchain-migration shape so an operator debugging a
+        re-fire has an accurate diagnostic.
+        """
+        row: Dict[str, Any] = {
+            "id": "0xreq-offchain",
+            "blockTimestamp": "1783499645",
+            "parsedRequest": {
+                "prompt": self._TITLE,
+                "tool": "resolve-market-jury-v1",
+            },
+            "deliveries": [
+                {
+                    "id": "0xdel-null",
+                    "blockTimestamp": "1783499700",
+                    "toolResponse": None,
+                }
+            ],
+        }
+        kv = _FakeKvStore()
+        subgraph = _SubgraphStub([row])
+        b, stack = self._wired_behaviour(kv, subgraph)
+        with stack:
+            _ = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+
+        offchain_warnings = [
+            call
+            for call in b.context.logger.warning.call_args_list
+            if "null ``toolResponse``" in str(call)
+        ]
+        phase_3_warnings = [
+            call
+            for call in b.context.logger.warning.call_args_list
+            if "phase 3" in str(call)
+        ]
+        assert len(offchain_warnings) == 1, offchain_warnings
+        # Must NOT hit the phase-3 branch: the picker DID keep a
+        # delivery (numeric ts), the toolResponse just happened to be
+        # null. Phase-3 would misdescribe the failure.
+        assert phase_3_warnings == [], phase_3_warnings
+
     def test_all_deliveries_bad_ts_logs_phase_3_warning(self) -> None:
         """Row with deliveries but no numeric ts -> phase-3 log fires with count.
 
