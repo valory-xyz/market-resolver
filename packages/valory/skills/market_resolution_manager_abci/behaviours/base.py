@@ -216,6 +216,63 @@ def is_cached_evaluation_valid(evaluation: Optional[dict]) -> bool:
     return evaluation.get("answer") is not None
 
 
+def pick_earliest_usable_seed_delivery(
+    deliveries: List[Any],
+) -> Optional[Dict[str, Any]]:
+    """Delivery selector for :func:`mech_cache.subgraph_row_to_cache_row`.
+
+    Preserves the "iterate all deliveries" contract that
+    ``_earliest_valid_evaluation`` documents at scan time (see the
+    comment on that helper): a mech-internal retry whose first delivery
+    is garbage but a later one is valid must still resolve on the
+    seeded cache row, even though the row schema only has slots for
+    one ``result`` / ``delivered_at`` pair.
+
+    Intent, in order of preference:
+
+    1. Return the earliest delivery with both a cache-valid evaluation
+       (``parse_mech_response`` + ``is_cached_evaluation_valid``) AND
+       a numeric ``blockTimestamp`` -- the numeric-ts requirement is
+       load-bearing here because the row schema stores ``result`` and
+       ``delivered_at`` as one atomic unit
+       (see :data:`mech_cache.DeliverySelector`), so a valid response
+       without a persistable timestamp can't be kept.
+    2. Failing that, fall back to the earliest delivery with a numeric
+       ``blockTimestamp`` (regardless of ``toolResponse`` validity).
+       Delegated to :func:`mech_cache.default_delivery_selector` so
+       the "earliest numeric-ts" policy stays in one place. This
+       degraded row rehydrates into a request whose one delivery
+       won't validate downstream, so the market classifies unanswered
+       and a fresh mech request will fire on the next scan.
+    3. If nothing matches either phase, return ``None``. The seeded
+       row still gets written (``fired_at`` comes from the request
+       body, not the deliveries) so the fire itself stays visible on
+       ``mech_requests``; the retry budget is preserved by that
+       row-level accounting regardless of which phase produces the
+       delivery.
+
+    :param deliveries: subgraph ``deliveries`` list (ascending order).
+    :return: the chosen delivery, or ``None`` if none can be used.
+    """
+    for delivery in deliveries:
+        if not isinstance(delivery, dict):
+            continue
+        evaluation = parse_mech_response(delivery.get("toolResponse"))
+        if evaluation is None:
+            continue
+        if not is_cached_evaluation_valid(evaluation):
+            continue
+        try:
+            int(delivery.get("blockTimestamp"))  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            continue
+        return delivery
+    # Phase 2 -- "earliest with numeric ts" is the mech_cache module's
+    # default policy already; delegate so the fallback semantics stay
+    # in one place and can't drift between the two callers.
+    return mech_cache.default_delivery_selector(deliveries)
+
+
 def to_content(query: str) -> bytes:
     """Convert the given query string to payload content."""
     finalized_query = {"query": query}
@@ -447,6 +504,128 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
             and (req.get("parsedRequest") or {}).get("prompt") == expected_prompt
         ]
 
+    def _audit_row_deliveries_shape(self, row: Any, market_id: str) -> List[Any]:
+        """Return the row's ``deliveries`` as a safe list + warn on drift.
+
+        The top-level ``historical`` list is guarded before this loop;
+        this covers peer drift inside ``row["deliveries"]``:
+
+        - Row itself is not a dict -> returns ``[]``. No warning here;
+          ``subgraph_row_to_cache_row`` will return ``None`` on the
+          same input and the outer loop already logs "unusable
+          subgraph row".
+        - ``deliveries`` is a truthy non-list envelope (dict, string,
+          etc.) -> warns and returns ``[]``. Without this branch the
+          row seeded delivery-less with zero diagnostics and looked
+          identical to "genuinely undelivered" in the store.
+        - ``deliveries`` is a list containing non-dict entries ->
+          warns naming the row id and returns the list verbatim (the
+          picker's own ``isinstance(delivery, dict)`` guard skips the
+          drifted entries).
+
+        :param row: one entry from the ``historical`` list.
+        :param market_id: id of the market being seeded, for the log.
+        :return: a list of deliveries safe to iterate on downstream
+            (empty list on non-dict row or non-list envelope).
+        """
+        if not isinstance(row, dict):
+            return []
+        raw_deliveries = row.get("deliveries")
+        if raw_deliveries is None:
+            return []
+        if not isinstance(raw_deliveries, list):
+            self.context.logger.warning(
+                "Non-list ``deliveries`` envelope in subgraph row for "
+                "market %s (type=%s); treating as no deliveries. "
+                "row_id=%r",
+                market_id,
+                type(raw_deliveries).__name__,
+                row.get("id"),
+            )
+            return []
+        if any(not isinstance(d, dict) for d in raw_deliveries):
+            self.context.logger.warning(
+                "Non-dict entries in subgraph deliveries for market %s; "
+                "ignoring the drifted entries. row_id=%r",
+                market_id,
+                row.get("id"),
+            )
+        return raw_deliveries
+
+    def _log_seed_phase(
+        self,
+        converted: Dict[str, Any],
+        raw_deliveries: List[Any],
+        market_id: str,
+    ) -> None:
+        """Emit the per-row seed-phase trace for one converted seed row.
+
+        See :func:`pick_earliest_usable_seed_delivery` for the phase
+        model. Same operational shape across the branches: any log
+        emitted here corresponds to a seeded row that scan will
+        classify as unanswered (so a fresh mech request will fire),
+        with the branch distinguishing the *cause*:
+
+        - Phase 3: picker returned ``None``. Gated on "the row
+          actually had deliveries" so a healthy in-flight market
+          with ``deliveries: []`` stays silent.
+        - Null-``toolResponse`` sub-case: picker kept a delivery
+          whose ``toolResponse`` was null in source. This is the
+          expected shape of every delivered request under the
+          off-chain regime (the mech stopped uploading response
+          content), so a fresh Safe with post-migration-only
+          history hits it once per delivered row. Logged at ``INFO``
+          so it doesn't dilute the WARNING channel the other
+          degraded branches use for genuinely anomalous cases.
+        - Phase 2: picker kept a delivery whose ``toolResponse``
+          doesn't validate. Message calls out that an earlier valid
+          delivery may have been skipped for a non-numeric
+          timestamp (phase 1 requires both a validating response
+          AND a numeric ts).
+        - Phase 1 (silent): valid evaluation preserved; no log.
+
+        :param converted: cache-row fields returned by
+            :func:`mech_cache.subgraph_row_to_cache_row`.
+        :param raw_deliveries: original ``deliveries`` list from the
+            subgraph row (see :meth:`_audit_row_deliveries_shape`);
+            used to gate the phase-3 log.
+        :param market_id: id of the market being seeded, for the log.
+        """
+        nonce = converted["nonce"]
+        if converted.get("delivered_at") is None:
+            if raw_deliveries:
+                self.context.logger.warning(
+                    "Seeded row %s for market %s carries no delivery "
+                    "(phase 3): the row had %d deliveries but none "
+                    "carried a numeric blockTimestamp; scan will "
+                    "classify unanswered and may re-fire when "
+                    "retry_after expires.",
+                    nonce,
+                    market_id,
+                    len(raw_deliveries),
+                )
+            return
+        if converted.get("result") is None:
+            self.context.logger.info(
+                "Seeded row %s for market %s carries a delivery with "
+                "null ``toolResponse`` (post-offchain-migration "
+                "subgraph shape): scan will classify unanswered and "
+                "may re-fire on the next scan.",
+                nonce,
+                market_id,
+            )
+            return
+        if not is_cached_evaluation_valid(parse_mech_response(converted.get("result"))):
+            self.context.logger.warning(
+                "Seeded row %s for market %s carries a degraded "
+                "delivery (phase 2): the kept delivery's toolResponse "
+                "does not validate (an earlier valid delivery may "
+                "have been skipped for a non-numeric timestamp); scan "
+                "will classify unanswered and may re-fire next cycle.",
+                nonce,
+                market_id,
+            )
+
     def _ensure_market_seeded(
         self,
         entry: Dict[str, Any],
@@ -514,7 +693,11 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
 
         written = 0
         for row in historical:
-            converted = mech_cache.subgraph_row_to_cache_row(row)
+            raw_deliveries = self._audit_row_deliveries_shape(row, market_id)
+            converted = mech_cache.subgraph_row_to_cache_row(
+                row,
+                delivery_selector=pick_earliest_usable_seed_delivery,
+            )
             if converted is None:
                 self.context.logger.warning(
                     f"Skipping unusable subgraph row while seeding market "
@@ -540,6 +723,7 @@ class MarketResolutionManagerBaseBehaviour(BaseBehaviour, ABC):
                 )
                 return False
             written += 1
+            self._log_seed_phase(converted, raw_deliveries, market_id)
 
         # If we saw non-empty historical rows but none of them were usable,
         # writing the marker with ``rows: 0`` would permanently mask the

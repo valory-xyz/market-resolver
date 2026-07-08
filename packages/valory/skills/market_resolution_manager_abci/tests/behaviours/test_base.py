@@ -39,6 +39,7 @@ from packages.valory.skills.market_resolution_manager_abci.behaviours.base impor
     is_cached_evaluation_valid,
     jury_error_discriminator,
     parse_mech_response,
+    pick_earliest_usable_seed_delivery,
     to_content,
 )
 from packages.valory.skills.market_resolution_manager_abci.behaviours.scan_markets import (
@@ -379,6 +380,121 @@ class TestIsCachedEvaluationValid:
     def test_answer_invalid_returns_true(self) -> None:
         """Evaluation with ANSWER_INVALID is valid."""
         assert is_cached_evaluation_valid({"answer": ANSWER_INVALID}) is True
+
+
+# ---------------------------------------------------------------------------
+# pick_earliest_usable_seed_delivery -- issue #42
+# ---------------------------------------------------------------------------
+
+
+class TestPickEarliestUsableSeedDelivery:
+    """Tests for the seed-time delivery picker.
+
+    Regression for issue #42: the pre-fix seeding path collapsed a
+    multi-delivery request into ``deliveries[0]`` and lost the "iterate
+    all deliveries" contract documented on
+    ``_earliest_valid_evaluation``. This picker restores it by making a
+    two-phase pick at seed time and letting the row schema stay
+    single-delivery.
+    """
+
+    _VALID = json.dumps(
+        {
+            "is_valid": True,
+            "is_determinable": True,
+            "has_occurred": True,
+            "agreement_ratio": 0.9,
+            "judge_reasoning": "clear yes",
+        }
+    )
+    _UNDET = json.dumps(
+        {
+            "is_valid": True,
+            "is_determinable": False,
+            "has_occurred": None,
+            "agreement_ratio": 0.5,
+            "judge_reasoning": "unclear",
+        }
+    )
+
+    def test_empty_deliveries_returns_none(self) -> None:
+        """No deliveries -> nothing to pick."""
+        assert pick_earliest_usable_seed_delivery([]) is None
+
+    def test_single_valid_delivery_returned(self) -> None:
+        """One delivery that validates -> that delivery is returned."""
+        deliveries = [
+            {"id": "d1", "blockTimestamp": "100", "toolResponse": self._VALID}
+        ]
+        assert pick_earliest_usable_seed_delivery(deliveries) is deliveries[0]
+
+    def test_garbage_first_valid_second_picks_second(self) -> None:
+        """The canonical issue-#42 case: earliest usable across ALL deliveries."""
+        deliveries = [
+            {"id": "d1", "blockTimestamp": "100", "toolResponse": "not json"},
+            {"id": "d2", "blockTimestamp": "200", "toolResponse": self._VALID},
+        ]
+        result = pick_earliest_usable_seed_delivery(deliveries)
+        assert result is deliveries[1]
+
+    def test_undeterminable_first_valid_second_picks_second(self) -> None:
+        """Undeterminable evaluation isn't a "resolves" delivery; keep scanning."""
+        deliveries = [
+            {"id": "d1", "blockTimestamp": "100", "toolResponse": self._UNDET},
+            {"id": "d2", "blockTimestamp": "200", "toolResponse": self._VALID},
+        ]
+        result = pick_earliest_usable_seed_delivery(deliveries)
+        assert result is deliveries[1]
+
+    def test_non_numeric_ts_on_first_falls_through(self) -> None:
+        """Sub-case from the issue: non-numeric ``blockTimestamp`` on first."""
+        deliveries = [
+            {"id": "d1", "blockTimestamp": "bad", "toolResponse": self._VALID},
+            {"id": "d2", "blockTimestamp": "200", "toolResponse": self._VALID},
+        ]
+        result = pick_earliest_usable_seed_delivery(deliveries)
+        assert result is deliveries[1]
+
+    def test_no_valid_falls_back_to_earliest_numeric_ts(self) -> None:
+        """Phase-2 fallback returns the earliest delivery with a numeric ts.
+
+        The seeded row rehydrates to a single-delivery request whose
+        ``toolResponse`` won't validate downstream, so scan_markets
+        classifies the market as unanswered and a fresh mech request
+        fires next scan -- correct here because no delivery actually
+        resolves. Retry-budget accounting is orthogonal: the row
+        itself is written regardless of the phase (see the intent
+        note in the picker docstring).
+        """
+        deliveries = [
+            {"id": "d1", "blockTimestamp": "100", "toolResponse": "garbage"},
+            {"id": "d2", "blockTimestamp": "200", "toolResponse": self._UNDET},
+        ]
+        result = pick_earliest_usable_seed_delivery(deliveries)
+        assert result is deliveries[0]
+
+    def test_no_numeric_ts_anywhere_returns_none(self) -> None:
+        """If nothing has a numeric ts, the row gets seeded delivery-less.
+
+        Row-level ``fired_at`` (from the request body, not the
+        deliveries) is what ``mech_retries`` counts in the caller, so
+        the fire itself stays visible regardless of the phase.
+        """
+        deliveries: List[Any] = [
+            {"id": "d1", "blockTimestamp": "bad", "toolResponse": self._VALID},
+            {"id": "d2", "blockTimestamp": None, "toolResponse": self._VALID},
+        ]
+        assert pick_earliest_usable_seed_delivery(deliveries) is None
+
+    def test_non_dict_deliveries_are_skipped(self) -> None:
+        """Malformed delivery entries don't crash the picker."""
+        deliveries: List[Any] = [
+            "not-a-dict",
+            None,
+            {"id": "d1", "blockTimestamp": "200", "toolResponse": self._VALID},
+        ]
+        result = pick_earliest_usable_seed_delivery(deliveries)
+        assert result is deliveries[2]
 
 
 # ---------------------------------------------------------------------------
@@ -965,6 +1081,24 @@ class TestEnsureMarketSeeded:
         )
         return b, stack
 
+    @staticmethod
+    def _warning_calls(behaviour: Any, substring: str) -> List[Any]:
+        """Return ``logger.warning`` call args whose stringified form matches."""
+        return [
+            call
+            for call in behaviour.context.logger.warning.call_args_list
+            if substring in str(call)
+        ]
+
+    @staticmethod
+    def _info_calls(behaviour: Any, substring: str) -> List[Any]:
+        """Return ``logger.info`` call args whose stringified form matches."""
+        return [
+            call
+            for call in behaviour.context.logger.info.call_args_list
+            if substring in str(call)
+        ]
+
     def test_cold_start_seeds_history_no_refire(self) -> None:
         """Acceptance: empty kv + on-chain history -> full retry budget, no re-fire.
 
@@ -1080,6 +1214,322 @@ class TestEnsureMarketSeeded:
 
         assert result is None
         assert self._MARKER_KEY not in kv.data
+
+    def test_garbage_first_valid_second_delivery_seeds_valid(self) -> None:
+        """End-to-end wiring test for issue #42.
+
+        A pre-migration market with two deliveries -- garbage first,
+        valid second -- must be seeded with the valid delivery so
+        ``_earliest_valid_evaluation`` classifies the rehydrated
+        request as answered. Without the ``delivery_selector`` wiring
+        in ``_ensure_market_seeded``, the default earliest-numeric-ts
+        picker would happily seed the garbage delivery (it has a
+        numeric ``blockTimestamp`` too) and the market would classify
+        unanswered, triggering a duplicate paid mech request. This
+        test is what pins that wiring; the picker unit tests can't.
+        """
+        valid_response = json.dumps(
+            {
+                "is_valid": True,
+                "is_determinable": True,
+                "has_occurred": True,
+                "agreement_ratio": 0.9,
+                "judge_reasoning": "clear yes",
+            }
+        )
+        row: Dict[str, Any] = {
+            "id": "0xreq-multi",
+            "blockTimestamp": "1690000100",
+            "parsedRequest": {
+                "prompt": self._TITLE,
+                "tool": "resolve-market-jury-v1",
+            },
+            "deliveries": [
+                {
+                    "id": "0xreq-multi-del-garbage",
+                    "blockTimestamp": "1690000200",
+                    "toolResponse": "not-a-json-payload",
+                },
+                {
+                    "id": "0xreq-multi-del-valid",
+                    "blockTimestamp": "1690000300",
+                    "toolResponse": valid_response,
+                },
+            ],
+        }
+        kv = _FakeKvStore()
+        subgraph = _SubgraphStub([row])
+        b, stack = self._wired_behaviour(kv, subgraph)
+        with stack:
+            result = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+
+        assert result is not None
+        assert len(result) == 1
+        # The seeded row now carries the valid delivery, not the garbage
+        # one -- so ``_earliest_valid_evaluation`` resolves and the
+        # market classifies as answered on the next scan.
+        evaluation = ScanMarketsBehaviour._earliest_valid_evaluation(result)
+        assert evaluation is not None
+        assert evaluation["answer"] == ANSWER_YES
+
+    def test_empty_deliveries_does_not_log_phase_3_warning(self) -> None:
+        """Healthy in-flight market (deliveries: []) must not trigger the phase-3 log.
+
+        The phase-3 WARNING was added to trace picker-can't-find-a-
+        usable-delivery cases, but an ``asked-but-mech-has-not-
+        answered-yet`` request also stores ``result: None``. Without
+        the "row actually had deliveries" gate, every healthy
+        in-flight market would log a re-fire signal at seed time --
+        noise in exactly the channel this log adds. This test pins
+        the guard so a regression can't re-introduce the noise.
+        """
+        kv = _FakeKvStore()
+        # Row with no deliveries at all -- normal in-flight shape.
+        subgraph = _SubgraphStub([self._subgraph_row("0xreq-in-flight")])
+        b, stack = self._wired_behaviour(kv, subgraph)
+        with stack:
+            _ = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+
+        assert self._warning_calls(b, "phase 3") == []
+
+    def test_null_toolresponse_delivery_logs_offchain_shape(self) -> None:
+        """Delivered row whose toolResponse is null gets an INFO trace, not a WARNING.
+
+        Regression: post-offchain-migration subgraph rows have
+        ``deliveries[].toolResponse: null`` by construction (the mech
+        stopped uploading response content). This is the *expected*
+        shape of every delivery under the off-chain regime -- a fresh
+        Safe with post-migration-only history hits it once per
+        delivered row. Before the fix, the picker returned the
+        delivery in phase 2 (numeric ts present), the seed-time log
+        fired the phase-3 WARNING branch with the incorrect "no
+        numeric blockTimestamp" wording, and would have burst-logged
+        WARNINGs for the expected shape on every seeded market.
+        Verified against real subgraph data at the 2026-07 migration
+        audit (fraction of delivered rows in this exact shape was
+        high enough that per-row WARNING would have diluted the
+        channel). Now emits INFO so the WARNING channel stays
+        reserved for genuinely anomalous phase-2/phase-3 cases.
+        """
+        row: Dict[str, Any] = {
+            "id": "0xreq-offchain",
+            "blockTimestamp": "1783499645",
+            "parsedRequest": {
+                "prompt": self._TITLE,
+                "tool": "resolve-market-jury-v1",
+            },
+            "deliveries": [
+                {
+                    "id": "0xdel-null",
+                    "blockTimestamp": "1783499700",
+                    "toolResponse": None,
+                }
+            ],
+        }
+        kv = _FakeKvStore()
+        subgraph = _SubgraphStub([row])
+        b, stack = self._wired_behaviour(kv, subgraph)
+        with stack:
+            _ = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+
+        # Exactly one INFO on this row, no WARNING at all -- the
+        # phase-2 / phase-3 branches would have misdescribed the
+        # cause, and the WARNING channel stays reserved for
+        # actionable anomalies.
+        assert len(self._info_calls(b, "null ``toolResponse``")) == 1
+        assert self._warning_calls(b, "phase 3") == []
+        assert self._warning_calls(b, "phase 2") == []
+
+    def test_phase_2_degraded_delivery_logs_warning(self) -> None:
+        """Row with a numeric-ts delivery whose toolResponse doesn't validate.
+
+        Picker keeps that delivery (it has a numeric timestamp and no
+        earlier delivery validated), row gets seeded, the log branch
+        must call out phase-2 with the accurate cause: the kept
+        delivery's toolResponse doesn't validate. The message must NOT
+        claim "no delivery yielded a valid evaluation" -- a delivery
+        with a valid evaluation might have existed with a non-numeric
+        timestamp (phase 1 needs both) and would have been skipped.
+        """
+        row: Dict[str, Any] = {
+            "id": "0xreq-degraded",
+            "blockTimestamp": "1690000100",
+            "parsedRequest": {
+                "prompt": self._TITLE,
+                "tool": "resolve-market-jury-v1",
+            },
+            "deliveries": [
+                {
+                    "id": "0xdel-garbage",
+                    "blockTimestamp": "1690000200",
+                    "toolResponse": "not-a-json-payload",
+                }
+            ],
+        }
+        kv = _FakeKvStore()
+        subgraph = _SubgraphStub([row])
+        b, stack = self._wired_behaviour(kv, subgraph)
+        with stack:
+            _ = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+
+        assert len(self._warning_calls(b, "phase 2")) == 1
+        assert self._warning_calls(b, "phase 3") == []
+        assert self._info_calls(b, "null ``toolResponse``") == []
+
+    def test_phase_1_happy_path_emits_no_warnings(self) -> None:
+        """Regression: an all-happy seed (phase 1 pick) must be silent.
+
+        An ``if``/``elif`` ordering bug that sprayed a WARNING on
+        every healthy answered seed would previously have passed CI
+        (the multi-delivery e2e test asserted the *evaluation*, not
+        the absence of noise). Pin the silence.
+        """
+        valid_response = json.dumps(
+            {
+                "is_valid": True,
+                "is_determinable": True,
+                "has_occurred": True,
+                "agreement_ratio": 0.9,
+                "judge_reasoning": "clear yes",
+            }
+        )
+        row: Dict[str, Any] = {
+            "id": "0xreq-happy",
+            "blockTimestamp": "1690000100",
+            "parsedRequest": {
+                "prompt": self._TITLE,
+                "tool": "resolve-market-jury-v1",
+            },
+            "deliveries": [
+                {
+                    "id": "0xdel-valid",
+                    "blockTimestamp": "1690000200",
+                    "toolResponse": valid_response,
+                }
+            ],
+        }
+        kv = _FakeKvStore()
+        subgraph = _SubgraphStub([row])
+        b, stack = self._wired_behaviour(kv, subgraph)
+        with stack:
+            _ = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+
+        assert self._warning_calls(b, "phase 2") == []
+        assert self._warning_calls(b, "phase 3") == []
+        assert self._info_calls(b, "null ``toolResponse``") == []
+
+    def test_non_dict_deliveries_entries_log_shape_drift(self) -> None:
+        """Row with mixed dict + non-dict entries -> shape-drift WARNING with row id.
+
+        The picker's own ``isinstance`` guard skips the drifted
+        entries, so the row still seeds correctly on the dict one --
+        but without the shape-drift log an operator has no signal
+        that the subgraph shape has drifted. Test pins the log
+        contract: fires once, carries the row's subgraph id, and does
+        not spam the phase-2/3 channels.
+        """
+        valid_response = json.dumps(
+            {
+                "is_valid": True,
+                "is_determinable": True,
+                "has_occurred": True,
+                "agreement_ratio": 0.9,
+                "judge_reasoning": "clear yes",
+            }
+        )
+        row: Dict[str, Any] = {
+            "id": "0xreq-mixed",
+            "blockTimestamp": "1690000100",
+            "parsedRequest": {
+                "prompt": self._TITLE,
+                "tool": "resolve-market-jury-v1",
+            },
+            "deliveries": [
+                "not-a-dict",
+                None,
+                {
+                    "id": "0xdel-valid",
+                    "blockTimestamp": "1690000200",
+                    "toolResponse": valid_response,
+                },
+            ],
+        }
+        kv = _FakeKvStore()
+        subgraph = _SubgraphStub([row])
+        b, stack = self._wired_behaviour(kv, subgraph)
+        with stack:
+            _ = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+
+        matched = self._warning_calls(b, "Non-dict entries")
+        assert len(matched) == 1
+        # Row id gets threaded through so an operator can grep by it.
+        assert "0xreq-mixed" in str(matched[0])
+        assert self._warning_calls(b, "phase 3") == []
+
+    def test_non_list_deliveries_envelope_logs_shape_drift(self) -> None:
+        """Row where ``deliveries`` is a non-list envelope -> its own WARNING.
+
+        Regression for the case that used to silently seed the row
+        delivery-less with zero diagnostics: if the subgraph ever
+        returns a dict envelope (or string, or number) in place of
+        the ``deliveries`` list, the guard must warn distinctly from
+        the "list contains non-dict entries" case and must include
+        the envelope type so a reader can grep.
+        """
+        row: Dict[str, Any] = {
+            "id": "0xreq-envelope",
+            "blockTimestamp": "1690000100",
+            "parsedRequest": {
+                "prompt": self._TITLE,
+                "tool": "resolve-market-jury-v1",
+            },
+            "deliveries": {"unexpected": "envelope"},
+        }
+        kv = _FakeKvStore()
+        subgraph = _SubgraphStub([row])
+        b, stack = self._wired_behaviour(kv, subgraph)
+        with stack:
+            _ = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+
+        matched = self._warning_calls(b, "Non-list ``deliveries`` envelope")
+        assert len(matched) == 1
+        # Envelope type + row id both surfaced so operators have a
+        # grep target and a shape signal.
+        assert "dict" in str(matched[0])
+        assert "0xreq-envelope" in str(matched[0])
+        # Row still seeds delivery-less; no phase-2/3 diagnostics.
+        assert self._warning_calls(b, "phase 3") == []
+        assert self._warning_calls(b, "phase 2") == []
+        assert self._info_calls(b, "null ``toolResponse``") == []
+
+    def test_all_deliveries_bad_ts_logs_phase_3_warning(self) -> None:
+        """Row with deliveries but no numeric ts -> phase-3 log fires with count.
+
+        Regression pair for
+        ``test_empty_deliveries_does_not_log_phase_3_warning``: the
+        guard on the phase-3 log must trigger ONLY when the picker
+        can't find a usable delivery, but the row HAD deliveries to
+        begin with -- that's the actual re-fire signal.
+        """
+        row: Dict[str, Any] = {
+            "id": "0xreq-bad-ts",
+            "blockTimestamp": "1690000100",
+            "parsedRequest": {
+                "prompt": self._TITLE,
+                "tool": "resolve-market-jury-v1",
+            },
+            "deliveries": [
+                {"id": "d1", "blockTimestamp": "bad", "toolResponse": "x"},
+                {"id": "d2", "blockTimestamp": None, "toolResponse": "y"},
+            ],
+        }
+        kv = _FakeKvStore()
+        subgraph = _SubgraphStub([row])
+        b, stack = self._wired_behaviour(kv, subgraph)
+        with stack:
+            _ = _exhaust_gen(b.fetch_mech_requests_for_market(self._make_entry()))
+
+        assert len(self._warning_calls(b, "phase 3")) == 1
 
     def test_unusable_subgraph_row_skipped_good_row_seeded(self) -> None:
         """A drifted subgraph row is skipped; the usable one still seeds."""

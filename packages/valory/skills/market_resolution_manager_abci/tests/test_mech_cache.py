@@ -107,7 +107,7 @@ class TestSubgraphRowToCacheRow:
         assert row["delivered_at"] is None
 
     def test_delivered_request_maps_first_delivery(self) -> None:
-        """The earliest (first) delivery becomes result/delivered_at."""
+        """Default selector picks the earliest delivery with a numeric ts."""
         row = mech_cache.subgraph_row_to_cache_row(
             self._subgraph_row(
                 deliveries=[
@@ -127,6 +127,81 @@ class TestSubgraphRowToCacheRow:
         assert row is not None
         assert row["delivered_at"] == 1690000100
         assert row["result"] == '{"is_valid": true}'
+
+    def test_default_selector_skips_non_numeric_first_delivery(self) -> None:
+        """Default selector falls through a bad-ts delivery to a later numeric one.
+
+        Regression for issue #42's sub-case: a non-numeric
+        ``deliveries[0].blockTimestamp`` used to discard the delivery
+        info entirely instead of trying deliveries 1..n. The seeded row
+        must still carry the earliest usable delivery so
+        ``_earliest_valid_evaluation`` can resolve at rehydrate time.
+        """
+        row = mech_cache.subgraph_row_to_cache_row(
+            self._subgraph_row(
+                deliveries=[
+                    {"id": "0xdel1", "blockTimestamp": "bad", "toolResponse": "x"},
+                    {
+                        "id": "0xdel2",
+                        "blockTimestamp": "1690000200",
+                        "toolResponse": '{"is_valid": true}',
+                    },
+                ]
+            )
+        )
+        assert row is not None
+        assert row["delivered_at"] == 1690000200
+        assert row["result"] == '{"is_valid": true}'
+
+    def test_custom_selector_can_pick_a_later_delivery(self) -> None:
+        """A caller-supplied selector overrides the default earliest-ts pick.
+
+        The seeding path uses this hook (see
+        ``pick_earliest_usable_seed_delivery`` in ``base.py``) to keep
+        the earliest *usable* delivery, not just the earliest one.
+        Without the hook, a mech-internal retry whose ``deliveries[0]``
+        is garbage would collapse to that garbage row and never
+        resolve, forcing a duplicate paid mech request.
+        """
+        deliveries = [
+            {"id": "0xdel1", "blockTimestamp": "1690000100", "toolResponse": "junk"},
+            {
+                "id": "0xdel2",
+                "blockTimestamp": "1690000200",
+                "toolResponse": '{"is_valid": true}',
+            },
+        ]
+
+        def _pick_second(_deliveries: list) -> dict:
+            return _deliveries[1]
+
+        row = mech_cache.subgraph_row_to_cache_row(
+            self._subgraph_row(deliveries=deliveries),
+            delivery_selector=_pick_second,
+        )
+        assert row is not None
+        assert row["delivered_at"] == 1690000200
+        assert row["result"] == '{"is_valid": true}'
+
+    def test_custom_selector_none_return_leaves_row_undelivered(self) -> None:
+        """A selector that returns ``None`` degrades to 'asked but not delivered'.
+
+        Leaves ``result``/``delivered_at`` empty; the row is still
+        written (``fired_at`` comes from the request body). The seeded
+        row rehydrates into a request with ``deliveries: []`` and
+        scan_markets classifies the market as unanswered -- correct
+        when the selector genuinely can't find a usable delivery.
+        """
+        deliveries = [
+            {"id": "0xdel1", "blockTimestamp": "1690000100", "toolResponse": "junk"}
+        ]
+        row = mech_cache.subgraph_row_to_cache_row(
+            self._subgraph_row(deliveries=deliveries),
+            delivery_selector=lambda _d: None,
+        )
+        assert row is not None
+        assert row["delivered_at"] is None
+        assert row["result"] is None
 
     def test_round_trips_through_serialize_and_rehydrate(self) -> None:
         """A converted row survives serialize -> rehydrate with the same shape.
