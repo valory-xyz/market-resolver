@@ -157,16 +157,20 @@ class TestMechMarketplaceConfigParity:
     framework replaces atomically -- setting one field in ops replaces the
     whole dict. If the defaults across skill.yaml, aea-config.yaml and
     service.yaml drift, operators who don't override every key silently
-    lose fields (e.g. ``use_offchain`` disappears and downstream Python
+    lose fields (e.g. a poll timeout disappears and downstream Python
     picks up whichever default the framework happens to fall through to).
-    Pin the seven offchain fields to identical values across all three
-    layers. Missing this coverage was jmoreira's MEDIUM finding on PR #37.
+    Pin the offchain fields still inside the dict to identical values
+    across all three layers. Missing this coverage was jmoreira's MEDIUM
+    finding on PR #37.
+
+    ``use_offchain`` and ``offchain_deposit_target_calls`` moved out of
+    the marketplace-config dict in mech-interact v0.32.7 and are now
+    top-level ``MechParams`` args; ``TestTopLevelMechParamsParity``
+    below covers their cross-layer parity separately.
     """
 
     _OFFCHAIN_KEYS = (
-        "use_offchain",
         "offchain_url",
-        "offchain_deposit_target_calls",
         "auto_deposit_cap_per_cycle",
         "offchain_poll_interval_seconds",
         "offchain_poll_timeout_seconds",
@@ -217,13 +221,120 @@ class TestMechMarketplaceConfigParity:
                 f"service={service[key]!r}"
             )
 
+
+class TestTopLevelMechParamsParity:
+    """``use_offchain`` and ``offchain_deposit_target_calls`` are top-level.
+
+    Upstream ``mech-interact`` v0.32.7 (PR #113) hoisted these two out of
+    the ``MechMarketplaceConfig`` dict into ``MechParams`` itself, with a
+    fail-loud migration guard: leaving either key nested in the composed
+    ``mech_marketplace_config`` mapping raises at ``MechParams.__init__``.
+    Assert that every layer declares them at the top level of the
+    ``params.args`` block, with the ships-dark ``use_offchain=false``
+    default preserved across all three files.
+    """
+
+    _TOP_LEVEL_KEYS = ("use_offchain", "offchain_deposit_target_calls")
+
+    def _skill_yaml_args(self) -> Dict[str, Any]:
+        data = _load_composed_skill_yaml()
+        return data["models"]["params"]["args"]
+
+    def _multi_doc_args(self, yaml_path: Path) -> Dict[str, Any]:
+        """Extract the ``params.args`` block from a multi-doc yaml file.
+
+        Both ``aea-config.yaml`` and ``service.yaml`` are multi-doc; the
+        skill block lives under ``public_id: valory/market_resolver_abci``.
+        The top-level env-var wrappers (``${USE_OFFCHAIN:bool:false}`` etc)
+        parse to strings under ``yaml.safe_load``, which is the shape we
+        want to introspect here -- see ``_parse_env_default`` below.
+        """
+        docs = list(yaml.safe_load_all(yaml_path.read_text()))
+        for doc in docs:
+            if not isinstance(doc, dict):
+                continue
+            if str(doc.get("public_id", "")).startswith("valory/market_resolver_abci"):
+                return doc["models"]["params"]["args"]  # type: ignore[no-any-return]
+        raise AssertionError(
+            f"market_resolver_abci block missing from {yaml_path.name}"
+        )
+
+    @staticmethod
+    def _parse_env_default(value: Any) -> Any:
+        """Peel a ``${VAR:type:default}`` env-var wrapper down to its default.
+
+        Plain scalars pass through untouched so this helper works uniformly
+        against ``skill.yaml`` (plain values) and ``aea-config.yaml`` /
+        ``service.yaml`` (env-var-wrapped values). The parser is intentionally
+        small; it only handles ``bool`` and ``int`` because those are the
+        two hoisted keys.
+        """
+        if not isinstance(value, str) or not value.startswith("${"):
+            return value
+        # ``${NAME:type:default}`` -- default is everything after the second colon
+        inner = value.removeprefix("${").rstrip("}")
+        parts = inner.split(":", 2)
+        assert len(parts) == 3, f"malformed env-var wrapper: {value!r}"
+        _, kind, default = parts
+        if kind == "bool":
+            return {"true": True, "false": False}[default.lower()]
+        if kind == "int":
+            return int(default)
+        raise AssertionError(f"unsupported env-var type in this test: {kind!r}")
+
+    def test_top_level_keys_present_on_all_three_layers(self) -> None:
+        """The two hoisted keys must exist at ``params.args`` on every layer."""
+        skill = self._skill_yaml_args()
+        agent = self._multi_doc_args(_AGENT_CONFIG_YAML)
+        service = self._multi_doc_args(_SERVICE_YAML)
+
+        for key in self._TOP_LEVEL_KEYS:
+            assert key in skill, f"skill.yaml missing top-level {key!r}"
+            assert key in agent, f"aea-config.yaml missing top-level {key!r}"
+            assert key in service, f"service.yaml missing top-level {key!r}"
+
+    def test_top_level_defaults_agree_across_layers(self) -> None:
+        """The three yaml layers must agree on the default values."""
+        skill = self._skill_yaml_args()
+        agent = self._multi_doc_args(_AGENT_CONFIG_YAML)
+        service = self._multi_doc_args(_SERVICE_YAML)
+
+        for key in self._TOP_LEVEL_KEYS:
+            s = self._parse_env_default(skill[key])
+            a = self._parse_env_default(agent[key])
+            v = self._parse_env_default(service[key])
+            assert s == a == v, (
+                f"top-level {key} drift: " f"skill={s!r} agent={a!r} service={v!r}"
+            )
+
     def test_use_offchain_defaults_false(self) -> None:
         """Ships-dark invariant: default must be ``false`` on all 3 layers."""
-        skill = self._skill_yaml_mmc()
-        agent = self._config_yaml_mmc()
-        service = self._service_yaml_mmc()
-        for name, dumped in (("skill", skill), ("agent", agent), ("service", service)):
-            assert dumped["use_offchain"] is False, (
+        skill = self._skill_yaml_args()
+        agent = self._multi_doc_args(_AGENT_CONFIG_YAML)
+        service = self._multi_doc_args(_SERVICE_YAML)
+        for name, args in (("skill", skill), ("agent", agent), ("service", service)):
+            assert self._parse_env_default(args["use_offchain"]) is False, (
                 f"{name}.yaml default use_offchain must be false -- flipping "
                 "it on requires operator opt-in per PR #37's description."
             )
+
+    def test_marketplace_dict_no_longer_carries_hoisted_keys(self) -> None:
+        """After v0.32.7, leaving either key in the dict trips the guard.
+
+        Guard against operators (or future refactors) re-nesting these
+        keys inside the ``mech_marketplace_config`` dict, which would boot
+        the agent into the fail-loud ``MechParams.__init__`` migration
+        error introduced by mech-interact PR #113.
+        """
+        parity = TestMechMarketplaceConfigParity()
+        for name, dumped in (
+            ("skill", parity._skill_yaml_mmc()),
+            ("agent", parity._config_yaml_mmc()),
+            ("service", parity._service_yaml_mmc()),
+        ):
+            for key in self._TOP_LEVEL_KEYS:
+                assert key not in dumped, (
+                    f"{name}.yaml still has {key!r} inside mech_marketplace_config; "
+                    "mech-interact v0.32.7 hoisted this to a top-level MechParams "
+                    "arg and MechParams.__init__ raises ValueError if it stays nested."
+                )

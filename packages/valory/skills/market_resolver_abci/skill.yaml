@@ -17,7 +17,7 @@ fingerprint:
   models.py: bafybeidsszitssqqgcdsgmxvaefp2wm7xq7swvqfvvxlz4ah5vz6yl2knq
   tests/__init__.py: bafybeibb6rglfusig6k56wjqe6pofhyjt2hbknwk6culahlooxo73bx2lu
   tests/test_behaviours.py: bafybeihencjmvknad45fimyeefym5x727iodmwbv435rswbyrmv6nqm3qi
-  tests/test_composition.py: bafybeifyw357hunx54f2dom4whj2r6q6fpm5qdeeyvjuwda2jpr2rxycuy
+  tests/test_composition.py: bafybeid334jt2zwmxqtly6qpdtk7z4xylsyuq24lq5tlcqq47uhs54zk3e
   tests/test_dialogues.py: bafybeihliu56ebvohw4xeztkingoyyqtb5ivcpkw6gn6cqdghbb5i7hzd4
   tests/test_handlers.py: bafybeih3zrglr7i4vqrpgebopapd2vzdwh3ad5lpokfveoywm5ei2ttw3m
   tests/test_models.py: bafybeidb2pfq4zci2f6nqfylggmzxjdfpv7aa5jtyt7i47tgunu5lupdly
@@ -40,8 +40,8 @@ skills:
 - valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeih66m7lseo6wottezai5d226ojokkrfbbb2eq6omw2m7vwly2h4fi
 - valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeib32ylhxf62axwjbyxqd274dp4pr2xs27jd62l2tcr3jzl7q5lvyy
 - valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeifhod5bey772duh2ypnmpsqmd2t4jxosbe3u5lwvh5q57zf3smcoq
-- valory/mech_interact_abci:0.1.0:bafybeifbkpgivxjexlhrptn2iaju7vyzeusevvucsin6tbjwveniykad2q
-- valory/market_resolution_manager_abci:0.1.0:bafybeihg5ysbo275hzocaec2h53ybkzo6yowuwub3utc5vt6vvscnrdezi
+- valory/mech_interact_abci:0.1.0:bafybeic5xfxdod5l56o7aojdamojnvi562nql2mlah73bf47d4guz4xnwi
+- valory/market_resolution_manager_abci:0.1.0:bafybeie3jpn5bsxviryyy3dx5tnkqvsxrntuwtbbre4enjf2l6zy7y4gpa
 behaviours:
   main:
     args: {}
@@ -190,6 +190,8 @@ models:
       mech_interact_round_timeout_seconds: 1200
       mech_interaction_sleep_time: 10
       use_mech_marketplace: true
+      use_offchain: false
+      offchain_deposit_target_calls: 10
       mech_marketplace_config:
         mech_marketplace_address: '0x735FAAb1c4Ec41128c367AFb5c3baC73509f70bB'
         priority_mech_address: '0x601024E27f1C67B28209E24272CED8A31fc8151F'
@@ -198,9 +200,7 @@ models:
         requester_staking_instance_address: '0xeF44Fb0842DDeF59D37f85D61A1eF492bbA6135d'
         response_timeout: 300
         use_dynamic_mech_selection: false
-        use_offchain: false
         offchain_url: null
-        offchain_deposit_target_calls: 10
         auto_deposit_cap_per_cycle: 5000000000000000000
         offchain_poll_interval_seconds: 3.0
         offchain_poll_timeout_seconds: 300.0
