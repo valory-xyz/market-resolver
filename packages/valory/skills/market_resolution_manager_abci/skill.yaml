@@ -54,7 +54,7 @@ protocols:
 - valory/kv_store:0.1.0:bafybeidlfrgv5rc7m7kj3j6u6umogmpy5bgcdzqtnsy3v75wn3likvyt6m
 skills:
 - valory/abstract_round_abci:0.1.0:bafybeifkxnvvgsldkb4rgejsoon2mvrmrnl7asy2nhenwss7hpwg3myflu
-- valory/mech_interact_abci:0.1.0:bafybeifbkpgivxjexlhrptn2iaju7vyzeusevvucsin6tbjwveniykad2q
+- valory/mech_interact_abci:0.1.0:bafybeic5xfxdod5l56o7aojdamojnvi562nql2mlah73bf47d4guz4xnwi
 - valory/transaction_settlement_abci:0.1.0:bafybeihizaapype5sz7vlosms3nfo6jzfj4ujycuf5uthviq2otvmw6f6m
 - valory/funds_forwarder_abci:0.1.0:bafybeiaeuq3j44d3h4msbsc4zwqphpk4xt2z65u5rkicvdd2bdy75ipeze
 - valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeih66m7lseo6wottezai5d226ojokkrfbbb2eq6omw2m7vwly2h4fi
