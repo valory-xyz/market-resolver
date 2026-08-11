@@ -72,7 +72,7 @@ override-dependencies = ["cffi<2.1"]
 # omen_* resolution skills, and genai for the llm protocol + openai
 # connection.
 upstream_pins = [
-    "valory-xyz/mech-interact@v0.32.7",
+    "valory-xyz/mech-interact@v0.32.8",
     # mech ships the `valory/balance_tracker` contract that
     # mech_interact_abci (v0.32.4+) references via YAML.
     "valory-xyz/mech@v0.34.2-rc2",
