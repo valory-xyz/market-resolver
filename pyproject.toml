@@ -76,8 +76,8 @@ upstream_pins = [
     # mech ships the `valory/balance_tracker` contract that
     # mech_interact_abci (v0.32.4+) references via YAML.
     "valory-xyz/mech@v0.36.0",
-    "valory-xyz/omen-protocol@v0.1.4",
-    "valory-xyz/genai@v7.2.2",
+    "valory-xyz/omen-protocol@v0.1.5",
+    "valory-xyz/genai@v7.2.5",
     # kv-store 0.7.0-rc1 is the first release that ships LIST/DELETE
     # performatives + pagination. Needed for market-resolver's "have I
     # asked this market?" cache (see docs/market_resolver_offchain_scope.md
