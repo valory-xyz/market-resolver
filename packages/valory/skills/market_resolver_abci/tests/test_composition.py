@@ -27,7 +27,6 @@ from typing import Any, Dict
 
 import yaml
 
-import packages.valory.skills.market_resolver_abci
 import packages.valory.skills.market_resolver_abci.composition  # noqa: F401
 
 
@@ -35,9 +34,11 @@ def test_import() -> None:
     """Test that the composition module can be imported."""
 
 
-_COMPOSED_SKILL_YAML = (
-    Path(packages.valory.skills.market_resolver_abci.__file__).parent / "skill.yaml"
-)
+# Resolve paths from this file, not from the package attribute: aea imports
+# skill test modules when it loads the skill, and there `packages` has no
+# `valory` attribute.
+_SKILL_DIR = Path(__file__).resolve().parents[1]
+_COMPOSED_SKILL_YAML = _SKILL_DIR / "skill.yaml"
 
 
 def _load_composed_skill_yaml() -> Any:
@@ -120,16 +121,10 @@ class TestKvStoreComposedWiring:
 
 
 _AGENT_CONFIG_YAML = (
-    Path(packages.valory.skills.market_resolver_abci.__file__).parent.parent.parent
-    / "agents"
-    / "market_resolver"
-    / "aea-config.yaml"
+    _SKILL_DIR.parent.parent / "agents" / "market_resolver" / "aea-config.yaml"
 )
 _SERVICE_YAML = (
-    Path(packages.valory.skills.market_resolver_abci.__file__).parent.parent.parent
-    / "services"
-    / "market_resolver"
-    / "service.yaml"
+    _SKILL_DIR.parent.parent / "services" / "market_resolver" / "service.yaml"
 )
 
 
