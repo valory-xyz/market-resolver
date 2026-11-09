@@ -37,11 +37,11 @@ skills:
 - valory/transaction_settlement_abci:0.1.0:bafybeidkkgo6tmpybsmzun3tnxrfzdkjvtvaxgqhx52yw3657tn25ybkri
 - valory/identify_service_owner_abci:0.1.0:bafybeicujogydxwsn3yjqgrjzrwgkeinxjyupsapl7g3b6wnc4krfk3upu
 - valory/funds_forwarder_abci:0.1.0:bafybeiepusn4y66o5ydx4veou6n6f5glsh2uam26dvhdxomdyjbdmjkytu
-- valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeibgvy6shgzjcabm2gcmjc2gft7ja3g46jbmcylgxrlscsmcw3aaqm
+- valory/omen_ct_redeem_tokens_abci:0.1.0:bafybeic3ggfheci4vvlpfyiytsq3h2sevp7l5xdhmwodvaleszflat2xmm
 - valory/omen_fpmm_remove_liquidity_abci:0.1.0:bafybeiew2i2wp4jvtbw5ppxdakw2qvte7ulz4kkfgczshbbqfbchyg4rgm
 - valory/omen_realitio_withdraw_bonds_abci:0.1.0:bafybeickxlykeaqxuyw3mp54kdrlqx7bmqotd66pnx2rozzviolr3t4i6m
 - valory/mech_interact_abci:0.1.0:bafybeid6ay4xgm4bs4nmbarl5fc6ygonrunh5im3acdu2xe2yzgzbp2b3m
-- valory/market_resolution_manager_abci:0.1.0:bafybeifcsym43pxfclwevhyz5tnqau5gpf56iynzruhut5todi36p6pkd4
+- valory/market_resolution_manager_abci:0.1.0:bafybeidzgwlywc7hwgmovh3hywhsvq6frcjc7mvh2wxegxoehgzcbopzri
 behaviours:
   main:
     args: {}
